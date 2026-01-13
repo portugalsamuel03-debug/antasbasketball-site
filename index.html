@@ -11,7 +11,7 @@
     <!-- Tailwind via CDN (ok por enquanto) -->
     <script src="https://cdn.tailwindcss.com"></script>
 
-    <!-- Fonte -->
+    <!-- Fonte Inter -->
     <link
       href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap"
       rel="stylesheet"
@@ -25,30 +25,47 @@
         overflow-x: hidden;
         -webkit-overflow-scrolling: touch;
       }
+
       ::-webkit-scrollbar { width: 4px; height: 0px; }
       ::-webkit-scrollbar-track { background: transparent; }
       ::-webkit-scrollbar-thumb { background: rgba(250, 203, 41, 0.2); border-radius: 20px; }
+
       .no-scrollbar::-webkit-scrollbar { display: none; }
       .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
       .mask-horizontal {
         mask-image: linear-gradient(to right, black 90%, transparent 100%);
         -webkit-mask-image: linear-gradient(to right, black 90%, transparent 100%);
       }
+
       .mask-horizontal-both {
         mask-image: linear-gradient(to right, transparent 0%, black 10%, black 90%, transparent 100%);
         -webkit-mask-image: linear-gradient(to right, transparent 0%, black 10%, black 90%, transparent 100%);
       }
+
       .animate-float { animation: float 3s ease-in-out infinite; }
-      @keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-5px); } }
-      :focus-visible { outline: 2px solid #facb29; outline-offset: 2px; }
-      .scroll-container-relative { position: relative; display: flex; align-items: center; }
+      @keyframes float {
+        0%, 100% { transform: translateY(0); }
+        50% { transform: translateY(-5px); }
+      }
+
+      :focus-visible {
+        outline: 2px solid #facb29;
+        outline-offset: 2px;
+      }
+
+      .scroll-container-relative {
+        position: relative;
+        display: flex;
+        align-items: center;
+      }
     </style>
   </head>
 
   <body class="bg-black text-white antialiased">
     <div id="root"></div>
 
-    <!-- Entry point do Vite -->
-    <script type="module" src="/src/main.tsx"></script>
+    <!-- Entry correto para seu projeto -->
+    <script type="module" src="/index.tsx"></script>
   </body>
 </html>
