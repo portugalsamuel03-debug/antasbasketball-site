@@ -1,0 +1,8 @@
+{
+  "name": "Antas Basketball Blog",
+  "description": "A high-performance, mobile-focused blog for basketball enthusiasts with a premium dark aesthetic and AI integration.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ]
+}
