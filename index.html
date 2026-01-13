@@ -2,11 +2,20 @@
 <html lang="pt-BR" class="scroll-smooth">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
+    />
     <title>Antas Basketball Blog</title>
 
+    <!-- Tailwind via CDN (ok por enquanto) -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+
+    <!-- Fonte -->
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap"
+      rel="stylesheet"
+    />
 
     <style>
       body {
@@ -39,7 +48,7 @@
   <body class="bg-black text-white antialiased">
     <div id="root"></div>
 
-    <!-- ESSA LINHA É A QUE FAZ FUNCIONAR NA VERCEL -->
+    <!-- Entry point do Vite -->
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
