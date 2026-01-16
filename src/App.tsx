@@ -8,7 +8,7 @@ import AuthPopup from "./components/AuthPopup";
 import AdminPanel from "./components/AdminPanel";
 
 import { supabase } from "./lib/supabase";
-import { getMyRole } from "./services/admin";
+import { getMyRole } from "./admin";
 
 // ⚠️ Ajuste o caminho do geminiService conforme sua estrutura.
 // Pelo seu print existe uma pasta /services na raiz do projeto, então esse tende a funcionar:

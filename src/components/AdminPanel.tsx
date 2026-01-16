@@ -10,7 +10,7 @@ import {
   ArticleRow,
   AuthorRow,
   TagRow,
-} from "../services/cms";
+} from "../cms";
 
 type Tab = "POSTS" | "AUTORES" | "TAGS";
 

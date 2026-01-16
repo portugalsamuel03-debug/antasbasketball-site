@@ -1,20 +1,17 @@
-import { supabase } from "../lib/supabase";
+import { supabase } from "./lib/supabase";
 
-export type Role = "user" | "admin";
-
-export async function getMyRole(): Promise<Role> {
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return "user";
+export async function getMyRole(): Promise<"admin" | "reader" | null> {
+  const { data: userData } = await supabase.auth.getUser();
+  const user = userData?.user;
+  if (!user) return null;
 
   const { data, error } = await supabase
     .from("profiles")
     .select("role")
     .eq("id", user.id)
-    .maybeSingle();
+    .single();
 
-  if (error) {
-    console.error("getMyRole error:", error);
-    return "user";
-  }
-  return (data?.role as Role) ?? "user";
+  if (error) return null;
+
+  return (data?.role ?? null) as "admin" | "reader" | null;
 }
