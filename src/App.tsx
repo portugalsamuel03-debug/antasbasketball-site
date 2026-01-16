@@ -1,111 +1,191 @@
-import React, { useState, useMemo, useEffect, useRef } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from "react";
 
-import Header from './components/Header';
-import SearchBar from './components/SearchBar';
-import FeaturedReaders from './components/FeaturedReaders';
-import FeaturedAuthors from './components/FeaturedAuthors';
-import SectionTitle from './components/SectionTitle';
-import ArticleCard from './components/ArticleCard';
-import BottomNav from './components/BottomNav';
-import NotificationPopup from './components/NotificationPopup';
-import AuthPopup from './components/AuthPopup';
-import ArticleView from './components/ArticleView';
-import ChampionDetailPopup from './components/ChampionDetailPopup';
-import HallOfFameDetailPopup from './components/HallOfFameDetailPopup';
-import ShareModal from './components/ShareModal';
+import Header from "./components/Header";
+import SearchBar from "./components/SearchBar";
+import BottomNav from "./components/BottomNav";
+import NotificationPopup from "./components/NotificationPopup";
+import AuthPopup from "./components/AuthPopup";
+import AdminPanel from "./components/AdminPanel";
 
-import { Category, SortOption, Article, HistoriaSubTab, RegrasSubTab, Champion, HallOfFame as HallOfFameType } from './types';
-import { ARTICLES, CHAMPIONS, HALL_OF_FAME, AUTHORS } from './constants';
-import { askGeminiAboutBasketball } from '../services/geminiService';
+import { supabase } from "./lib/supabase";
+import { getMyRole } from "./services/admin";
 
-import {
-  MessageCircle,
-  X,
-  ChevronUp,
-  Trophy,
-  Star,
-  BookOpen,
-  Tag,
-  Bookmark,
-  User,
-  Repeat,
-  UserX,
-  Layout,
-  FileText,
-  ChevronRight,
-  ChevronLeft
-} from 'lucide-react';
+// ⚠️ Ajuste o caminho do geminiService conforme sua estrutura.
+// Pelo seu print existe uma pasta /services na raiz do projeto, então esse tende a funcionar:
+import { askGeminiAboutBasketball } from "../services/geminiService";
+
+// Tipos (confere se estão em src/types.ts)
+import { Category, SortOption } from "./types";
 
 const App: React.FC = () => {
+  // ======= Estado do app (igual o seu) =======
   const [activeTab, setActiveTab] = useState<Category>(Category.INICIO);
-  const [historiaSubTab, setHistoriaSubTab] = useState<HistoriaSubTab>('ARTIGOS');
-  const [regrasSubTab, setRegrasSubTab] = useState<RegrasSubTab>('ARTIGOS');
-  const [selectedTag, setSelectedTag] = useState<string | null>(null);
-  const [selectedAuthorId, setSelectedAuthorId] = useState<string | null>(null);
   const [isDarkMode, setIsDarkMode] = useState(true);
+
   const [aiResponse, setAiResponse] = useState<string | null>(null);
   const [isAIProcessing, setIsAIProcessing] = useState(false);
+
   const [isNotifOpen, setIsNotifOpen] = useState(false);
   const [isAuthOpen, setIsAuthOpen] = useState(false);
-  const [sortOption, setSortOption] = useState<SortOption>('RECENTES');
-  const [selectedArticle, setSelectedArticle] = useState<Article | null>(null);
-  const [selectedChampion, setSelectedChampion] = useState<Champion | null>(null);
-  const [selectedHallMember, setSelectedHallMember] = useState<HallOfFameType | null>(null);
-  const [articleToShare, setArticleToShare] = useState<Article | null>(null);
+
+  const [sortOption, setSortOption] = useState<SortOption>("RECENTES");
+
+  // ======= Admin/Auth =======
+  const [authReady, setAuthReady] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  // ======= Scroll / UI (se você quiser manter depois) =======
   const [scrollProgress, setScrollProgress] = useState(0);
   const [showBackToTop, setShowBackToTop] = useState(false);
-  const [savedIds, setSavedIds] = useState<string[]>([]);
 
   const subTabsRef = useRef<HTMLDivElement>(null);
   const tagsRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    const updateSaved = () => {
-      setSavedIds(JSON.parse(localStorage.getItem('readLaterArticles') || '[]'));
-    };
-    updateSaved();
-    window.addEventListener('readLaterUpdated', updateSaved);
-    return () => window.removeEventListener('readLaterUpdated', updateSaved);
+  // ======= Admin Mode via querystring =======
+  const isAdminMode = useMemo(() => {
+    return new URLSearchParams(window.location.search).get("admin") === "1";
   }, []);
 
+  // ======= Boot auth + role =======
+  useEffect(() => {
+    let mounted = true;
+
+    async function boot() {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
+      if (session?.user) {
+        const role = await getMyRole();
+        if (mounted) setIsAdmin(role === "admin");
+      } else {
+        if (mounted) setIsAdmin(false);
+      }
+
+      if (mounted) setAuthReady(true);
+    }
+
+    boot();
+
+    const { data: sub } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      if (!mounted) return;
+
+      if (session?.user) {
+        const role = await getMyRole();
+        setIsAdmin(role === "admin");
+      } else {
+        setIsAdmin(false);
+      }
+    });
+
+    return () => {
+      mounted = false;
+      sub.subscription.unsubscribe();
+    };
+  }, []);
+
+  // ======= Scroll progress / back to top =======
   useEffect(() => {
     const handleScroll = () => {
       const totalScroll = document.documentElement.scrollHeight - window.innerHeight;
       const currentScroll = window.scrollY;
       const progress = totalScroll > 0 ? (currentScroll / totalScroll) * 100 : 0;
+
       setScrollProgress(progress);
       setShowBackToTop(currentScroll > 600);
     };
-    window.addEventListener('scroll', handleScroll, { passive: true });
-    return () => window.removeEventListener('scroll', handleScroll);
+
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
+  // ======= Lock scroll when popup open =======
   useEffect(() => {
-    if (selectedArticle || isNotifOpen || isAuthOpen || selectedChampion || selectedHallMember || articleToShare) {
-      document.body.style.overflow = 'hidden';
+    if (isNotifOpen || isAuthOpen) {
+      document.body.style.overflow = "hidden";
     } else {
-      document.body.style.overflow = '';
+      document.body.style.overflow = "";
     }
-    return () => { document.body.style.overflow = ''; };
-  }, [selectedArticle, isNotifOpen, isAuthOpen, selectedChampion, selectedHallMember, articleToShare]);
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [isNotifOpen, isAuthOpen]);
 
+  // ======= Theme =======
   const toggleTheme = () => {
     const newMode = !isDarkMode;
     setIsDarkMode(newMode);
-    document.body.className = newMode ? 'bg-black text-white antialiased' : 'bg-[#FDFBF4] text-[#0B1D33] antialiased';
+    document.body.className = newMode
+      ? "bg-black text-white antialiased"
+      : "bg-[#FDFBF4] text-[#0B1D33] antialiased";
   };
 
+  // ======= Search (Gemini) =======
   const handleSearch = async (query: string) => {
-    setIsAIProcessing(true);
-    const response = await askGeminiAboutBasketball(query);
-    setAiResponse(response);
-    setIsAIProcessing(false);
+    try {
+      setIsAIProcessing(true);
+      const response = await askGeminiAboutBasketball(query);
+      setAiResponse(response);
+    } catch (e) {
+      console.error(e);
+      setAiResponse("Deu ruim na Antas AI. Tenta de novo em alguns segundos 😅");
+    } finally {
+      setIsAIProcessing(false);
+    }
   };
 
-  const scrollToTop = () => window.scrollTo({ top: 0, behavior: 'smooth' });
+  const scrollToTop = () => window.scrollTo({ top: 0, behavior: "smooth" });
 
+  // ======= Admin gate =======
+  if (!authReady) {
+    return (
+      <div className="min-h-screen bg-black text-white flex items-center justify-center">
+        Carregando…
+      </div>
+    );
+  }
+
+  if (isAdminMode) {
+    if (!isAdmin) {
+      return (
+        <div className="min-h-screen bg-black text-white flex items-center justify-center p-6 text-center">
+          <div>
+            <div className="text-xl font-black">Admin bloqueado</div>
+            <div className="text-gray-400 mt-2 text-sm">
+              Você precisa estar logado com uma conta <b>admin</b>.
+            </div>
+            <div className="text-gray-500 mt-2 text-xs">
+              Dica: abre o site normal, faz login e volta em <b>/?admin=1</b>.
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div className="min-h-screen bg-black">
+        <AdminPanel />
+      </div>
+    );
+  }
+
+  // ======= App normal =======
   return (
-    <div className={`min-h-screen flex flex-col pb-32 max-w-md mx-auto relative transition-all duration-500 ${isDarkMode ? 'bg-black text-white' : 'bg-[#FDFBF4] text-[#0B1D33]'}`}>
+    <div
+      className={`min-h-screen flex flex-col pb-32 max-w-md mx-auto relative transition-all duration-500 ${
+        isDarkMode ? "bg-black text-white" : "bg-[#FDFBF4] text-[#0B1D33]"
+      }`}
+    >
+      {/* Barra de progresso opcional */}
+      <div className="fixed top-0 left-0 right-0 h-1 z-[100] flex justify-center max-w-md mx-auto">
+        <div
+          className={`h-full transition-all duration-300 ease-out shadow-[0_0_10px_rgba(250,203,41,0.3)] ${
+            isDarkMode ? "bg-yellow-400" : "bg-[#0B1D33]"
+          }`}
+          style={{ width: `${scrollProgress}%` }}
+        />
+      </div>
+
       <Header
         isDarkMode={isDarkMode}
         onToggleTheme={toggleTheme}
@@ -113,7 +193,43 @@ const App: React.FC = () => {
         onOpenAuth={() => setIsAuthOpen(true)}
       />
 
-      <SearchBar isDarkMode={isDarkMode} onSearch={handleSearch} isAIProcessing={isAIProcessing} />
+      <main className="flex-1">
+        <SearchBar isDarkMode={isDarkMode} onSearch={handleSearch} isAIProcessing={isAIProcessing} />
+
+        {aiResponse && (
+          <div className="px-6 mt-4">
+            <div
+              className={`border rounded-[28px] p-6 relative shadow-2xl backdrop-blur-md ${
+                isDarkMode ? "bg-yellow-400/10 border-yellow-400/30" : "bg-[#0B1D33]/5 border-[#0B1D33]/10"
+              }`}
+            >
+              <button
+                onClick={() => setAiResponse(null)}
+                className="absolute top-4 right-4 p-1.5 rounded-full transition-colors text-gray-500 hover:text-white"
+              >
+                ✕
+              </button>
+              <div className="text-[11px] font-black uppercase tracking-widest text-yellow-400 mb-2">
+                Antas AI
+              </div>
+              <p className={`text-sm italic font-medium ${isDarkMode ? "text-yellow-50/90" : "text-[#0B1D33]/80"}`}>
+                "{aiResponse}"
+              </p>
+            </div>
+          </div>
+        )}
+      </main>
+
+      {showBackToTop && (
+        <button
+          onClick={scrollToTop}
+          className={`fixed bottom-36 right-6 p-4 rounded-full shadow-2xl z-[70] active:scale-90 ${
+            isDarkMode ? "bg-yellow-400 text-black" : "bg-[#0B1D33] text-white"
+          }`}
+        >
+          ↑
+        </button>
+      )}
 
       <BottomNav activeTab={activeTab} onTabChange={setActiveTab} isDarkMode={isDarkMode} />
 

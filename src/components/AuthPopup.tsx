@@ -1,8 +1,7 @@
-import React, { useMemo, useState } from "react";
+import React, { useState } from "react";
 import { X, Dribbble, ChevronDown } from "lucide-react";
 import { NBA_TEAMS } from "../constants";
 import { supabase } from "../lib/supabase";
-
 
 interface AuthPopupProps {
   isOpen: boolean;
@@ -11,100 +10,68 @@ interface AuthPopupProps {
 
 const AuthPopup: React.FC<AuthPopupProps> = ({ isOpen, onClose }) => {
   const [view, setView] = useState<"LOGIN" | "SIGNUP">("LOGIN");
+  const [selectedTeam, setSelectedTeam] = useState("");
 
-  // LOGIN
   const [loginEmail, setLoginEmail] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
 
-  // SIGNUP
   const [fullName, setFullName] = useState("");
   const [signupEmail, setSignupEmail] = useState("");
-  const [selectedTeam, setSelectedTeam] = useState("");
   const [signupPassword, setSignupPassword] = useState("");
 
   const [loading, setLoading] = useState(false);
-  const [msg, setMsg] = useState<{ type: "error" | "success"; text: string } | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+
+  if (!isOpen) return null;
 
   const inputClasses =
     "w-full bg-[#F0F4F8] border-none rounded-2xl py-4 px-6 text-sm text-[#0B1D33] focus:ring-2 focus:ring-[#0B1D33]/20 outline-none transition-all placeholder:text-gray-400 font-medium";
 
-  const canLogin = useMemo(() => {
-    return loginEmail.trim().length > 3 && loginPassword.trim().length >= 6;
-  }, [loginEmail, loginPassword]);
-
-  const canSignup = useMemo(() => {
-    return (
-      fullName.trim().length >= 3 &&
-      signupEmail.trim().length > 3 &&
-      signupPassword.trim().length >= 6 &&
-      selectedTeam.trim().length > 0
-    );
-  }, [fullName, signupEmail, signupPassword, selectedTeam]);
-
-  if (!isOpen) return null;
-
-  function showError(text: string) {
-    setMsg({ type: "error", text });
-  }
-
-  function showSuccess(text: string) {
-    setMsg({ type: "success", text });
-  }
-
   async function handleLogin() {
-    setMsg(null);
+    setErr(null);
     setLoading(true);
     try {
-      // Obs: por enquanto é email mesmo. Username a gente adiciona depois.
       const { error } = await supabase.auth.signInWithPassword({
         email: loginEmail.trim(),
         password: loginPassword,
       });
-
-      if (error) {
-        showError(error.message);
-        return;
-      }
-
-      showSuccess("Logado ✅");
+      if (error) throw error;
       onClose();
     } catch (e: any) {
-      showError(e?.message ?? "Erro ao logar");
+      setErr(e?.message ?? "Erro ao entrar");
     } finally {
       setLoading(false);
     }
   }
 
   async function handleSignup() {
-    setMsg(null);
+    setErr(null);
     setLoading(true);
     try {
       const { data, error } = await supabase.auth.signUp({
         email: signupEmail.trim(),
         password: signupPassword,
         options: {
-          data: {
-            name: fullName.trim(),
-            team: selectedTeam,
-          },
+          data: { full_name: fullName },
         },
       });
+      if (error) throw error;
 
-      if (error) {
-        showError(error.message);
-        return;
-      }
-
-      // Dependendo da config do Supabase, pode pedir confirmação por email
-      if (data.user && !data.session) {
-        showSuccess("Conta criada! Confirme no e-mail para entrar ✅");
-      } else {
-        showSuccess("Conta criada e logado ✅");
+      // Atualiza campos extras do profile (trigger já cria o profile)
+      const userId = data.user?.id;
+      if (userId) {
+        await supabase
+          .from("profiles")
+          .update({
+            display_name: fullName,
+            favorite_team: selectedTeam || null,
+          })
+          .eq("id", userId);
       }
 
       onClose();
     } catch (e: any) {
-      showError(e?.message ?? "Erro ao criar conta");
+      setErr(e?.message ?? "Erro ao criar conta");
     } finally {
       setLoading(false);
     }
@@ -112,8 +79,10 @@ const AuthPopup: React.FC<AuthPopupProps> = ({ isOpen, onClose }) => {
 
   return (
     <div className="fixed inset-0 z-[150] flex items-center justify-center px-6">
-      <div className="absolute inset-0 bg-[#0B1D33]/60 backdrop-blur-md" onClick={onClose}></div>
-
+      <div
+        className="absolute inset-0 bg-[#0B1D33]/60 backdrop-blur-md"
+        onClick={onClose}
+      />
       <div className="relative w-full max-w-sm bg-white rounded-[50px] overflow-hidden shadow-[0_20px_60px_rgba(0,0,0,0.3)] animate-in zoom-in-95 duration-300 p-8 flex flex-col items-center">
         <button
           onClick={onClose}
@@ -129,18 +98,15 @@ const AuthPopup: React.FC<AuthPopupProps> = ({ isOpen, onClose }) => {
         <h2 className="text-2xl font-black text-[#0B1D33] uppercase italic tracking-tighter mb-1">
           BORA A NOSSA
         </h2>
-        <p className="text-[11px] font-bold text-gray-400 uppercase tracking-widest mb-5 text-center px-4 leading-tight">
-          {view === "LOGIN" ? "Junte-se à maior comunidade de basquete." : "Se identifique, meliante"}
+        <p className="text-[11px] font-bold text-gray-400 uppercase tracking-widest mb-6 text-center px-4 leading-tight">
+          {view === "LOGIN"
+            ? "Junte-se à maior comunidade de basquete."
+            : "Se identifique, meliante"}
         </p>
 
-        {/* mensagem */}
-        {msg && (
-          <div
-            className={`w-full mb-4 rounded-2xl px-4 py-3 text-sm font-semibold ${
-              msg.type === "error" ? "bg-red-50 text-red-700" : "bg-green-50 text-green-700"
-            }`}
-          >
-            {msg.text}
+        {!!err && (
+          <div className="w-full mb-4 text-[12px] font-bold text-red-600 bg-red-50 border border-red-200 rounded-2xl px-4 py-3">
+            {err}
           </div>
         )}
 
@@ -153,7 +119,6 @@ const AuthPopup: React.FC<AuthPopupProps> = ({ isOpen, onClose }) => {
                 className={inputClasses}
                 value={loginEmail}
                 onChange={(e) => setLoginEmail(e.target.value)}
-                autoComplete="email"
               />
               <input
                 type="password"
@@ -161,24 +126,16 @@ const AuthPopup: React.FC<AuthPopupProps> = ({ isOpen, onClose }) => {
                 className={inputClasses}
                 value={loginPassword}
                 onChange={(e) => setLoginPassword(e.target.value)}
-                autoComplete="current-password"
               />
-
               <button
                 onClick={handleLogin}
-                disabled={!canLogin || loading}
-                className={`w-full bg-[#0B1D33] text-white py-5 rounded-3xl font-black text-xs uppercase tracking-[0.2em] shadow-lg shadow-[#0B1D33]/20 active:scale-95 transition-all mt-4 ${
-                  (!canLogin || loading) ? "opacity-60 cursor-not-allowed" : ""
-                }`}
+                disabled={loading}
+                className="w-full bg-[#0B1D33] text-white py-5 rounded-3xl font-black text-xs uppercase tracking-[0.2em] shadow-lg shadow-[#0B1D33]/20 active:scale-95 transition-all mt-2 disabled:opacity-60"
               >
                 {loading ? "ENTRANDO..." : "ENTRAR NO TIME"}
               </button>
-
               <button
-                onClick={() => {
-                  setMsg(null);
-                  setView("SIGNUP");
-                }}
+                onClick={() => setView("SIGNUP")}
                 className="w-full bg-[#F0F4F8] text-[#0B1D33] py-5 rounded-3xl font-black text-xs uppercase tracking-[0.2em] active:scale-95 transition-all"
               >
                 CRIAR NOVA CONTA
@@ -192,16 +149,13 @@ const AuthPopup: React.FC<AuthPopupProps> = ({ isOpen, onClose }) => {
                 className={inputClasses}
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
-                autoComplete="name"
               />
-
               <input
                 type="email"
                 placeholder="SEU MELHOR E-MAIL"
                 className={inputClasses}
                 value={signupEmail}
                 onChange={(e) => setSignupEmail(e.target.value)}
-                autoComplete="email"
               />
 
               <div className="relative">
@@ -228,28 +182,21 @@ const AuthPopup: React.FC<AuthPopupProps> = ({ isOpen, onClose }) => {
 
               <input
                 type="password"
-                placeholder="CRIE UMA SENHA (mín. 6)"
+                placeholder="CRIE UMA SENHA"
                 className={inputClasses}
                 value={signupPassword}
                 onChange={(e) => setSignupPassword(e.target.value)}
-                autoComplete="new-password"
               />
 
               <button
                 onClick={handleSignup}
-                disabled={!canSignup || loading}
-                className={`w-full bg-[#0B1D33] text-white py-5 rounded-3xl font-black text-xs uppercase tracking-[0.2em] shadow-lg shadow-[#0B1D33]/20 active:scale-95 transition-all mt-4 ${
-                  (!canSignup || loading) ? "opacity-60 cursor-not-allowed" : ""
-                }`}
+                disabled={loading}
+                className="w-full bg-[#0B1D33] text-white py-5 rounded-3xl font-black text-xs uppercase tracking-[0.2em] shadow-lg shadow-[#0B1D33]/20 active:scale-95 transition-all mt-2 disabled:opacity-60"
               >
                 {loading ? "CRIANDO..." : "FINALIZAR ESCALAÇÃO"}
               </button>
-
               <button
-                onClick={() => {
-                  setMsg(null);
-                  setView("LOGIN");
-                }}
+                onClick={() => setView("LOGIN")}
                 className="w-full text-gray-400 py-2 font-black text-[10px] uppercase tracking-widest hover:text-[#0B1D33] transition-colors"
               >
                 Já tenho conta, quero entrar
