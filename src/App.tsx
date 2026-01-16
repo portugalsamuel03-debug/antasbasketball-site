@@ -7,18 +7,16 @@ import NotificationPopup from "./components/NotificationPopup";
 import AuthPopup from "./components/AuthPopup";
 import AdminPanel from "./components/AdminPanel";
 
-import { supabase } from "./lib/supabase";
+import { supabase, supabaseConfigError } from "./lib/supabase";
 import { getMyRole } from "./admin";
 
-// ⚠️ Ajuste o caminho do geminiService conforme sua estrutura.
-// Pelo seu print existe uma pasta /services na raiz do projeto, então esse tende a funcionar:
+// Se sua pasta services está na raiz do projeto (fora de src), isso costuma funcionar:
 import { askGeminiAboutBasketball } from "../services/geminiService";
 
-// Tipos (confere se estão em src/types.ts)
 import { Category, SortOption } from "./types";
 
 const App: React.FC = () => {
-  // ======= Estado do app (igual o seu) =======
+  // ======= Estado do app =======
   const [activeTab, setActiveTab] = useState<Category>(Category.INICIO);
   const [isDarkMode, setIsDarkMode] = useState(true);
 
@@ -33,8 +31,9 @@ const App: React.FC = () => {
   // ======= Admin/Auth =======
   const [authReady, setAuthReady] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [bootError, setBootError] = useState<string | null>(null);
 
-  // ======= Scroll / UI (se você quiser manter depois) =======
+  // ======= Scroll / UI =======
   const [scrollProgress, setScrollProgress] = useState(0);
   const [showBackToTop, setShowBackToTop] = useState(false);
 
@@ -46,35 +45,58 @@ const App: React.FC = () => {
     return new URLSearchParams(window.location.search).get("admin") === "1";
   }, []);
 
-  // ======= Boot auth + role =======
+  // ======= Boot auth + role (NUNCA travar no loading) =======
   useEffect(() => {
     let mounted = true;
 
     async function boot() {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
+      try {
+        // Se supabase não inicializou (env faltando), mostra erro e sai do loading
+        if (!supabase) {
+          if (mounted) setBootError(supabaseConfigError || "Supabase não inicializou.");
+          return;
+        }
 
-      if (session?.user) {
-        const role = await getMyRole();
-        if (mounted) setIsAdmin(role === "admin");
-      } else {
-        if (mounted) setIsAdmin(false);
+        const { data, error } = await supabase.auth.getSession();
+        if (error) throw error;
+
+        const session = data.session;
+
+        if (session?.user) {
+          const role = await getMyRole(); // deve retornar "admin" ou "reader"
+          if (mounted) setIsAdmin(role === "admin");
+        } else {
+          if (mounted) setIsAdmin(false);
+        }
+      } catch (e: any) {
+        console.error(e);
+        if (mounted) setBootError(e?.message || "Erro no boot do app.");
+      } finally {
+        if (mounted) setAuthReady(true);
       }
-
-      if (mounted) setAuthReady(true);
     }
 
     boot();
 
-    const { data: sub } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      if (!mounted) return;
+    // Se não tem supabase, nem assina auth state
+    if (!supabase) {
+      return () => {
+        mounted = false;
+      };
+    }
 
-      if (session?.user) {
-        const role = await getMyRole();
-        setIsAdmin(role === "admin");
-      } else {
-        setIsAdmin(false);
+    const { data: sub } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      try {
+        if (!mounted) return;
+
+        if (session?.user) {
+          const role = await getMyRole();
+          setIsAdmin(role === "admin");
+        } else {
+          setIsAdmin(false);
+        }
+      } catch (e) {
+        console.error(e);
       }
     });
 
@@ -136,15 +158,21 @@ const App: React.FC = () => {
 
   const scrollToTop = () => window.scrollTo({ top: 0, behavior: "smooth" });
 
-  // ======= Admin gate =======
+  // ======= Loading (agora mostra erro se existir) =======
   if (!authReady) {
     return (
-      <div className="min-h-screen bg-black text-white flex items-center justify-center">
-        Carregando…
+      <div className="min-h-screen bg-black text-white flex items-center justify-center p-6 text-center">
+        <div>
+          <div className="text-lg font-black">Carregando…</div>
+          {bootError && (
+            <div className="mt-3 text-sm text-red-300 whitespace-pre-wrap">{bootError}</div>
+          )}
+        </div>
       </div>
     );
   }
 
+  // ======= Admin gate =======
   if (isAdminMode) {
     if (!isAdmin) {
       return (
@@ -200,7 +228,9 @@ const App: React.FC = () => {
           <div className="px-6 mt-4">
             <div
               className={`border rounded-[28px] p-6 relative shadow-2xl backdrop-blur-md ${
-                isDarkMode ? "bg-yellow-400/10 border-yellow-400/30" : "bg-[#0B1D33]/5 border-[#0B1D33]/10"
+                isDarkMode
+                  ? "bg-yellow-400/10 border-yellow-400/30"
+                  : "bg-[#0B1D33]/5 border-[#0B1D33]/10"
               }`}
             >
               <button

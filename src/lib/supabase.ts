@@ -1,14 +1,14 @@
-import { createClient } from "@supabase/supabase-js";
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string;
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined;
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
 
-if (!supabaseUrl || !supabaseAnonKey) {
-  // Ajuda MUITO quando dá tela preta por env faltando
-  console.error("Supabase env missing:", {
-    VITE_SUPABASE_URL: !!supabaseUrl,
-    VITE_SUPABASE_ANON_KEY: !!supabaseAnonKey,
-  });
-}
+export const supabase: SupabaseClient | null =
+  supabaseUrl && supabaseAnonKey
+    ? createClient(supabaseUrl, supabaseAnonKey)
+    : null;
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+export const supabaseConfigError =
+  !supabaseUrl || !supabaseAnonKey
+    ? "Faltou configurar VITE_SUPABASE_URL e/ou VITE_SUPABASE_ANON_KEY (Vercel env)."
+    : null;
