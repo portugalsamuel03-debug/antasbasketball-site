@@ -3,6 +3,7 @@ import { X, Dribbble, ChevronDown } from "lucide-react";
 import { NBA_TEAMS } from "../constants";
 import { supabase } from "../lib/supabase";
 
+
 interface AuthPopupProps {
   isOpen: boolean;
   onClose: () => void;
