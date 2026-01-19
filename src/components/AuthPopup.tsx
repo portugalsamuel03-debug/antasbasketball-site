@@ -66,6 +66,16 @@ const AuthPopup: React.FC<AuthPopupProps> = ({ isOpen, onClose }) => {
 
     try {
       const { error } = await supabase.auth.signInWithPassword({
+  email: loginEmail.trim(),
+  password: loginPassword,
+});
+if (error) throw error;
+
+// garante que a sessão foi persistida antes de fechar o modal
+await supabase.auth.getSession();
+
+onClose();
+
         email: loginEmail.trim(),
         password: loginPassword,
       });
