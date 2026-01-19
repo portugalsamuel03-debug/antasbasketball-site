@@ -7,17 +7,11 @@ import BottomNav from "./components/BottomNav";
 import NotificationPopup from "./components/NotificationPopup";
 import AuthPopup from "./components/AuthPopup";
 import AdminPanel from "./components/AdminPanel";
-import SectionTitle from "./components/SectionTitle";
-import ArticleCard from "./components/ArticleCard";
 
 import { supabase } from "./lib/supabase";
 import { getMyRole } from "./admin";
-
 import { askGeminiAboutBasketball } from "./services/geminiService";
-import { fetchPublishedArticlesJoined } from "./services/articles";
-
-import { ARTICLES, AUTHORS } from "./constants";
-import { Article, Category, SortOption } from "./types";
+import { Category, SortOption } from "./types";
 
 function withTimeout<T>(promise: Promise<T>, ms = 8000): Promise<T> {
   return new Promise((resolve, reject) => {
@@ -34,40 +28,6 @@ function withTimeout<T>(promise: Promise<T>, ms = 8000): Promise<T> {
   });
 }
 
-// DB category (sem acento) -> enum do app (com acento)
-function mapDbCategoryToApp(dbCategory?: string | null): Category {
-  const v = (dbCategory ?? "").toUpperCase();
-
-  switch (v) {
-    case "INICIO":
-    case "INÍCIO":
-      return Category.INICIO;
-    case "NOTICIAS":
-    case "NOTÍCIAS":
-      return Category.NOTICIAS;
-    case "HISTORIA":
-    case "HISTÓRIA":
-      return Category.HISTORIA;
-    case "REGRAS":
-      return Category.REGRAS;
-    case "PODCAST":
-      return Category.PODCAST;
-    case "STATUS":
-      return Category.STATUS;
-    default:
-      return Category.NOTICIAS;
-  }
-}
-
-function ptDate(iso?: string | null) {
-  if (!iso) return "";
-  try {
-    return new Date(iso).toLocaleDateString("pt-BR");
-  } catch {
-    return "";
-  }
-}
-
 const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<Category>(Category.INICIO);
   const [isDarkMode, setIsDarkMode] = useState(true);
@@ -78,8 +38,7 @@ const App: React.FC = () => {
   const [isNotifOpen, setIsNotifOpen] = useState(false);
   const [isAuthOpen, setIsAuthOpen] = useState(false);
 
-  // você não está usando ainda, mas deixei pra não quebrar seu fluxo
-  const [sortOption] = useState<SortOption>("RECENTES");
+  const [sortOption, setSortOption] = useState<SortOption>("RECENTES");
 
   // Admin/Auth
   const [authReady, setAuthReady] = useState(false);
@@ -87,19 +46,24 @@ const App: React.FC = () => {
   const [role, setRole] = useState<string | null>(null);
   const [adminError, setAdminError] = useState<string | null>(null);
 
-  // Posts (site normal)
-  const [articles, setArticles] = useState<Article[]>(ARTICLES);
-  const [isLoadingArticles, setIsLoadingArticles] = useState(true);
-
   // UI extras
   const [scrollProgress, setScrollProgress] = useState(0);
   const [showBackToTop, setShowBackToTop] = useState(false);
+
   const subTabsRef = useRef<HTMLDivElement>(null);
   const tagsRef = useRef<HTMLDivElement>(null);
 
   const isAdminMode = useMemo(() => {
     return new URLSearchParams(window.location.search).get("admin") === "1";
   }, []);
+
+  // ✅ helper: manda admin pro painel quando ele logar na página normal
+  const redirectAdminIfNeeded = (r: string | null) => {
+    if (r === "admin" && !isAdminMode) {
+      // mantém mesma origem e só troca querystring
+      window.location.assign("/?admin=1");
+    }
+  };
 
   // Boot session + role
   useEffect(() => {
@@ -125,15 +89,21 @@ const App: React.FC = () => {
         try {
           const r = await withTimeout(getMyRole(), 8000);
           if (!mounted) return;
-          setRole(r ?? null);
-        } catch {
+
+          const roleValue = r ?? null;
+          setRole(roleValue);
+
+          // ✅ se for admin e estiver na tela normal, manda pro painel
+          redirectAdminIfNeeded(roleValue);
+
+        } catch (e) {
           if (!mounted) return;
           setRole(null);
           setAdminError("Erro ao validar sessão (Supabase).");
         }
 
         setAuthReady(true);
-      } catch {
+      } catch (e) {
         if (!mounted) return;
         setSessionUserId(null);
         setRole(null);
@@ -158,7 +128,13 @@ const App: React.FC = () => {
       try {
         const r = await withTimeout(getMyRole(), 8000);
         if (!mounted) return;
-        setRole(r ?? null);
+
+        const roleValue = r ?? null;
+        setRole(roleValue);
+
+        // ✅ quando logar pelo popup, redireciona automático
+        redirectAdminIfNeeded(roleValue);
+
       } catch {
         if (!mounted) return;
         setRole(null);
@@ -170,60 +146,7 @@ const App: React.FC = () => {
       mounted = false;
       sub.subscription.unsubscribe();
     };
-  }, []);
-
-  // Carrega posts do Supabase pro site normal
-  useEffect(() => {
-    let alive = true;
-
-    (async () => {
-      try {
-        setIsLoadingArticles(true);
-
-        const db = await fetchPublishedArticlesJoined();
-
-        const mapped: Article[] = (db ?? []).map((a) => {
-          const authorName = a.author?.name ?? AUTHORS?.[0]?.name ?? "ANTAS";
-          const authorId = a.author?.id ?? AUTHORS?.[0]?.id ?? "a1";
-
-          const tags =
-            a.article_tags?.map((x) => x.tag?.label || x.tag?.slug).filter(Boolean) ?? [];
-
-          return {
-            id: a.id,
-            authorId,
-            category: mapDbCategoryToApp(a.category),
-            title: a.title ?? "",
-            description: a.excerpt ?? "",
-            content: a.content ?? "",
-            imageUrl: a.cover_url ?? "",
-            likes: a.likes ?? 0,
-            reactions: [],
-            commentsCount: a.comments_count ?? 0,
-            readTime: `${a.reading_minutes ?? 5} MIN`,
-            author: authorName,
-            date: ptDate(a.published_at),
-            comments: [],
-            tags: tags as string[],
-          };
-        });
-
-        // se DB vazio, mantém constants
-        const finalList = mapped.length ? mapped : ARTICLES;
-
-        if (alive) setArticles(finalList);
-      } catch (e) {
-        console.error("Erro ao carregar artigos do Supabase:", e);
-        if (alive) setArticles(ARTICLES);
-      } finally {
-        if (alive) setIsLoadingArticles(false);
-      }
-    })();
-
-    return () => {
-      alive = false;
-    };
-  }, []);
+  }, [isAdminMode]);
 
   // Scroll progress / back to top
   useEffect(() => {
@@ -318,19 +241,12 @@ const App: React.FC = () => {
   }
 
   // ===== App normal =====
-  const visibleArticles = articles.filter((a) => {
-    // INÍCIO pode mostrar tudo (ou você pode filtrar como quiser)
-    if (activeTab === Category.INICIO) return true;
-    return a.category === activeTab;
-  });
-
   return (
     <div
       className={`min-h-screen flex flex-col pb-32 max-w-md mx-auto relative transition-all duration-500 ${
         isDarkMode ? "bg-black text-white" : "bg-[#FDFBF4] text-[#0B1D33]"
       }`}
     >
-      {/* Barra de progresso */}
       <div className="fixed top-0 left-0 right-0 h-1 z-[100] flex justify-center max-w-md mx-auto">
         <div
           className={`h-full transition-all duration-300 ease-out shadow-[0_0_10px_rgba(250,203,41,0.3)] ${
@@ -372,24 +288,6 @@ const App: React.FC = () => {
             </div>
           </div>
         )}
-
-        <div className="px-6 mt-6">
-          <SectionTitle title={activeTab} isDarkMode={isDarkMode} />
-
-          {isLoadingArticles ? (
-            <div className="mt-4 text-sm text-gray-400">Carregando posts…</div>
-          ) : visibleArticles.length === 0 ? (
-            <div className="mt-4 text-sm text-gray-400">
-              Ainda não tem posts publicados nessa aba. (Publica no admin 😉)
-            </div>
-          ) : (
-            <div className="mt-4 space-y-4">
-              {visibleArticles.map((a) => (
-                <ArticleCard key={a.id} article={a} isDarkMode={isDarkMode} />
-              ))}
-            </div>
-          )}
-        </div>
       </main>
 
       {showBackToTop && (
