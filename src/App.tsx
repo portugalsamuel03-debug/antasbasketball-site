@@ -9,8 +9,12 @@ import AuthPopup from "./components/AuthPopup";
 import AdminPanel from "./components/AdminPanel";
 
 import { supabase } from "./lib/supabase";
-import { getMyRole } from "./admin";
+import { getMyRole, type UserRole } from "./admin";
+
+// ✅ ajuste conforme sua estrutura:
+// se estiver em src/services/geminiService.ts:
 import { askGeminiAboutBasketball } from "./services/geminiService";
+
 import { Category, SortOption } from "./types";
 
 function withTimeout<T>(promise: Promise<T>, ms = 8000): Promise<T> {
@@ -28,6 +32,10 @@ function withTimeout<T>(promise: Promise<T>, ms = 8000): Promise<T> {
   });
 }
 
+async function sleep(ms: number) {
+  return new Promise((res) => setTimeout(res, ms));
+}
+
 const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<Category>(Category.INICIO);
   const [isDarkMode, setIsDarkMode] = useState(true);
@@ -40,39 +48,55 @@ const App: React.FC = () => {
 
   const [sortOption, setSortOption] = useState<SortOption>("RECENTES");
 
-  // Admin/Auth
+  // ===== Auth / Admin =====
   const [authReady, setAuthReady] = useState(false);
   const [sessionUserId, setSessionUserId] = useState<string | null>(null);
-  const [role, setRole] = useState<string | null>(null);
+  const [role, setRole] = useState<UserRole | null>(null);
   const [adminError, setAdminError] = useState<string | null>(null);
 
-  // UI extras
+  // ===== UI extras =====
   const [scrollProgress, setScrollProgress] = useState(0);
   const [showBackToTop, setShowBackToTop] = useState(false);
-
   const subTabsRef = useRef<HTMLDivElement>(null);
   const tagsRef = useRef<HTMLDivElement>(null);
 
+  // Admin mode via querystring
   const isAdminMode = useMemo(() => {
     return new URLSearchParams(window.location.search).get("admin") === "1";
   }, []);
 
-  // ✅ helper: manda admin pro painel quando ele logar na página normal
-  const redirectAdminIfNeeded = (r: string | null) => {
-    if (r === "admin" && !isAdminMode) {
-      // mantém mesma origem e só troca querystring
-      window.location.assign("/?admin=1");
-    }
+  // Helper: força navegar para admin (sem React Router)
+  const goAdmin = () => {
+    const url = new URL(window.location.href);
+    url.searchParams.set("admin", "1");
+    window.location.href = url.toString();
+  };
+
+  const goHome = () => {
+    const url = new URL(window.location.href);
+    url.searchParams.delete("admin");
+    window.location.href = url.toString();
   };
 
   // Boot session + role
   useEffect(() => {
     let mounted = true;
 
+    async function resolveRoleWithRetry(): Promise<UserRole | null> {
+      // 2 tentativas leves (resolve muitos AbortError aleatórios)
+      let r = await withTimeout(getMyRole(), 8000);
+      if (!r) {
+        await sleep(400);
+        r = await withTimeout(getMyRole(), 8000);
+      }
+      return r ?? null;
+    }
+
     async function loadSessionAndRole() {
       setAdminError(null);
 
       try {
+        // 1) pega sessão local
         const { data } = await withTimeout(supabase.auth.getSession(), 8000);
         const userId = data.session?.user?.id ?? null;
 
@@ -86,29 +110,38 @@ const App: React.FC = () => {
           return;
         }
 
+        // 2) busca role
         try {
-          const r = await withTimeout(getMyRole(), 8000);
+          const r = await resolveRoleWithRetry();
           if (!mounted) return;
 
-          const roleValue = r ?? null;
-          setRole(roleValue);
+          setRole(r);
 
-          // ✅ se for admin e estiver na tela normal, manda pro painel
-          redirectAdminIfNeeded(roleValue);
-
-        } catch (e) {
+          // ✅ Se logou e é admin, redireciona pro admin automaticamente
+          // (só se não estiver no admin ainda)
+          if (r === "admin" && !isAdminMode) {
+            goAdmin();
+            return; // evita render “piscar”
+          }
+        } catch (e: any) {
           if (!mounted) return;
+          console.error("role error:", e);
+          // não trava tudo — deixa como não-admin
           setRole(null);
-          setAdminError("Erro ao validar sessão (Supabase).");
+
+          // se quiser mostrar mensagem só quando estiver no /admin
+          if (isAdminMode) setAdminError("Erro ao validar sessão (Supabase).");
         }
 
         setAuthReady(true);
       } catch (e) {
         if (!mounted) return;
+        console.error("session error:", e);
         setSessionUserId(null);
         setRole(null);
         setAuthReady(true);
-        setAdminError("Timeout ao validar sessão (Supabase).");
+
+        if (isAdminMode) setAdminError("Timeout ao validar sessão (Supabase).");
       }
     }
 
@@ -122,23 +155,27 @@ const App: React.FC = () => {
 
       if (!userId) {
         setRole(null);
+        // se estiver no admin, manda pra home
+        if (isAdminMode) goHome();
         return;
       }
 
       try {
-        const r = await withTimeout(getMyRole(), 8000);
+        const r = await resolveRoleWithRetry();
         if (!mounted) return;
 
-        const roleValue = r ?? null;
-        setRole(roleValue);
+        setRole(r);
 
-        // ✅ quando logar pelo popup, redireciona automático
-        redirectAdminIfNeeded(roleValue);
-
-      } catch {
+        // ✅ após login, se for admin, vai pro admin
+        if (r === "admin" && !isAdminMode) {
+          goAdmin();
+          return;
+        }
+      } catch (e) {
         if (!mounted) return;
+        console.error("auth change role error:", e);
         setRole(null);
-        setAdminError("Erro ao validar sessão (Supabase).");
+        if (isAdminMode) setAdminError("Erro ao validar sessão (Supabase).");
       }
     });
 
@@ -146,7 +183,8 @@ const App: React.FC = () => {
       mounted = false;
       sub.subscription.unsubscribe();
     };
-  }, [isAdminMode]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Scroll progress / back to top
   useEffect(() => {
@@ -196,7 +234,7 @@ const App: React.FC = () => {
 
   const scrollToTop = () => window.scrollTo({ top: 0, behavior: "smooth" });
 
-  // ===== Admin gate screens =====
+  // ===== Boot screen =====
   if (!authReady) {
     return (
       <div className="min-h-screen bg-black text-white flex items-center justify-center">
@@ -205,6 +243,7 @@ const App: React.FC = () => {
     );
   }
 
+  // ===== Admin gate =====
   if (isAdminMode) {
     if (adminError) {
       return (
@@ -212,6 +251,12 @@ const App: React.FC = () => {
           <div>
             <div className="text-2xl font-black mb-2">Erro no Admin</div>
             <div className="text-red-400 font-medium">{adminError}</div>
+            <button
+              className="mt-6 px-5 py-3 rounded-2xl bg-white/10 hover:bg-white/15 transition"
+              onClick={() => window.location.reload()}
+            >
+              Recarregar
+            </button>
           </div>
         </div>
       );
@@ -225,9 +270,14 @@ const App: React.FC = () => {
           <div>
             <div className="text-2xl font-black mb-2">Acesso restrito</div>
             <div className="text-gray-300">
-              Faça login com uma conta <b>admin</b> e acesse novamente em:
+              Faça login com uma conta <b>admin</b> e tente novamente.
             </div>
-            <div className="mt-3 font-black text-yellow-400">/?admin=1</div>
+            <button
+              className="mt-6 px-5 py-3 rounded-2xl bg-yellow-400 text-black font-black"
+              onClick={goHome}
+            >
+              Voltar pro site
+            </button>
           </div>
         </div>
       );
@@ -247,6 +297,7 @@ const App: React.FC = () => {
         isDarkMode ? "bg-black text-white" : "bg-[#FDFBF4] text-[#0B1D33]"
       }`}
     >
+      {/* Barra de progresso opcional */}
       <div className="fixed top-0 left-0 right-0 h-1 z-[100] flex justify-center max-w-md mx-auto">
         <div
           className={`h-full transition-all duration-300 ease-out shadow-[0_0_10px_rgba(250,203,41,0.3)] ${
