@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 
 import Header from "./components/Header";
 import SearchBar from "./components/SearchBar";
@@ -7,24 +7,11 @@ import NotificationPopup from "./components/NotificationPopup";
 import AuthPopup from "./components/AuthPopup";
 import AdminPanel from "./components/AdminPanel";
 
-import { supabase, supabaseConfigError } from "./lib/supabase";
+import { supabase } from "./lib/supabase";
 import { getMyRole } from "./admin";
 
 import { askGeminiAboutBasketball } from "../services/geminiService";
-import { Category, SortOption } from "./types";
-
-function withTimeout<T>(p: Promise<T>, ms = 6000): Promise<T> {
-  return new Promise((resolve, reject) => {
-    const id = setTimeout(() => reject(new Error("Timeout ao validar sessão (Supabase).")), ms);
-    p.then((v) => {
-      clearTimeout(id);
-      resolve(v);
-    }).catch((e) => {
-      clearTimeout(id);
-      reject(e);
-    });
-  });
-}
+import { Category } from "./types";
 
 const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<Category>(Category.INICIO);
@@ -36,54 +23,54 @@ const App: React.FC = () => {
   const [isNotifOpen, setIsNotifOpen] = useState(false);
   const [isAuthOpen, setIsAuthOpen] = useState(false);
 
-  const [sortOption, setSortOption] = useState<SortOption>("RECENTES");
-
   // Admin
-  const [adminChecked, setAdminChecked] = useState(false);
+  const [authReady, setAuthReady] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
-  const [bootError, setBootError] = useState<string | null>(null);
+  const [authError, setAuthError] = useState<string | null>(null);
 
-  const isAdminMode = useMemo(
-    () => new URLSearchParams(window.location.search).get("admin") === "1",
-    []
-  );
+  const isAdminMode = useMemo(() => {
+    return new URLSearchParams(window.location.search).get("admin") === "1";
+  }, []);
 
+  // Boot auth com timeout de segurança
   useEffect(() => {
     let mounted = true;
+    const timeout = setTimeout(() => {
+      if (mounted) {
+        setAuthError("Timeout ao validar sessão (Supabase).");
+        setAuthReady(true);
+      }
+    }, 8000); // 8s no máximo
 
-    async function bootAdminGate() {
+    async function boot() {
       try {
-        if (!supabase) {
-          setBootError(supabaseConfigError || "Supabase não inicializou.");
-          return;
-        }
-
-        const { data } = await withTimeout(supabase.auth.getSession(), 6000);
+        const { data } = await supabase.auth.getSession();
         const session = data.session;
 
         if (session?.user) {
-          const role = await withTimeout(getMyRole(), 6000);
+          const role = await getMyRole();
           if (mounted) setIsAdmin(role === "admin");
-        } else {
-          if (mounted) setIsAdmin(false);
         }
-      } catch (e: any) {
-        console.error(e);
-        if (mounted) setBootError(e?.message || "Erro ao validar admin.");
-        if (mounted) setIsAdmin(false);
+
+        if (mounted) setAuthReady(true);
+      } catch (e) {
+        console.error("Erro auth:", e);
+        if (mounted) {
+          setAuthError("Erro ao validar sessão (Supabase).");
+          setAuthReady(true);
+        }
       } finally {
-        if (mounted) setAdminChecked(true);
+        clearTimeout(timeout);
       }
     }
 
-    // Só valida admin se estiver em modo admin
-    if (isAdminMode) bootAdminGate();
-    else setAdminChecked(true);
+    boot();
 
     return () => {
       mounted = false;
+      clearTimeout(timeout);
     };
-  }, [isAdminMode]);
+  }, []);
 
   const toggleTheme = () => {
     const newMode = !isDarkMode;
@@ -98,59 +85,59 @@ const App: React.FC = () => {
       setIsAIProcessing(true);
       const response = await askGeminiAboutBasketball(query);
       setAiResponse(response);
-    } catch (e) {
-      console.error(e);
-      setAiResponse("Deu ruim na Antas AI. Tenta de novo 😅");
+    } catch {
+      setAiResponse("Erro ao consultar a Antas AI.");
     } finally {
       setIsAIProcessing(false);
     }
   };
 
-  // ===== ADMIN VIEW =====
+  // Loading
+  if (!authReady) {
+    return (
+      <div className="min-h-screen bg-black text-white flex items-center justify-center">
+        Carregando...
+      </div>
+    );
+  }
+
+  // Erro de auth
+  if (authError) {
+    return (
+      <div className="min-h-screen bg-black text-white flex flex-col items-center justify-center">
+        <h1 className="text-xl font-bold mb-2">Erro no Admin</h1>
+        <p className="text-red-400 text-sm">{authError}</p>
+      </div>
+    );
+  }
+
+  // Admin gate
   if (isAdminMode) {
-    if (!adminChecked) {
-      return (
-        <div className="min-h-screen bg-black text-white flex items-center justify-center">
-          Carregando…
-        </div>
-      );
-    }
-
-    if (bootError) {
-      return (
-        <div className="min-h-screen bg-black text-white flex items-center justify-center p-6 text-center">
-          <div>
-            <div className="text-xl font-black">Erro no Admin</div>
-            <div className="mt-3 text-sm text-red-300 whitespace-pre-wrap">{bootError}</div>
-          </div>
-        </div>
-      );
-    }
-
     if (!isAdmin) {
       return (
-        <div className="min-h-screen bg-black text-white flex items-center justify-center p-6 text-center">
+        <div className="min-h-screen bg-black text-white flex items-center justify-center text-center px-6">
           <div>
-            <div className="text-xl font-black">Admin bloqueado</div>
-            <div className="text-gray-400 mt-2 text-sm">
-              Faça login com a conta admin e recarregue <b>/?admin=1</b>.
-            </div>
+            <h1 className="text-xl font-bold">Acesso restrito</h1>
+            <p className="text-gray-400 mt-2">
+              Faça login com uma conta admin e acesse novamente em:
+            </p>
+            <p className="text-yellow-400 mt-1">/?admin=1</p>
           </div>
         </div>
       );
     }
 
     return (
-      <div className="min-h-screen bg-black">
+      <div className="min-h-screen bg-black text-white">
         <AdminPanel />
       </div>
     );
   }
 
-  // ===== NORMAL VIEW =====
+  // App normal
   return (
     <div
-      className={`min-h-screen flex flex-col pb-32 max-w-md mx-auto relative transition-all duration-500 ${
+      className={`min-h-screen flex flex-col pb-32 max-w-md mx-auto transition-all duration-500 ${
         isDarkMode ? "bg-black text-white" : "bg-[#FDFBF4] text-[#0B1D33]"
       }`}
     >
@@ -162,37 +149,32 @@ const App: React.FC = () => {
       />
 
       <main className="flex-1">
-        <SearchBar isDarkMode={isDarkMode} onSearch={handleSearch} isAIProcessing={isAIProcessing} />
+        <SearchBar
+          isDarkMode={isDarkMode}
+          onSearch={handleSearch}
+          isAIProcessing={isAIProcessing}
+        />
 
         {aiResponse && (
           <div className="px-6 mt-4">
-            <div
-              className={`border rounded-[28px] p-6 relative shadow-2xl backdrop-blur-md ${
-                isDarkMode
-                  ? "bg-yellow-400/10 border-yellow-400/30"
-                  : "bg-[#0B1D33]/5 border-[#0B1D33]/10"
-              }`}
-            >
-              <button
-                onClick={() => setAiResponse(null)}
-                className="absolute top-4 right-4 p-1.5 rounded-full transition-colors text-gray-500 hover:text-white"
-              >
-                ✕
-              </button>
-              <div className="text-[11px] font-black uppercase tracking-widest text-yellow-400 mb-2">
-                Antas AI
-              </div>
-              <p className={`text-sm italic font-medium ${isDarkMode ? "text-yellow-50/90" : "text-[#0B1D33]/80"}`}>
-                "{aiResponse}"
-              </p>
+            <div className="bg-white/5 rounded-xl p-4 text-sm italic">
+              {aiResponse}
             </div>
           </div>
         )}
       </main>
 
-      <BottomNav activeTab={activeTab} onTabChange={setActiveTab} isDarkMode={isDarkMode} />
+      <BottomNav
+        activeTab={activeTab}
+        onTabChange={setActiveTab}
+        isDarkMode={isDarkMode}
+      />
 
-      <NotificationPopup isDarkMode={isDarkMode} isOpen={isNotifOpen} onClose={() => setIsNotifOpen(false)} />
+      <NotificationPopup
+        isDarkMode={isDarkMode}
+        isOpen={isNotifOpen}
+        onClose={() => setIsNotifOpen(false)}
+      />
       <AuthPopup isOpen={isAuthOpen} onClose={() => setIsAuthOpen(false)} />
     </div>
   );
