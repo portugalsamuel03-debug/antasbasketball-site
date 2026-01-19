@@ -1,14 +1,11 @@
+// src/lib/supabase.ts
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined;
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
-
-export const supabase: SupabaseClient | null =
-  supabaseUrl && supabaseAnonKey
-    ? createClient(supabaseUrl, supabaseAnonKey)
-    : null;
+const url = import.meta.env.VITE_SUPABASE_URL as string | undefined;
+const anon = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
 
 export const supabaseConfigError =
-  !supabaseUrl || !supabaseAnonKey
-    ? "Faltou configurar VITE_SUPABASE_URL e/ou VITE_SUPABASE_ANON_KEY (Vercel env)."
-    : null;
+  !url ? "Faltou VITE_SUPABASE_URL" : !anon ? "Faltou VITE_SUPABASE_ANON_KEY" : null;
+
+export const supabase: SupabaseClient | null =
+  supabaseConfigError ? null : createClient(url!, anon!);
