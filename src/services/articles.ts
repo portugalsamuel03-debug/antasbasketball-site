@@ -25,9 +25,9 @@ type DbArticleRow = {
   cover_url: string | null;
   category: string;
   subcategory: string | null;
-  reading_minutes: number;
-  likes: number;
-  comments_count: number;
+  reading_minutes: number | null;
+  likes: number | null;
+  comments_count: number | null;
   author_id: string | null;
   published: boolean;
   published_at: string;
@@ -37,8 +37,10 @@ type DbArticleRow = {
   article_tags: { tag: DbTag | null }[] | null;
 };
 
+const FALLBACK_COVER =
+  "https://images.unsplash.com/photo-1546519638-68e109498ffc?w=1200&q=80&auto=format&fit=crop";
+
 function dbCategoryToUi(cat: string): Category {
-  // seu enum tem acento, o banco não
   switch ((cat ?? "").toUpperCase()) {
     case "INICIO":
       return Category.INICIO;
@@ -57,9 +59,28 @@ function dbCategoryToUi(cat: string): Category {
   }
 }
 
+function formatDateYYYYMMDD(iso: string): string {
+  // mantém simples e estável pro seu UI
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  const yyyy = String(d.getFullYear());
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}`;
+}
+
+function uniqueStrings(arr: string[]): string[] {
+  return Array.from(new Set(arr.map((x) => x.trim()).filter(Boolean)));
+}
+
 function toUiArticle(row: DbArticleRow): Article {
-  const tags =
-    row.article_tags?.map((x) => x.tag?.label).filter(Boolean) as string[] | undefined;
+  const tags = uniqueStrings(
+    (row.article_tags ?? [])
+      .map((x) => x?.tag?.label ?? "")
+      .filter(Boolean)
+  );
+
+  const minutes = Math.max(1, row.reading_minutes ?? 5);
 
   return {
     id: row.id,
@@ -69,18 +90,18 @@ function toUiArticle(row: DbArticleRow): Article {
     title: row.title,
     description: row.excerpt ?? "",
     content: row.content,
-    imageUrl: row.cover_url ?? "",
+    imageUrl: row.cover_url?.trim() ? row.cover_url : FALLBACK_COVER,
 
     likes: row.likes ?? 0,
-    reactions: [], // se quiser mapear depois
+    reactions: [], // depois dá pra mapear do banco
     commentsCount: row.comments_count ?? 0,
-    readTime: `${Math.max(1, row.reading_minutes ?? 5)} MIN`,
+    readTime: `${minutes} MIN`,
 
     author: row.author?.name ?? "Antas",
-    date: row.published_at,
+    date: formatDateYYYYMMDD(row.published_at),
 
-    comments: [], // você ainda não está puxando comments aqui
-    tags: tags ?? [],
+    comments: [], // ainda não está puxando comments
+    tags,
   };
 }
 
@@ -100,5 +121,5 @@ export async function fetchPublishedArticlesJoined(): Promise<Article[]> {
 
   if (error) throw error;
 
-  return ((data ?? []) as unknown as DbArticleRow[]).map(toUiArticle);
+  return (data as unknown as DbArticleRow[]).map(toUiArticle);
 }
