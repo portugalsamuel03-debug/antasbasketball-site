@@ -13,6 +13,7 @@ import ShareModal from "./components/ShareModal";
 import NotificationPopup from "./components/NotificationPopup";
 import AuthPopup from "./components/AuthPopup";
 import AdminPanel from "./components/AdminPanel";
+import ProfilePopup from "./components/ProfilePopup";
 
 // Home sections (opcionais)
 import FeaturedReaders from "./components/FeaturedReaders";
@@ -34,6 +35,7 @@ export default function App() {
   const [activeTab, setActiveTab] = useState<Category>(Category.NOTICIAS);
 
   const [authOpen, setAuthOpen] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
 
   const [sortOption, setSortOption] = useState<SortOption>("RECENTES");
@@ -50,14 +52,22 @@ export default function App() {
   const [shareOpen, setShareOpen] = useState(false);
   const [shareArticle, setShareArticle] = useState<Article | null>(null);
 
-  // /?admin=1 abre painel
-  const isAdminRoute = useMemo(() => {
+  // URL params (sem router)
+  const searchParams = useMemo(() => {
+    try {
+      return new URLSearchParams(window.location.search);
+    } catch {
+      return new URLSearchParams();
+    }
+  }, []);
+
+  const isAdminRoute = (() => {
     try {
       return new URLSearchParams(window.location.search).get("admin") === "1";
     } catch {
       return false;
     }
-  }, []);
+  })();
 
   // ===== Boot session + role =====
   useEffect(() => {
@@ -125,6 +135,19 @@ export default function App() {
     };
   }, []);
 
+  // ✅ Admin logou -> redireciona automático para /?admin=1
+  useEffect(() => {
+    if (!authReady) return;
+    if (!sessionUserId) return;
+    if (role !== "admin") return;
+    if (isAdminRoute) return;
+
+    const url = new URL(window.location.href);
+    url.searchParams.set("admin", "1");
+    url.searchParams.delete("edit");
+    window.location.replace(url.toString());
+  }, [authReady, sessionUserId, role, isAdminRoute]);
+
   // ===== Theme =====
   useEffect(() => {
     const saved = localStorage.getItem("antas_theme");
@@ -167,7 +190,6 @@ export default function App() {
   // ===== Search =====
   const onSearch = async (q: string) => {
     setSearchQuery(q);
-    // aqui é só “efeito” pra UI (não depende de IA)
     setIsAIProcessing(true);
     setTimeout(() => setIsAIProcessing(false), 450);
   };
@@ -178,45 +200,46 @@ export default function App() {
     setShareOpen(true);
   };
 
+  // ✅ Clique no boneco: Auth (se não logado) ou Profile (se logado)
+  const onUserPress = () => {
+    if (sessionUserId) setProfileOpen(true);
+    else setAuthOpen(true);
+  };
+
+  // ✅ Admin: ir pro painel já editando o post
+  const goAdminEdit = (id: string) => {
+    const url = new URL(window.location.href);
+    url.searchParams.set("admin", "1");
+    url.searchParams.set("edit", id);
+    window.location.assign(url.toString());
+  };
+
   // ===== Sorting + filtering =====
   const filteredArticles = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
 
     let list = articles;
 
-    // filtra por categoria (aba)
     if (activeTab && activeTab !== Category.INICIO) {
       list = list.filter((a) => a.category === activeTab);
     }
 
-    // busca simples
     if (q) {
       list = list.filter((a) => {
-        const hay = [
-          a.title,
-          a.description,
-          a.content,
-          a.author,
-          ...(a.tags ?? []),
-        ]
+        const hay = [a.title, a.description, a.content, a.author, ...(a.tags ?? [])]
           .join(" ")
           .toLowerCase();
-
         return hay.includes(q);
       });
     }
 
-    // ordenação
     const sorted = [...list];
     sorted.sort((a, b) => {
       if (sortOption === "RECENTES") return (b.date ?? "").localeCompare(a.date ?? "");
       if (sortOption === "ANTIGOS") return (a.date ?? "").localeCompare(b.date ?? "");
       if (sortOption === "CURTIDOS") return (b.likes ?? 0) - (a.likes ?? 0);
       if (sortOption === "COMENTADOS") return (b.commentsCount ?? 0) - (a.commentsCount ?? 0);
-      if (sortOption === "SALVOS") {
-        // se você tiver “saved” no Article depois, pluga aqui; por enquanto mantém estável
-        return (b.likes ?? 0) - (a.likes ?? 0);
-      }
+      if (sortOption === "SALVOS") return (b.likes ?? 0) - (a.likes ?? 0);
       return 0;
     });
 
@@ -254,6 +277,7 @@ export default function App() {
           </div>
 
           <AuthPopup isOpen={authOpen} onClose={() => setAuthOpen(false)} />
+          <ProfilePopup isOpen={profileOpen} onClose={() => setProfileOpen(false)} />
         </div>
       );
     }
@@ -261,6 +285,8 @@ export default function App() {
     return (
       <div className="bg-black min-h-screen">
         <AdminPanel />
+        <AuthPopup isOpen={authOpen} onClose={() => setAuthOpen(false)} />
+        <ProfilePopup isOpen={profileOpen} onClose={() => setProfileOpen(false)} />
       </div>
     );
   }
@@ -282,6 +308,7 @@ export default function App() {
           isDarkMode={isDarkMode}
         />
         <AuthPopup isOpen={authOpen} onClose={() => setAuthOpen(false)} />
+        <ProfilePopup isOpen={profileOpen} onClose={() => setProfileOpen(false)} />
         <NotificationPopup
           isOpen={notificationsOpen}
           onClose={() => setNotificationsOpen(false)}
@@ -292,6 +319,8 @@ export default function App() {
   }
 
   // ===== App shell =====
+  const isAdmin = role === "admin";
+
   return (
     <div className={isDarkMode ? "bg-black text-white min-h-screen" : "bg-[#FDFBF4] text-[#0B1D33] min-h-screen"}>
       <div className={`max-w-md mx-auto min-h-screen ${isDarkMode ? "bg-black" : "bg-[#FDFBF4]"}`}>
@@ -299,15 +328,13 @@ export default function App() {
           isDarkMode={isDarkMode}
           onToggleTheme={() => setIsDarkMode((v) => !v)}
           onOpenNotifications={() => setNotificationsOpen(true)}
-          onOpenAuth={() => setAuthOpen(true)}
+          onOpenAuth={onUserPress}
           hasNewNotifications={true}
         />
 
         <main className="pb-28">
-          {/* Busca */}
           <SearchBar onSearch={onSearch} isAIProcessing={isAIProcessing} isDarkMode={isDarkMode} />
 
-          {/* Erros (role / artigos) */}
           {adminError && (
             <div className="px-6">
               <div className="text-[12px] font-bold bg-red-500/10 border border-red-500/30 rounded-2xl px-4 py-3 text-red-200">
@@ -324,7 +351,6 @@ export default function App() {
             </div>
           )}
 
-          {/* INÍCIO */}
           {activeTab === Category.INICIO && (
             <>
               <FeaturedReaders isDarkMode={isDarkMode} />
@@ -332,7 +358,6 @@ export default function App() {
             </>
           )}
 
-          {/* NOTÍCIAS / demais abas com artigos */}
           {activeTab !== Category.INICIO && (
             <>
               <SectionTitle
@@ -357,6 +382,8 @@ export default function App() {
                       onClick={() => setSelectedArticle(a)}
                       onShare={onShare}
                       isDarkMode={isDarkMode}
+                      isAdmin={isAdmin}
+                      onEdit={goAdminEdit}
                     />
                   ))}
                 </div>
@@ -367,8 +394,8 @@ export default function App() {
 
         <BottomNav activeTab={activeTab} onTabChange={setActiveTab} isDarkMode={isDarkMode} />
 
-        {/* Popups */}
         <AuthPopup isOpen={authOpen} onClose={() => setAuthOpen(false)} />
+        <ProfilePopup isOpen={profileOpen} onClose={() => setProfileOpen(false)} />
 
         <NotificationPopup
           isOpen={notificationsOpen}
@@ -376,7 +403,12 @@ export default function App() {
           isDarkMode={isDarkMode}
         />
 
-        <ShareModal isOpen={shareOpen} onClose={() => setShareOpen(false)} article={shareArticle} isDarkMode={isDarkMode} />
+        <ShareModal
+          isOpen={shareOpen}
+          onClose={() => setShareOpen(false)}
+          article={shareArticle}
+          isDarkMode={isDarkMode}
+        />
       </div>
     </div>
   );
