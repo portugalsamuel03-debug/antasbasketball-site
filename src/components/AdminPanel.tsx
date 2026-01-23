@@ -230,25 +230,44 @@ const AdminPanel: React.FC = () => {
     await refreshAll();
   }
 
+  // ✅ FIX: salvar TAG de forma direta (sem depender do cms.ts) e mostrar erro real
   async function saveTag() {
-    if (!tagEditing?.label) {
+    setMsg(null);
+
+    const rawLabel = (tagEditing?.label ?? "").trim();
+    if (!rawLabel) {
       setMsg("Tag precisa de label.");
       return;
     }
-    const payload: Partial<TagRow> = {
-      ...tagEditing,
-      slug: tagEditing.slug?.trim() || slugify(tagEditing.label),
-      label: tagEditing.label.toUpperCase().trim(),
-    };
-    const { error } = await upsertTag(payload);
-    if (error) {
-      console.error(error);
-      setMsg("Erro ao salvar tag.");
-      return;
+
+    const label = rawLabel.toUpperCase();
+    const slug = (tagEditing?.slug ?? "").trim() || slugify(rawLabel);
+
+    try {
+      const payload = {
+        id: tagEditing?.id ?? undefined,
+        slug,
+        label,
+      };
+
+      const { error } = await supabase
+        .from("tags")
+        .upsert(payload, { onConflict: "id" })
+        .select();
+
+      if (error) {
+        console.error("saveTag error:", error);
+        setMsg(`Erro ao salvar tag: ${error.message}`);
+        return;
+      }
+
+      setMsg("Tag salva ✅");
+      setTagEditing(null);
+      await refreshAll();
+    } catch (e: any) {
+      console.error("saveTag crash:", e);
+      setMsg(e?.message ?? "Erro inesperado ao salvar tag.");
     }
-    setMsg("Tag salva ✅");
-    setTagEditing(null);
-    await refreshAll();
   }
 
   async function quickAddCategory() {

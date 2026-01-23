@@ -1,3 +1,4 @@
+// src/App.tsx
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "./lib/supabase";
 import { getMyRole } from "./admin";
@@ -14,6 +15,9 @@ import NotificationPopup from "./components/NotificationPopup";
 import AuthPopup from "./components/AuthPopup";
 import AdminPanel from "./components/AdminPanel";
 
+// ✅ novo
+import ProfilePopup from "./components/ProfilePopup";
+
 // Home sections (opcionais)
 import FeaturedReaders from "./components/FeaturedReaders";
 import FeaturedAuthors from "./components/FeaturedAuthors";
@@ -23,17 +27,7 @@ import { fetchPublishedArticlesJoined } from "./services/articles";
 import { Article, Category, SortOption } from "./types";
 
 type Role = "admin" | "reader";
-type RoleState = Role | "unknown"; // <-- novo: unknown = ainda validando
-type ProfileRow = {
-  id: string;
-  email: string | null;
-  display_name: string | null;
-  nickname: string | null;
-  avatar_url: string | null;
-  favorite_team: string | null;
-  role: Role;
-  updated_at?: string | null; // ✅ ADICIONADO
-};
+type RoleState = Role | "unknown";
 
 function safeSearchParam(name: string) {
   try {
@@ -43,199 +37,11 @@ function safeSearchParam(name: string) {
   }
 }
 
-function dicebear(seed: string) {
-  return `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(seed)}`;
-}
-
-const ProfileModal: React.FC<{
-  isOpen: boolean;
-  onClose: () => void;
-  userId: string;
-}> = ({ isOpen, onClose, userId }) => {
-  const [loading, setLoading] = useState(false);
-  const [err, setErr] = useState<string | null>(null);
-
-  const [displayName, setDisplayName] = useState("");
-  const [nickname, setNickname] = useState("");
-  const [avatarUrl, setAvatarUrl] = useState("");
-
-  const [showAvatars, setShowAvatars] = useState(false);
-
-  const avatarSeeds = useMemo(
-    () => ["Antas", "Basket", "MVP", "Rookie", "AllStar", "GOAT", "Playoffs", "Squad", "Crossover", "Dunk"],
-    []
-  );
-
-  useEffect(() => {
-    if (!isOpen) return;
-
-    (async () => {
-      setErr(null);
-      setLoading(true);
-      try {
-        const { data, error } = await supabase
-          .from("profiles")
-          .select("display_name,nickname,avatar_url")
-          .eq("id", userId)
-          .maybeSingle();
-
-        if (error) throw error;
-
-        setDisplayName(data?.display_name ?? "");
-        setNickname(data?.nickname ?? "");
-        setAvatarUrl(data?.avatar_url ?? "");
-      } catch (e: any) {
-        setErr(e?.message ?? "Erro ao carregar perfil.");
-      } finally {
-        setLoading(false);
-      }
-    })();
-  }, [isOpen, userId]);
-
-  async function save() {
-    setErr(null);
-    setLoading(true);
-    try {
-      const payload: Partial<ProfileRow> = {
-        display_name: displayName.trim() || null,
-        nickname: nickname.trim() || null,
-        avatar_url: avatarUrl.trim() || null,
-        updated_at: new Date().toISOString(), // ✅ SEM "as any"
-      };
-
-      const { error } = await supabase.from("profiles").update(payload).eq("id", userId);
-      if (error) throw error;
-
-      onClose();
-    } catch (e: any) {
-      setErr(e?.message ?? "Erro ao salvar perfil.");
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  async function signOut() {
-    await supabase.auth.signOut();
-    onClose();
-  }
-
-  if (!isOpen) return null;
-
-  const inputClasses =
-    "w-full bg-[#F0F4F8] border-none rounded-2xl py-4 px-6 text-sm text-[#0B1D33] focus:ring-2 focus:ring-[#0B1D33]/20 outline-none transition-all placeholder:text-gray-400 font-medium";
-
-  return (
-    <div className="fixed inset-0 z-[160] flex items-center justify-center px-6">
-      <div className="absolute inset-0 bg-[#0B1D33]/60 backdrop-blur-md" onClick={onClose} />
-      <div className="relative w-full max-w-sm bg-white rounded-[34px] overflow-hidden shadow-[0_20px_80px_rgba(0,0,0,0.45)]">
-        <div className="px-7 pt-7 pb-5 border-b border-black/5 flex justify-between items-center">
-          <div>
-            <div className="text-[10px] font-black tracking-[0.2em] uppercase text-gray-400">Conta</div>
-            <div className="text-2xl font-black italic tracking-tighter text-[#0B1D33]">SEU PERFIL</div>
-          </div>
-          <button onClick={onClose} className="p-2 rounded-full hover:bg-black/5 text-gray-500">
-            ✕
-          </button>
-        </div>
-
-        <div className="p-7 space-y-3">
-          {err && (
-            <div className="text-[12px] font-bold bg-red-500/10 border border-red-500/30 rounded-2xl px-4 py-3 text-red-600">
-              {err}
-            </div>
-          )}
-
-          <input
-            className={inputClasses}
-            placeholder="Seu nome"
-            value={displayName}
-            onChange={(e) => setDisplayName(e.target.value)}
-            disabled={loading}
-          />
-
-          <input
-            className={inputClasses}
-            placeholder="Nickname (pra comentários)"
-            value={nickname}
-            onChange={(e) => setNickname(e.target.value)}
-            disabled={loading}
-          />
-
-          <div className="space-y-2">
-            <input
-              className={inputClasses}
-              placeholder="URL da foto (avatar)"
-              value={avatarUrl}
-              onChange={(e) => setAvatarUrl(e.target.value)}
-              disabled={loading}
-            />
-
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={() => setShowAvatars((v) => !v)}
-                className="flex-1 py-3 rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] bg-[#0B1D33]/5 text-[#0B1D33]"
-              >
-                {showAvatars ? "Fechar sugestões" : "Sugestões de avatar"}
-              </button>
-              <button
-                type="button"
-                onClick={() => setAvatarUrl(dicebear(nickname || displayName || "User"))}
-                className="py-3 px-4 rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] bg-yellow-400 text-black"
-                title="Gerar automático"
-              >
-                Auto
-              </button>
-            </div>
-
-            {showAvatars && (
-              <div className="grid grid-cols-5 gap-2 pt-1">
-                {avatarSeeds.map((s) => {
-                  const url = dicebear(s);
-                  return (
-                    <button
-                      key={s}
-                      type="button"
-                      onClick={() => setAvatarUrl(url)}
-                      className={`rounded-2xl p-2 border transition ${
-                        avatarUrl === url ? "border-yellow-400" : "border-black/10 hover:border-black/20"
-                      }`}
-                      title={s}
-                    >
-                      <img src={url} className="w-10 h-10 rounded-full" />
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-
-          <button
-            onClick={save}
-            disabled={loading}
-            className="w-full bg-[#5C6773] text-white py-4 rounded-3xl font-black text-xs uppercase tracking-[0.2em] disabled:opacity-60"
-          >
-            {loading ? "SALVANDO..." : "SALVAR"}
-          </button>
-
-          <button
-            onClick={signOut}
-            className="w-full bg-[#0B1D33]/5 text-[#0B1D33] py-4 rounded-3xl font-black text-xs uppercase tracking-[0.2em]"
-          >
-            SAIR DA CONTA
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-};
-
 export default function App() {
   // ===== Auth / Role =====
   const [authReady, setAuthReady] = useState(false);
   const [sessionUserId, setSessionUserId] = useState<string | null>(null);
 
-  // role agora tem "unknown" (validando), e não derruba sua sessão em erro
   const [role, setRole] = useState<RoleState>("unknown");
   const [adminError, setAdminError] = useState<string | null>(null);
   const [roleChecking, setRoleChecking] = useState(false);
@@ -271,7 +77,10 @@ export default function App() {
   const mountedRef = useRef(true);
 
   // ===== Helpers: role cache + timeout =====
-  const roleCacheKey = useMemo(() => (sessionUserId ? `antas_role:${sessionUserId}` : null), [sessionUserId]);
+  const roleCacheKey = useMemo(
+    () => (sessionUserId ? `antas_role:${sessionUserId}` : null),
+    [sessionUserId]
+  );
 
   function getCachedRole(): Role | null {
     if (!roleCacheKey) return null;
@@ -297,6 +106,7 @@ export default function App() {
     const t = window.setTimeout(() => controller.abort(), 20000);
 
     try {
+      // se seu getMyRole aceitar signal, pode trocar aqui depois
       const r = await getMyRole();
       const normalized = (r as Role) === "admin" ? "admin" : "reader";
       return normalized;
@@ -311,9 +121,11 @@ export default function App() {
     setRoleChecking(true);
     setAdminError(null);
 
+    // 1) cache imediato
     const cached = getCachedRole();
     if (cached) setRole(cached);
 
+    // 2) revalida
     try {
       const r = await getRoleWithTimeout();
       if (!mountedRef.current) return;
@@ -322,6 +134,7 @@ export default function App() {
       setCachedRole(r);
     } catch (e: any) {
       console.error(`refreshRole error (${reason}):`, e);
+
       if (!mountedRef.current) return;
 
       const cached2 = getCachedRole();
@@ -334,6 +147,7 @@ export default function App() {
     }
   }
 
+  // ===== Boot session + role =====
   useEffect(() => {
     mountedRef.current = true;
 
@@ -361,6 +175,7 @@ export default function App() {
       } catch (e: any) {
         console.error("boot auth error:", e);
         if (!mountedRef.current) return;
+
         setAdminError(e?.message ?? "Erro ao validar sessão (Supabase).");
       } finally {
         if (mountedRef.current) setAuthReady(true);
@@ -392,6 +207,7 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // ===== Theme =====
   useEffect(() => {
     const saved = localStorage.getItem("antas_theme");
     if (saved === "light") setIsDarkMode(false);
@@ -403,6 +219,7 @@ export default function App() {
     document.body.style.background = isDarkMode ? "#000" : "#FDFBF4";
   }, [isDarkMode]);
 
+  // ===== Load articles =====
   useEffect(() => {
     let alive = true;
 
@@ -429,17 +246,32 @@ export default function App() {
     };
   }, []);
 
+  // ===== Search =====
   const onSearch = async (q: string) => {
     setSearchQuery(q);
     setIsAIProcessing(true);
     setTimeout(() => setIsAIProcessing(false), 450);
   };
 
+  // ===== Share =====
   const onShare = (a: Article) => {
     setShareArticle(a);
     setShareOpen(true);
   };
 
+  // ✅ abrir artigo pelo id (usado no ProfilePopup)
+  const openArticleById = (articleId: string) => {
+    const found = articles.find((a) => a.id === articleId) ?? null;
+    if (found) {
+      setProfileOpen(false);
+      setSelectedArticle(found);
+      return;
+    }
+    // caso raro: lista ainda não carregou ou não está no estado
+    alert("Não encontrei esse post na lista atual. Atualize e tente novamente.");
+  };
+
+  // ===== Sorting + filtering =====
   const filteredArticles = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
     let list = articles;
@@ -470,6 +302,7 @@ export default function App() {
     return sorted;
   }, [articles, activeTab, searchQuery, sortOption]);
 
+  // ===== Loading screen =====
   if (!authReady) {
     return (
       <div className={isDarkMode ? "bg-black text-white min-h-screen" : "bg-[#FDFBF4] text-[#0B1D33] min-h-screen"}>
@@ -481,6 +314,7 @@ export default function App() {
     );
   }
 
+  // ===== Admin route =====
   if (isAdminRoute) {
     if (role === "unknown") {
       return (
@@ -548,15 +382,30 @@ export default function App() {
     return (
       <div className="bg-black min-h-screen">
         <AdminPanel />
-        {sessionUserId && <ProfileModal isOpen={profileOpen} onClose={() => setProfileOpen(false)} userId={sessionUserId} />}
+
+        {/* ✅ Perfil no admin também (opcional, mas já deixei pronto) */}
+        {sessionUserId && (
+          <ProfilePopup
+            isOpen={profileOpen}
+            onClose={() => setProfileOpen(false)}
+            userId={sessionUserId}
+            onOpenArticle={(id) => openArticleById(id)}
+          />
+        )}
       </div>
     );
   }
 
+  // ===== Article opened =====
   if (selectedArticle) {
     return (
       <>
-        <ArticleView article={selectedArticle} onBack={() => setSelectedArticle(null)} onShare={onShare} isDarkMode={isDarkMode} />
+        <ArticleView
+          article={selectedArticle}
+          onBack={() => setSelectedArticle(null)}
+          onShare={onShare}
+          isDarkMode={isDarkMode}
+        />
 
         <ShareModal isOpen={shareOpen} onClose={() => setShareOpen(false)} article={shareArticle} isDarkMode={isDarkMode} />
 
@@ -564,7 +413,15 @@ export default function App() {
 
         <NotificationPopup isOpen={notificationsOpen} onClose={() => setNotificationsOpen(false)} isDarkMode={isDarkMode} />
 
-        {sessionUserId && <ProfileModal isOpen={profileOpen} onClose={() => setProfileOpen(false)} userId={sessionUserId} />}
+        {/* ✅ Perfil */}
+        {sessionUserId && (
+          <ProfilePopup
+            isOpen={profileOpen}
+            onClose={() => setProfileOpen(false)}
+            userId={sessionUserId}
+            onOpenArticle={(id) => openArticleById(id)}
+          />
+        )}
       </>
     );
   }
@@ -581,6 +438,7 @@ export default function App() {
     window.location.assign(url.toString());
   };
 
+  // ===== App shell =====
   return (
     <div className={isDarkMode ? "bg-black text-white min-h-screen" : "bg-[#FDFBF4] text-[#0B1D33] min-h-screen"}>
       <div className={`max-w-md mx-auto min-h-screen ${isDarkMode ? "bg-black" : "bg-[#FDFBF4]"}`}>
@@ -620,7 +478,12 @@ export default function App() {
 
           {activeTab !== Category.INICIO && (
             <>
-              <SectionTitle title={String(activeTab)} sortOption={sortOption} onSortChange={setSortOption} isDarkMode={isDarkMode} />
+              <SectionTitle
+                title={String(activeTab)}
+                sortOption={sortOption}
+                onSortChange={setSortOption}
+                isDarkMode={isDarkMode}
+              />
 
               {loadingArticles ? (
                 <div className="px-6 text-sm text-gray-400">Carregando posts…</div>
@@ -649,12 +512,23 @@ export default function App() {
 
         <BottomNav activeTab={activeTab} onTabChange={setActiveTab} isDarkMode={isDarkMode} />
 
+        {/* Auth */}
         <AuthPopup isOpen={authOpen} onClose={() => setAuthOpen(false)} />
 
-        {sessionUserId && <ProfileModal isOpen={profileOpen} onClose={() => setProfileOpen(false)} userId={sessionUserId} />}
+        {/* ✅ Perfil (novo) */}
+        {sessionUserId && (
+          <ProfilePopup
+            isOpen={profileOpen}
+            onClose={() => setProfileOpen(false)}
+            userId={sessionUserId}
+            onOpenArticle={(id) => openArticleById(id)}
+          />
+        )}
 
+        {/* Notificações */}
         <NotificationPopup isOpen={notificationsOpen} onClose={() => setNotificationsOpen(false)} isDarkMode={isDarkMode} />
 
+        {/* Share */}
         <ShareModal isOpen={shareOpen} onClose={() => setShareOpen(false)} article={shareArticle} isDarkMode={isDarkMode} />
       </div>
     </div>

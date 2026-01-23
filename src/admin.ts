@@ -7,30 +7,51 @@ function sleep(ms: number) {
   return new Promise((r) => setTimeout(r, ms));
 }
 
+function withTimeout<T>(p: Promise<T>, ms: number, label = "timeout") {
+  return new Promise<T>((resolve, reject) => {
+    const t = window.setTimeout(() => reject(new Error(`${label} (${ms}ms)`)), ms);
+    p.then(
+      (v) => {
+        window.clearTimeout(t);
+        resolve(v);
+      },
+      (e) => {
+        window.clearTimeout(t);
+        reject(e);
+      }
+    );
+  });
+}
+
 export async function getMyRole(): Promise<Role | null> {
-  // 1) pega usuário logado
-  const { data: userData, error: userErr } = await supabase.auth.getUser();
-  if (userErr) return null;
+  // 1) sessão local (mais rápido e confiável)
+  const { data } = await supabase.auth.getSession();
+  const userId = data.session?.user?.id ?? null;
+  if (!userId) return null;
 
-  const user = userData?.user;
-  if (!user) return null;
+  // 2) retry curto pra role (às vezes profiles demora alguns ms pós-login)
+  const tries = [0, 150, 350, 700];
 
-  // 2) tenta buscar role com retry (token às vezes ainda não “entrou”)
-  const tries = [0, 250, 700, 1400]; // delays progressivos
   for (let i = 0; i < tries.length; i++) {
     if (tries[i]) await sleep(tries[i]);
 
-    const { data, error } = await supabase
-      .from("profiles")
-      .select("role")
-      .eq("id", user.id)
-      .maybeSingle();
+    try {
+      const query = supabase
+        .from("profiles")
+        .select("role")
+        .eq("id", userId)
+        .maybeSingle();
 
-    // achou
-    if (!error && data?.role) return (data.role as Role) ?? null;
+      const { data: row, error } = await withTimeout(query, 6000, "getMyRole");
 
-    // se não existe profile ainda, não adianta insistir muito
-    // (mas geralmente o trigger cria — então a 2ª tentativa resolve)
+      if (!error && row?.role) {
+        return row.role === "admin" ? "admin" : "reader";
+      }
+
+      if (error) console.warn("getMyRole try error:", error.message);
+    } catch (e: any) {
+      console.warn("getMyRole try crash:", e?.message ?? e);
+    }
   }
 
   return null;
