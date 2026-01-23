@@ -23,6 +23,20 @@ import FeaturedAuthors from "./components/FeaturedAuthors";
 import { fetchPublishedArticlesJoined } from "./services/articles";
 import { Article, Category, SortOption } from "./types";
 
+// helper: timeout para promessas (evita “Carregando…” infinito)
+function withTimeout<T>(p: Promise<T>, ms: number, label: string): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const t = setTimeout(() => reject(new Error(`Timeout: ${label} (${ms}ms)`)), ms);
+    p.then((v) => {
+      clearTimeout(t);
+      resolve(v);
+    }).catch((e) => {
+      clearTimeout(t);
+      reject(e);
+    });
+  });
+}
+
 export default function App() {
   // ===== Auth / Role =====
   const [authReady, setAuthReady] = useState(false);
@@ -52,24 +66,16 @@ export default function App() {
   const [shareOpen, setShareOpen] = useState(false);
   const [shareArticle, setShareArticle] = useState<Article | null>(null);
 
-  // URL params (sem router)
-  const searchParams = useMemo(() => {
-    try {
-      return new URLSearchParams(window.location.search);
-    } catch {
-      return new URLSearchParams();
-    }
-  }, []);
-
-  const isAdminRoute = (() => {
+  // ===== URL flags =====
+  const isAdminRoute = useMemo(() => {
     try {
       return new URLSearchParams(window.location.search).get("admin") === "1";
     } catch {
       return false;
     }
-  })();
+  }, []);
 
-  // ===== Boot session + role =====
+  // ===== Boot session + role (robusto com timeout) =====
   useEffect(() => {
     let mounted = true;
 
@@ -77,30 +83,34 @@ export default function App() {
       setAdminError(null);
 
       try {
-        const { data } = await supabase.auth.getSession();
+        // 1) Session (com timeout)
+        const { data } = await withTimeout(supabase.auth.getSession(), 7000, "getSession");
         const userId = data.session?.user?.id ?? null;
 
         if (!mounted) return;
 
         setSessionUserId(userId);
 
-        if (!userId) {
+        // ✅ libera o app mesmo que role demore
+        setAuthReady(true);
+
+        // 2) Role (com timeout)
+        if (userId) {
+          const r = await withTimeout(getMyRole(), 7000, "getMyRole");
+          if (!mounted) return;
+          setRole((r as any) ?? null);
+        } else {
           setRole(null);
-          return;
         }
-
-        const r = await getMyRole();
-        if (!mounted) return;
-
-        setRole((r as any) ?? null);
       } catch (e: any) {
         console.error("boot auth error:", e);
         if (!mounted) return;
+
+        // ✅ nunca travar em loading
         setSessionUserId(null);
         setRole(null);
         setAdminError(e?.message ?? "Erro ao validar sessão (Supabase).");
-      } finally {
-        if (mounted) setAuthReady(true);
+        setAuthReady(true);
       }
     };
 
@@ -111,6 +121,10 @@ export default function App() {
 
       const userId = session?.user?.id ?? null;
       setSessionUserId(userId);
+      setAdminError(null);
+
+      // ✅ libera o app sempre
+      setAuthReady(true);
 
       if (!userId) {
         setRole(null);
@@ -118,35 +132,44 @@ export default function App() {
       }
 
       try {
-        const r = await getMyRole();
+        const r = await withTimeout(getMyRole(), 7000, "getMyRole");
         if (!mounted) return;
         setRole((r as any) ?? null);
-      } catch (e) {
+      } catch (e: any) {
         console.error("role check error:", e);
         if (!mounted) return;
         setRole(null);
-        setAdminError("Erro ao validar sessão (Supabase).");
+        setAdminError(e?.message ?? "Erro ao validar role (Supabase).");
       }
     });
 
     return () => {
       mounted = false;
-      data.subscription.unsubscribe();
+      try {
+        data.subscription.unsubscribe();
+      } catch {}
     };
   }, []);
 
-  // ✅ Admin logou -> redireciona automático para /?admin=1
+  // ✅ Admin logou -> redireciona para /?admin=1 sem recarregar
   useEffect(() => {
     if (!authReady) return;
     if (!sessionUserId) return;
     if (role !== "admin") return;
-    if (isAdminRoute) return;
 
-    const url = new URL(window.location.href);
-    url.searchParams.set("admin", "1");
-    url.searchParams.delete("edit");
-    window.location.replace(url.toString());
-  }, [authReady, sessionUserId, role, isAdminRoute]);
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const alreadyAdmin = params.get("admin") === "1";
+      if (alreadyAdmin) return;
+
+      params.set("admin", "1");
+      params.delete("edit");
+      const next = `${window.location.pathname}?${params.toString()}`;
+      window.history.replaceState({}, "", next);
+    } catch {
+      // fallback: se algo der ruim, não quebra
+    }
+  }, [authReady, sessionUserId, role]);
 
   // ===== Theme =====
   useEffect(() => {
@@ -200,7 +223,7 @@ export default function App() {
     setShareOpen(true);
   };
 
-  // ✅ Clique no boneco: Auth (se não logado) ou Profile (se logado)
+  // ✅ Clique no boneco: Auth (se não logado) ou Perfil (se logado)
   const onUserPress = () => {
     if (sessionUserId) setProfileOpen(true);
     else setAuthOpen(true);
@@ -220,19 +243,23 @@ export default function App() {
 
     let list = articles;
 
+    // filtra por categoria (aba)
     if (activeTab && activeTab !== Category.INICIO) {
       list = list.filter((a) => a.category === activeTab);
     }
 
+    // busca simples
     if (q) {
       list = list.filter((a) => {
         const hay = [a.title, a.description, a.content, a.author, ...(a.tags ?? [])]
           .join(" ")
           .toLowerCase();
+
         return hay.includes(q);
       });
     }
 
+    // ordenação
     const sorted = [...list];
     sorted.sort((a, b) => {
       if (sortOption === "RECENTES") return (b.date ?? "").localeCompare(a.date ?? "");
@@ -268,6 +295,13 @@ export default function App() {
             <div className="mt-3 text-sm text-gray-400">
               Você precisa estar logado como <span className="text-yellow-400 font-bold">admin</span>.
             </div>
+
+            {!!adminError && (
+              <div className="mt-4 text-[12px] font-bold bg-red-500/10 border border-red-500/30 rounded-2xl px-4 py-3 text-red-200">
+                {adminError}
+              </div>
+            )}
+
             <button
               onClick={() => setAuthOpen(true)}
               className="mt-6 w-full bg-yellow-400 text-black py-4 rounded-3xl font-black text-xs uppercase tracking-[0.2em]"
