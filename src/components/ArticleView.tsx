@@ -19,16 +19,12 @@ interface ArticleViewProps {
   isDarkMode: boolean;
 }
 
-type DbCommentRow = {
+type DbCommentViewRow = {
   id: string;
   article_id: string;
   user_id: string;
   body: string;
   created_at: string;
-};
-
-type DbProfileMini = {
-  id: string;
   display_name: string | null;
   nickname: string | null;
   avatar_url: string | null;
@@ -270,12 +266,13 @@ const ArticleView: React.FC<ArticleViewProps> = ({ article, onBack, onShare, isD
     setSaved(!!savedRow);
   }
 
+  // ✅ AGORA LÊ DA VIEW (já vem profile junto, sem relationship)
   async function loadComments() {
     setErrorMsg(null);
 
     const { data, error } = await supabase
-      .from("article_comments")
-      .select("id,article_id,user_id,body,created_at")
+      .from("v_article_comments_with_profile")
+      .select("id,article_id,user_id,body,created_at,display_name,nickname,avatar_url")
       .eq("article_id", article.id)
       .order("created_at", { ascending: true });
 
@@ -285,30 +282,11 @@ const ArticleView: React.FC<ArticleViewProps> = ({ article, onBack, onShare, isD
       return;
     }
 
-    const rows = (data ?? []) as DbCommentRow[];
-    if (rows.length === 0) {
-      setComments([]);
-      setCommentsCount(0);
-      return;
-    }
-
-    const userIds = Array.from(new Set(rows.map((r) => r.user_id)));
-
-    // Busca profiles dos autores (SEM JOIN automático)
-    const { data: profs, error: profErr } = await supabase
-      .from("profiles")
-      .select("id,display_name,nickname,avatar_url")
-      .in("id", userIds);
-
-    if (profErr) console.warn("profiles for comments error:", profErr);
-
-    const map = new Map<string, DbProfileMini>();
-    (profs ?? []).forEach((pp: any) => map.set(pp.id, pp as DbProfileMini));
+    const rows = (data ?? []) as DbCommentViewRow[];
 
     const ui: Comment[] = rows.map((r) => {
-      const pp = map.get(r.user_id);
-      const author = (pp?.nickname || pp?.display_name || "Usuário") as string;
-      const avatar = (pp?.avatar_url || FALLBACK_AVATAR) as string;
+      const author = (r.nickname || r.display_name || "Usuário") as string;
+      const avatar = (r.avatar_url || FALLBACK_AVATAR) as string;
 
       return {
         id: r.id,
@@ -416,6 +394,7 @@ const ArticleView: React.FC<ArticleViewProps> = ({ article, onBack, onShare, isD
     setSent(true);
 
     try {
+      // ✅ INSERT CONTINUA NA TABELA NORMAL
       const { error } = await supabase.from("article_comments").insert({
         article_id: article.id,
         user_id: user.id,
@@ -454,7 +433,10 @@ const ArticleView: React.FC<ArticleViewProps> = ({ article, onBack, onShare, isD
       <div className={`max-w-md mx-auto min-h-screen flex flex-col relative pb-32 ${isDarkMode ? "bg-black" : "bg-[#FDFBF4]"}`}>
         {/* Reading Progress Bar */}
         <div className="fixed top-0 left-0 right-0 h-1 z-[100] flex justify-center max-w-md mx-auto pointer-events-none">
-          <div className={`h-full transition-all duration-150 ease-out ${isDarkMode ? "bg-yellow-400" : "bg-[#0B1D33]"}`} style={{ width: `${readingProgress}%` }} />
+          <div
+            className={`h-full transition-all duration-150 ease-out ${isDarkMode ? "bg-yellow-400" : "bg-[#0B1D33]"}`}
+            style={{ width: `${readingProgress}%` }}
+          />
         </div>
 
         <div
@@ -508,22 +490,40 @@ const ArticleView: React.FC<ArticleViewProps> = ({ article, onBack, onShare, isD
         </div>
 
         <div className="relative w-full h-[380px] overflow-hidden">
-          <img src={article.imageUrl} alt={article.title} className={`w-full h-full object-cover scale-105 ${isDarkMode ? "grayscale-[0.2]" : "grayscale-0"}`} />
+          <img
+            src={article.imageUrl}
+            alt={article.title}
+            className={`w-full h-full object-cover scale-105 ${isDarkMode ? "grayscale-[0.2]" : "grayscale-0"}`}
+          />
           <div className={`absolute inset-0 bg-gradient-to-t via-transparent to-transparent ${isDarkMode ? "from-black" : "from-[#FDFBF4]"}`} />
           <div className="absolute bottom-10 px-8">
             <div className="flex items-center gap-3 mb-4">
-              <span className={`px-4 py-1.5 text-[10px] font-black rounded-full uppercase tracking-[0.2em] shadow-xl ${isDarkMode ? "bg-yellow-400 text-black" : "bg-[#0B1D33] text-white"}`}>
+              <span
+                className={`px-4 py-1.5 text-[10px] font-black rounded-full uppercase tracking-[0.2em] shadow-xl ${
+                  isDarkMode ? "bg-yellow-400 text-black" : "bg-[#0B1D33] text-white"
+                }`}
+              >
                 {article.category}
               </span>
-              <span className={`text-[10px] font-black uppercase tracking-widest backdrop-blur-md px-3 py-1.5 rounded-full ${isDarkMode ? "bg-white/5 text-gray-400" : "bg-[#0B1D33]/5 text-[#0B1D33]"}`}>
+              <span
+                className={`text-[10px] font-black uppercase tracking-widest backdrop-blur-md px-3 py-1.5 rounded-full ${
+                  isDarkMode ? "bg-white/5 text-gray-400" : "bg-[#0B1D33]/5 text-[#0B1D33]"
+                }`}
+              >
                 {article.readTime}
               </span>
             </div>
-            <h1 className={`text-3xl font-black leading-[1.1] tracking-tighter ${isDarkMode ? "text-white" : "text-[#0B1D33]"}`}>{article.title}</h1>
+            <h1 className={`text-3xl font-black leading-[1.1] tracking-tighter ${isDarkMode ? "text-white" : "text-[#0B1D33]"}`}>
+              {article.title}
+            </h1>
           </div>
         </div>
 
-        <div className={`px-8 py-6 flex items-center justify-between border-b transition-all ${isDarkMode ? "border-white/5 bg-[#080808]" : "border-[#0B1D33]/5 bg-[#F0F2F5]/30"}`}>
+        <div
+          className={`px-8 py-6 flex items-center justify-between border-b transition-all ${
+            isDarkMode ? "border-white/5 bg-[#080808]" : "border-[#0B1D33]/5 bg-[#F0F2F5]/30"
+          }`}
+        >
           <div className="flex items-center gap-4">
             <div className="w-12 h-12 rounded-full overflow-hidden border-2 shadow-inner border-white/5">
               <img src={headerAvatar} alt="avatar" className="w-full h-full object-cover" />
@@ -534,7 +534,10 @@ const ArticleView: React.FC<ArticleViewProps> = ({ article, onBack, onShare, isD
             </div>
           </div>
 
-          <button onClick={toggleLike} className={`flex flex-col items-center gap-1 transition-all ${liked ? "text-red-500 scale-110" : "text-gray-500 hover:text-white"}`}>
+          <button
+            onClick={toggleLike}
+            className={`flex flex-col items-center gap-1 transition-all ${liked ? "text-red-500 scale-110" : "text-gray-500 hover:text-white"}`}
+          >
             <div className={`p-2.5 rounded-full ${liked ? "bg-red-500/10" : isDarkMode ? "bg-white/5" : "bg-[#0B1D33]/5"}`}>
               <Heart size={22} fill={liked ? "currentColor" : "none"} strokeWidth={liked ? 0 : 2.5} />
             </div>
@@ -548,7 +551,11 @@ const ArticleView: React.FC<ArticleViewProps> = ({ article, onBack, onShare, isD
           </p>
         </div>
 
-        <div className={`border-t px-8 pt-12 pb-20 rounded-t-[50px] mt-8 flex-1 shadow-[0_-20px_50px_rgba(0,0,0,0.05)] transition-all ${isDarkMode ? "bg-[#0c0c0c] border-white/5" : "bg-white border-[#0B1D33]/5"}`}>
+        <div
+          className={`border-t px-8 pt-12 pb-20 rounded-t-[50px] mt-8 flex-1 shadow-[0_-20px_50px_rgba(0,0,0,0.05)] transition-all ${
+            isDarkMode ? "bg-[#0c0c0c] border-white/5" : "bg-white border-[#0B1D33]/5"
+          }`}
+        >
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-3">
               <div className={`p-2.5 rounded-xl ${isDarkMode ? "bg-yellow-400/10" : "bg-[#0B1D33]/5"}`}>

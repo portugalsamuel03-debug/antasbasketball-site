@@ -22,6 +22,24 @@ type MiniArticle = {
 
 type Tab = "PERFIL" | "CURTIDOS" | "SALVOS";
 
+type LikeViewRow = {
+  user_id: string;
+  liked_at: string;
+  article_id: string;
+  title: string;
+  cover_url: string | null;
+  published_at: string | null;
+};
+
+type SavedViewRow = {
+  user_id: string;
+  saved_at: string;
+  article_id: string;
+  title: string;
+  cover_url: string | null;
+  published_at: string | null;
+};
+
 function dicebear(seed: string) {
   return `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(seed)}`;
 }
@@ -112,51 +130,37 @@ export default function ProfilePopup({
     setErr(null);
 
     try {
-      // Curtidos
+      // ✅ CURTIDOS via VIEW
       const { data: likesData, error: likesErr } = await supabase
-        .from("article_likes")
-        .select(
-          `
-          created_at,
-          articles:articles (
-            id,
-            title,
-            cover_url,
-            published_at
-          )
-        `
-        )
+        .from("v_user_liked_articles")
+        .select("user_id,liked_at,article_id,title,cover_url,published_at")
         .eq("user_id", userId)
-        .order("created_at", { ascending: false });
+        .order("liked_at", { ascending: false });
 
       if (likesErr) throw likesErr;
 
-      const liked = ((likesData as any[]) ?? [])
-        .map((x) => x.articles)
-        .filter(Boolean) as MiniArticle[];
+      const liked = ((likesData as any[]) ?? []).map((x: LikeViewRow) => ({
+        id: x.article_id,
+        title: x.title,
+        cover_url: x.cover_url,
+        published_at: x.published_at,
+      })) as MiniArticle[];
 
-      // Salvos
+      // ✅ SALVOS via VIEW
       const { data: savedData, error: savedErr } = await supabase
-        .from("article_read_later")
-        .select(
-          `
-          created_at,
-          articles:articles (
-            id,
-            title,
-            cover_url,
-            published_at
-          )
-        `
-        )
+        .from("v_user_saved_articles")
+        .select("user_id,saved_at,article_id,title,cover_url,published_at")
         .eq("user_id", userId)
-        .order("created_at", { ascending: false });
+        .order("saved_at", { ascending: false });
 
       if (savedErr) throw savedErr;
 
-      const saved = ((savedData as any[]) ?? [])
-        .map((x) => x.articles)
-        .filter(Boolean) as MiniArticle[];
+      const saved = ((savedData as any[]) ?? []).map((x: SavedViewRow) => ({
+        id: x.article_id,
+        title: x.title,
+        cover_url: x.cover_url,
+        published_at: x.published_at,
+      })) as MiniArticle[];
 
       setLikedArticles(liked);
       setSavedArticles(saved);
@@ -181,7 +185,6 @@ export default function ProfilePopup({
     setLoading(true);
 
     try {
-      // ✅ remove updated_at do payload (pra não dar erro TS/typing)
       const payload = {
         display_name: displayName.trim() || null,
         nickname: nickname.trim() || null,
@@ -191,7 +194,6 @@ export default function ProfilePopup({
       const { error } = await supabase.from("profiles").update(payload).eq("id", userId);
       if (error) throw error;
 
-      // fecha e volta pro modo visualizar
       setEditMode(false);
       setTab("PERFIL");
       onClose();

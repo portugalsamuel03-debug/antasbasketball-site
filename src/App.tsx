@@ -51,7 +51,9 @@ export default function App() {
 
   // ===== UI =====
   const [isDarkMode, setIsDarkMode] = useState(true);
-  const [activeTab, setActiveTab] = useState<Category>(Category.NOTICIAS);
+
+  // ✅ COMEÇA NO HOME (INICIO)
+  const [activeTab, setActiveTab] = useState<Category>(Category.INICIO);
 
   const [authOpen, setAuthOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
@@ -267,7 +269,6 @@ export default function App() {
       setSelectedArticle(found);
       return;
     }
-    // caso raro: lista ainda não carregou ou não está no estado
     alert("Não encontrei esse post na lista atual. Atualize e tente novamente.");
   };
 
@@ -383,7 +384,6 @@ export default function App() {
       <div className="bg-black min-h-screen">
         <AdminPanel />
 
-        {/* ✅ Perfil no admin também (opcional, mas já deixei pronto) */}
         {sessionUserId && (
           <ProfilePopup
             isOpen={profileOpen}
@@ -408,12 +408,9 @@ export default function App() {
         />
 
         <ShareModal isOpen={shareOpen} onClose={() => setShareOpen(false)} article={shareArticle} isDarkMode={isDarkMode} />
-
         <AuthPopup isOpen={authOpen} onClose={() => setAuthOpen(false)} />
-
         <NotificationPopup isOpen={notificationsOpen} onClose={() => setNotificationsOpen(false)} isDarkMode={isDarkMode} />
 
-        {/* ✅ Perfil */}
         {sessionUserId && (
           <ProfilePopup
             isOpen={profileOpen}
@@ -512,10 +509,8 @@ export default function App() {
 
         <BottomNav activeTab={activeTab} onTabChange={setActiveTab} isDarkMode={isDarkMode} />
 
-        {/* Auth */}
         <AuthPopup isOpen={authOpen} onClose={() => setAuthOpen(false)} />
 
-        {/* ✅ Perfil (novo) */}
         {sessionUserId && (
           <ProfilePopup
             isOpen={profileOpen}
@@ -525,10 +520,7 @@ export default function App() {
           />
         )}
 
-        {/* Notificações */}
         <NotificationPopup isOpen={notificationsOpen} onClose={() => setNotificationsOpen(false)} isDarkMode={isDarkMode} />
-
-        {/* Share */}
         <ShareModal isOpen={shareOpen} onClose={() => setShareOpen(false)} article={shareArticle} isDarkMode={isDarkMode} />
       </div>
     </div>
