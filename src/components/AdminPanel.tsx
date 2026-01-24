@@ -13,7 +13,7 @@ import {
 } from "../cms";
 import { supabase } from "../lib/supabase";
 
-type Tab = "VISÕES" | "POSTS" | "AUTORES" | "TAGS";
+type Tab = "VISÕES" | "POSTS" | "AUTORES" | "TAGS" | "CATEGORIAS";
 
 type CategoryRow = {
   id: number;
@@ -87,14 +87,18 @@ const AdminPanel: React.FC = () => {
   const [editing, setEditing] = useState<Partial<ArticleRow> | null>(null);
   const [authorEditing, setAuthorEditing] = useState<Partial<AuthorRow> | null>(null);
 
-  // quick tag create (inline no editor)
-  const [tagQuickOpen, setTagQuickOpen] = useState(false);
-  const [tagQuickLabel, setTagQuickLabel] = useState("");
-  const [tagQuickSlug, setTagQuickSlug] = useState("");
+  // TAGS editor (aba TAGS)
+  const [tagEditing, setTagEditing] = useState<Partial<TagRow> | null>(null);
 
-  // tags vinculadas ao post
+  // CATEGORIES editor (aba CATEGORIAS)
+  const [categoryEditing, setCategoryEditing] = useState<Partial<CategoryRow> | null>(null);
+
+  // tags do post (editor POSTS)
   const [selectedTagIds, setSelectedTagIds] = useState<string[]>([]);
   const [loadingPostTags, setLoadingPostTags] = useState(false);
+
+  // preview do post
+  const [postMode, setPostMode] = useState<"EDIT" | "PREVIEW">("EDIT");
 
   // filtros (lista de posts)
   const [q, setQ] = useState("");
@@ -106,9 +110,15 @@ const AdminPanel: React.FC = () => {
   const [articleTagMap, setArticleTagMap] = useState<Map<string, string[]>>(new Map());
   const [loadingTagMap, setLoadingTagMap] = useState(false);
 
+  // quick category create (no editor post)
   const [quickCategoryOpen, setQuickCategoryOpen] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState("");
   const [newCategoryIcon, setNewCategoryIcon] = useState("");
+
+  // quick tag create (inline no editor post)
+  const [tagQuickOpen, setTagQuickOpen] = useState(false);
+  const [tagQuickLabel, setTagQuickLabel] = useState("");
+  const [tagQuickSlug, setTagQuickSlug] = useState("");
 
   const authorById = useMemo(() => {
     const m = new Map<string, AuthorRow>();
@@ -125,11 +135,11 @@ const AdminPanel: React.FC = () => {
   const categoryOptions = useMemo(() => {
     const active = categories.filter((c) => c.is_active !== false);
     const fromDb = active
+      .slice()
       .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
       .map((c) => c.name);
 
     const fromArticles = Array.from(new Set(articles.map((a) => a.category).filter(Boolean))) as string[];
-
     const merged = Array.from(new Set([...fromDb, ...fromArticles, ...DEFAULT_VIEWS]));
     return merged.filter(Boolean);
   }, [categories, articles]);
@@ -161,16 +171,17 @@ const AdminPanel: React.FC = () => {
     setAuthors(nextAuthors);
     setTags(nextTags);
 
-    // categories
+    // categories direto do Supabase
     try {
       const { data, error } = await supabase
         .from("categories")
         .select("id,name,slug,icon,sort_order,is_active")
         .order("sort_order", { ascending: true });
+
       if (error) throw error;
       setCategories((data as any) ?? []);
     } catch (e) {
-      console.warn("Falha ao carregar categories (ok):", e);
+      console.warn("Falha ao carregar categories:", e);
       setCategories([]);
     }
 
@@ -193,7 +204,7 @@ const AdminPanel: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // carrega map de tags pra filtros/visões (uma vez por refresh)
+  // map article -> tags (pra filtro e chips)
   async function loadTagMapForArticles(articleIds: string[]) {
     if (!articleIds.length) {
       setArticleTagMap(new Map());
@@ -229,14 +240,14 @@ const AdminPanel: React.FC = () => {
   }
 
   useEffect(() => {
-    const ids = articles.map((a) => a.id).filter(Boolean);
-    loadTagMapForArticles(ids);
+    loadTagMapForArticles(articles.map((a) => a.id).filter(Boolean));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [articles]);
 
   function openEdit(a: ArticleRow) {
     setTab("POSTS");
     setEditing(a);
+    setPostMode("EDIT");
     setSearchParam("admin", "1");
     setSearchParam("edit", a.id);
   }
@@ -244,6 +255,8 @@ const AdminPanel: React.FC = () => {
   function closeEdit() {
     setEditing(null);
     setSelectedTagIds([]);
+    setTagQuickOpen(false);
+    setPostMode("EDIT");
     setSearchParam("edit", null);
   }
 
@@ -254,8 +267,7 @@ const AdminPanel: React.FC = () => {
       if (error) throw error;
       const ids = ((data as any[]) ?? []).map((x) => x.tag_id).filter(Boolean);
       setSelectedTagIds(ids);
-    } catch (e: any) {
-      console.warn("loadArticleTags error:", e?.message ?? e);
+    } catch {
       setSelectedTagIds([]);
     } finally {
       setLoadingPostTags(false);
@@ -277,6 +289,7 @@ const AdminPanel: React.FC = () => {
     if (error) throw error;
   }
 
+  // ---------- POSTS ----------
   async function saveArticle() {
     if (!editing) return;
 
@@ -300,9 +313,7 @@ const AdminPanel: React.FC = () => {
       if (error) throw error;
 
       const saved = (data as any) as ArticleRow;
-      if (saved?.id) {
-        await syncArticleTags(saved.id, selectedTagIds);
-      }
+      if (saved?.id) await syncArticleTags(saved.id, selectedTagIds);
 
       setMsg("Artigo salvo ✅");
       closeEdit();
@@ -331,89 +342,6 @@ const AdminPanel: React.FC = () => {
     }
   }
 
-  async function quickAddCategory() {
-    setMsg(null);
-    const name = newCategoryName.trim();
-    if (!name) return setMsg("Digite o nome da categoria.");
-
-    try {
-      const slug = slugify(name);
-      const icon = newCategoryIcon.trim() || null;
-
-      const { error } = await supabase.from("categories").insert({
-        name,
-        slug,
-        icon,
-        sort_order: 0,
-        is_active: true,
-      });
-
-      if (error) throw error;
-
-      setQuickCategoryOpen(false);
-      setNewCategoryName("");
-      setNewCategoryIcon("");
-      setMsg("Categoria criada ✅");
-
-      if (editing) setEditing({ ...editing, category: name });
-
-      await refreshAll();
-    } catch (e: any) {
-      console.error(e);
-      setMsg(e?.message ?? "Erro ao criar categoria.");
-    }
-  }
-
-  async function quickCreateTag() {
-    setMsg(null);
-
-    const rawLabel = tagQuickLabel.trim();
-    if (!rawLabel) return setMsg("Digite o label da tag.");
-
-    const label = rawLabel.toUpperCase();
-    const slug = tagQuickSlug.trim() || slugify(rawLabel);
-
-    try {
-      const { data, error } = await supabase.from("tags").insert({ label, slug }).select("*").single();
-      if (error) throw error;
-
-      setTagQuickOpen(false);
-      setTagQuickLabel("");
-      setTagQuickSlug("");
-
-      await refreshAll();
-      if (data?.id) setSelectedTagIds((prev) => Array.from(new Set([...prev, data.id])));
-      setMsg("Tag criada ✅");
-    } catch (e: any) {
-      console.error(e);
-      setMsg(e?.message ?? "Erro ao criar tag.");
-    }
-  }
-
-  async function saveAuthor() {
-    if (!authorEditing?.name) return setMsg("Autor precisa de nome.");
-
-    setMsg(null);
-    try {
-      const payload: Partial<AuthorRow> = {
-        ...authorEditing,
-        slug: authorEditing.slug?.trim() || slugify(authorEditing.name),
-        updated_at: new Date().toISOString() as any,
-      };
-
-      const { error } = await upsertAuthor(payload);
-      if (error) throw error;
-
-      setMsg("Autor salvo ✅");
-      setAuthorEditing(null);
-      await refreshAll();
-    } catch (e: any) {
-      console.error(e);
-      setMsg(e?.message ?? "Erro ao salvar autor.");
-    }
-  }
-
-  // ✅ ações rápidas
   async function quickTogglePublish(a: ArticleRow) {
     setMsg(null);
     try {
@@ -470,44 +398,12 @@ const AdminPanel: React.FC = () => {
     }
   }
 
-  // ---------- LISTAS / VISÕES ----------
-  const input =
-    "w-full bg-black/30 border border-white/10 rounded-2xl px-4 py-3 text-sm outline-none focus:border-yellow-400/40";
-  const label =
-    "text-[10px] font-black uppercase tracking-widest text-gray-400";
-
-  const postsSorted = useMemo(() => {
-    return [...articles].sort((a, b) => (b.published_at ?? "").localeCompare(a.published_at ?? ""));
-  }, [articles]);
-
-  const filteredPosts = useMemo(() => {
-    const qq = q.trim().toLowerCase();
-
-    return postsSorted.filter((a) => {
-      // categoria
-      if (filterCategory !== "ALL" && a.category !== filterCategory) return false;
-
-      // status
-      if (filterStatus === "PUBLISHED" && !a.published) return false;
-      if (filterStatus === "DRAFT" && a.published) return false;
-
-      // tag
-      if (filterTagId !== "ALL") {
-        const tIds = articleTagMap.get(a.id) ?? [];
-        if (!tIds.includes(filterTagId)) return false;
-      }
-
-      // busca
-      if (!qq) return true;
-      const blob = `${a.title ?? ""} ${a.slug ?? ""} ${a.excerpt ?? ""}`.toLowerCase();
-      return blob.includes(qq);
-    });
-  }, [postsSorted, q, filterCategory, filterStatus, filterTagId, articleTagMap]);
-
   function openNewPost(category?: string) {
     setSearchParam("admin", "1");
     setSearchParam("edit", null);
     setSelectedTagIds([]);
+    setTagQuickOpen(false);
+    setPostMode("EDIT");
     setTab("POSTS");
     setEditing({
       title: "",
@@ -523,6 +419,215 @@ const AdminPanel: React.FC = () => {
       author_id: authors[0]?.id ?? null,
     });
   }
+
+  // ---------- AUTORES ----------
+  async function saveAuthor() {
+    if (!authorEditing?.name) return setMsg("Autor precisa de nome.");
+
+    setMsg(null);
+    try {
+      const payload: Partial<AuthorRow> = {
+        ...authorEditing,
+        slug: authorEditing.slug?.trim() || slugify(authorEditing.name),
+        updated_at: new Date().toISOString() as any,
+      };
+
+      const { error } = await upsertAuthor(payload);
+      if (error) throw error;
+
+      setMsg("Autor salvo ✅");
+      setAuthorEditing(null);
+      await refreshAll();
+    } catch (e: any) {
+      console.error(e);
+      setMsg(e?.message ?? "Erro ao salvar autor.");
+    }
+  }
+
+  // ---------- TAGS (UPGRADE #1) ----------
+  async function saveTag() {
+    setMsg(null);
+
+    const rawLabel = (tagEditing?.label ?? "").trim();
+    if (!rawLabel) return setMsg("Tag precisa de label.");
+
+    const label = rawLabel.toUpperCase();
+    const slug = (tagEditing?.slug ?? "").trim() || slugify(rawLabel);
+
+    try {
+      const payload = {
+        id: tagEditing?.id ?? undefined,
+        label,
+        slug,
+      };
+
+      const { error } = await supabase.from("tags").upsert(payload, { onConflict: "id" }).select();
+      if (error) throw error;
+
+      setMsg("Tag salva ✅");
+      setTagEditing(null);
+      await refreshAll();
+    } catch (e: any) {
+      console.error(e);
+      setMsg(e?.message ?? "Erro ao salvar tag.");
+    }
+  }
+
+  async function removeTag(tagId: string) {
+    if (!confirm("Apagar esta TAG? Isso remove também os vínculos nos posts.")) return;
+
+    setMsg(null);
+    try {
+      // remove vínculos primeiro
+      const { error: relErr } = await supabase.from("article_tags").delete().eq("tag_id", tagId);
+      if (relErr) throw relErr;
+
+      const { error } = await supabase.from("tags").delete().eq("id", tagId);
+      if (error) throw error;
+
+      setMsg("Tag apagada ✅");
+      if (tagEditing?.id === tagId) setTagEditing(null);
+      await refreshAll();
+    } catch (e: any) {
+      console.error(e);
+      setMsg(e?.message ?? "Erro ao apagar tag.");
+    }
+  }
+
+  async function quickCreateTag() {
+    setMsg(null);
+
+    const rawLabel = tagQuickLabel.trim();
+    if (!rawLabel) return setMsg("Digite o label da tag.");
+
+    const label = rawLabel.toUpperCase();
+    const slug = tagQuickSlug.trim() || slugify(rawLabel);
+
+    try {
+      const { data, error } = await supabase.from("tags").insert({ label, slug }).select("*").single();
+      if (error) throw error;
+
+      setTagQuickOpen(false);
+      setTagQuickLabel("");
+      setTagQuickSlug("");
+
+      await refreshAll();
+      if (data?.id) setSelectedTagIds((prev) => Array.from(new Set([...prev, data.id])));
+      setMsg("Tag criada ✅");
+    } catch (e: any) {
+      console.error(e);
+      setMsg(e?.message ?? "Erro ao criar tag.");
+    }
+  }
+
+  // ---------- CATEGORIAS (UPGRADE #2) ----------
+  async function saveCategory() {
+    setMsg(null);
+    const name = (categoryEditing?.name ?? "").trim();
+    if (!name) return setMsg("Categoria precisa de nome.");
+
+    try {
+      const payload = {
+        id: categoryEditing?.id ?? undefined,
+        name,
+        slug: (categoryEditing?.slug ?? "").trim() || slugify(name),
+        icon: (categoryEditing?.icon ?? "").trim() || null,
+        sort_order: Number(categoryEditing?.sort_order ?? 0),
+        is_active: categoryEditing?.is_active ?? true,
+      };
+
+      const { error } = await supabase.from("categories").upsert(payload, { onConflict: "id" }).select();
+      if (error) throw error;
+
+      setMsg("Categoria salva ✅");
+      setCategoryEditing(null);
+      await refreshAll();
+    } catch (e: any) {
+      console.error(e);
+      setMsg(e?.message ?? "Erro ao salvar categoria.");
+    }
+  }
+
+  async function toggleCategoryActive(cat: CategoryRow) {
+    setMsg(null);
+    try {
+      const { error } = await supabase
+        .from("categories")
+        .update({ is_active: !cat.is_active })
+        .eq("id", cat.id);
+
+      if (error) throw error;
+      setMsg(!cat.is_active ? "Categoria ativada ✅" : "Categoria desativada ✅");
+      await refreshAll();
+    } catch (e: any) {
+      console.error(e);
+      setMsg(e?.message ?? "Erro ao alterar categoria.");
+    }
+  }
+
+  // quick add category (editor post)
+  async function quickAddCategory() {
+    setMsg(null);
+    const name = newCategoryName.trim();
+    if (!name) return setMsg("Digite o nome da categoria.");
+
+    try {
+      const slug = slugify(name);
+      const icon = newCategoryIcon.trim() || null;
+
+      const { error } = await supabase.from("categories").insert({
+        name,
+        slug,
+        icon,
+        sort_order: 0,
+        is_active: true,
+      });
+
+      if (error) throw error;
+
+      setQuickCategoryOpen(false);
+      setNewCategoryName("");
+      setNewCategoryIcon("");
+      setMsg("Categoria criada ✅");
+
+      if (editing) setEditing({ ...editing, category: name });
+
+      await refreshAll();
+    } catch (e: any) {
+      console.error(e);
+      setMsg(e?.message ?? "Erro ao criar categoria.");
+    }
+  }
+
+  // ---------- LISTAS / VISÕES ----------
+  const input =
+    "w-full bg-black/30 border border-white/10 rounded-2xl px-4 py-3 text-sm outline-none focus:border-yellow-400/40";
+  const label =
+    "text-[10px] font-black uppercase tracking-widest text-gray-400";
+
+  const postsSorted = useMemo(() => {
+    return [...articles].sort((a, b) => (b.published_at ?? "").localeCompare(a.published_at ?? ""));
+  }, [articles]);
+
+  const filteredPosts = useMemo(() => {
+    const qq = q.trim().toLowerCase();
+
+    return postsSorted.filter((a) => {
+      if (filterCategory !== "ALL" && a.category !== filterCategory) return false;
+
+      if (filterStatus === "PUBLISHED" && !a.published) return false;
+      if (filterStatus === "DRAFT" && a.published) return false;
+
+      if (filterTagId !== "ALL") {
+        const tIds = articleTagMap.get(a.id) ?? [];
+        if (!tIds.includes(filterTagId)) return false;
+      }
+
+      if (!qq) return true;
+      const blob = `${a.title ?? ""} ${a.slug ?? ""} ${a.excerpt ?? ""}`.toLowerCase();
+      return blob.includes(qq);
+    });
+  }, [postsSorted, q, filterCategory, filterStatus, filterTagId, articleTagMap]);
 
   const viewCounts = useMemo(() => {
     const m = new Map<string, number>();
@@ -542,6 +647,43 @@ const AdminPanel: React.FC = () => {
     setFilterTagId("ALL");
     setQ("");
   }
+
+  // ---------- PREVIEW (UPGRADE #3) ----------
+  const previewData = useMemo(() => {
+    if (!editing) return null;
+
+    const authorName =
+      authorById.get(editing.author_id ?? "")?.name ?? "Sem autor";
+
+    const cover = (editing.cover_url ?? "").trim();
+    const cat = (editing.category ?? "").trim();
+    const sub = (editing.subcategory ?? "").trim();
+    const title = (editing.title ?? "").trim() || "Sem título";
+    const excerpt = (editing.excerpt ?? "").trim();
+    const content = (editing.content ?? "").trim();
+
+    const tLabels = (selectedTagIds ?? [])
+      .map((id) => tagById.get(id)?.label)
+      .filter(Boolean) as string[];
+
+    const publishedAtText = editing.published_at
+      ? toDatetimeLocal(editing.published_at).replace("T", " ")
+      : "—";
+
+    return {
+      cover,
+      cat,
+      sub,
+      title,
+      excerpt,
+      content,
+      authorName,
+      publishedAtText,
+      tLabels,
+      published: !!editing.published,
+      reading: Number(editing.reading_minutes ?? 5),
+    };
+  }, [editing, authorById, selectedTagIds, tagById]);
 
   if (loading) {
     return (
@@ -576,7 +718,7 @@ const AdminPanel: React.FC = () => {
       )}
 
       <div className="flex gap-2 mt-6 flex-wrap">
-        {(["VISÕES", "POSTS", "AUTORES", "TAGS"] as Tab[]).map((t) => (
+        {(["VISÕES", "POSTS", "AUTORES", "TAGS", "CATEGORIAS"] as Tab[]).map((t) => (
           <button
             key={t}
             onClick={() => setTab(t)}
@@ -593,7 +735,7 @@ const AdminPanel: React.FC = () => {
       {tab === "VISÕES" && (
         <div className="mt-6 space-y-4">
           <div className="text-[11px] text-gray-400">
-            Atalhos por categoria (como você pediu: REGRAS usando <b>articles.category</b>).
+            Atalhos por categoria (REGRAS = <b>articles.category</b>).
           </div>
 
           <div className="grid grid-cols-2 gap-3">
@@ -603,12 +745,8 @@ const AdminPanel: React.FC = () => {
                 onClick={() => openView(c)}
                 className="bg-white/5 border border-white/10 rounded-[24px] p-4 text-left hover:bg-white/10 transition"
               >
-                <div className="text-[10px] font-black uppercase tracking-widest text-yellow-400">
-                  {c}
-                </div>
-                <div className="text-2xl font-black mt-2 tabular-nums">
-                  {viewCounts.get(c) ?? 0}
-                </div>
+                <div className="text-[10px] font-black uppercase tracking-widest text-yellow-400">{c}</div>
+                <div className="text-2xl font-black mt-2 tabular-nums">{viewCounts.get(c) ?? 0}</div>
                 <div className="text-[11px] text-gray-400 mt-1">itens</div>
               </button>
             ))}
@@ -635,9 +773,7 @@ const AdminPanel: React.FC = () => {
 
           {/* filtros */}
           <div className="bg-white/5 border border-white/10 rounded-[24px] p-4 space-y-3">
-            <div className="text-[10px] font-black uppercase tracking-widest text-yellow-400">
-              Filtros
-            </div>
+            <div className="text-[10px] font-black uppercase tracking-widest text-yellow-400">Filtros</div>
 
             <input
               className={input}
@@ -661,11 +797,7 @@ const AdminPanel: React.FC = () => {
 
               <div>
                 <div className={label}>Status</div>
-                <select
-                  className={input}
-                  value={filterStatus}
-                  onChange={(e) => setFilterStatus(e.target.value as any)}
-                >
+                <select className={input} value={filterStatus} onChange={(e) => setFilterStatus(e.target.value as any)}>
                   <option value="ALL">Todos</option>
                   <option value="PUBLISHED">Publicado</option>
                   <option value="DRAFT">Rascunho</option>
@@ -710,289 +842,402 @@ const AdminPanel: React.FC = () => {
           {/* editor */}
           {editing && (
             <div className="bg-white/5 border border-white/10 rounded-[28px] p-5 space-y-4">
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between gap-2">
                 <div className="text-[10px] font-black uppercase tracking-widest text-yellow-400">Editar post</div>
-                <button
-                  onClick={closeEdit}
-                  className="px-4 py-2 rounded-2xl text-[10px] font-black uppercase tracking-widest bg-white/5 border border-white/10"
-                >
-                  Fechar
-                </button>
-              </div>
 
-              {/* Título + slug */}
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <div className={label}>Título</div>
-                  <input
-                    className={input}
-                    placeholder="Título"
-                    value={editing.title ?? ""}
-                    onChange={(e) => setEditing({ ...editing, title: e.target.value })}
-                  />
-                </div>
-
-                <div>
-                  <div className={label}>Slug</div>
-                  <input
-                    className={input}
-                    placeholder="Slug (opcional)"
-                    value={editing.slug ?? ""}
-                    onChange={(e) => setEditing({ ...editing, slug: e.target.value })}
-                  />
-                </div>
-              </div>
-
-              {/* Categoria + */}
-              <div>
-                <div className={label}>Categoria</div>
-                <div className="grid grid-cols-[1fr_auto] gap-2 items-center">
-                  <select
-                    className={input}
-                    value={editing.category ?? ""}
-                    onChange={(e) => setEditing({ ...editing, category: e.target.value })}
-                  >
-                    {categoryOptions.map((c) => (
-                      <option key={c} value={c}>
-                        {c}
-                      </option>
-                    ))}
-                  </select>
+                <div className="flex gap-2">
                   <button
-                    type="button"
-                    onClick={() => setQuickCategoryOpen(true)}
-                    className="px-4 py-3 rounded-2xl text-[12px] font-black bg-yellow-400 text-black"
-                    title="Criar nova categoria"
+                    onClick={() => setPostMode("EDIT")}
+                    className={`px-4 py-2 rounded-2xl text-[10px] font-black uppercase tracking-widest border ${
+                      postMode === "EDIT"
+                        ? "bg-yellow-400 text-black border-yellow-400"
+                        : "bg-white/5 border-white/10 text-gray-200"
+                    }`}
                   >
-                    +
+                    Editar
+                  </button>
+
+                  <button
+                    onClick={() => setPostMode("PREVIEW")}
+                    className={`px-4 py-2 rounded-2xl text-[10px] font-black uppercase tracking-widest border ${
+                      postMode === "PREVIEW"
+                        ? "bg-yellow-400 text-black border-yellow-400"
+                        : "bg-white/5 border-white/10 text-gray-200"
+                    }`}
+                    disabled={!editing.title && !editing.content}
+                  >
+                    Preview
+                  </button>
+
+                  <button
+                    onClick={closeEdit}
+                    className="px-4 py-2 rounded-2xl text-[10px] font-black uppercase tracking-widest bg-white/5 border border-white/10"
+                  >
+                    Fechar
                   </button>
                 </div>
               </div>
 
-              {/* Subcategoria */}
-              <div>
-                <div className={label}>Subcategoria</div>
-                <select
-                  className={input}
-                  value={editing.subcategory ?? ""}
-                  onChange={(e) => setEditing({ ...editing, subcategory: e.target.value || null })}
-                >
-                  <option value="">Sem subcategoria</option>
-                  {subcategoryOptions.map((s) => (
-                    <option key={s} value={s}>
-                      {s}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              {postMode === "PREVIEW" && previewData ? (
+                <div className="space-y-4">
+                  <div className="rounded-[24px] overflow-hidden border border-white/10 bg-black/20">
+                    {previewData.cover ? (
+                      <img src={previewData.cover} className="w-full h-[220px] object-cover" alt="cover" />
+                    ) : (
+                      <div className="w-full h-[220px] flex items-center justify-center text-gray-400 text-sm">
+                        Sem imagem (cover_url)
+                      </div>
+                    )}
 
-              {/* Autor */}
-              <div>
-                <div className={label}>Autor</div>
-                <div className="grid grid-cols-[1fr_auto] gap-2 items-center">
-                  <select
-                    className={input}
-                    value={editing.author_id ?? ""}
-                    onChange={(e) => setEditing({ ...editing, author_id: e.target.value || null })}
-                  >
-                    <option value="">Sem autor</option>
-                    {authors.map((a) => (
-                      <option key={a.id} value={a.id}>
-                        {a.name}
-                      </option>
-                    ))}
-                  </select>
+                    <div className="p-4 space-y-3">
+                      <div className="flex flex-wrap gap-2 items-center">
+                        <span className="px-3 py-1 rounded-full bg-yellow-400 text-black text-[10px] font-black uppercase tracking-widest">
+                          {previewData.cat || "SEM CATEGORIA"}
+                        </span>
+                        {previewData.sub ? (
+                          <span className="px-3 py-1 rounded-full bg-white/5 border border-white/10 text-gray-200 text-[10px] font-black uppercase tracking-widest">
+                            {previewData.sub}
+                          </span>
+                        ) : null}
+                        <span className="px-3 py-1 rounded-full bg-white/5 border border-white/10 text-gray-300 text-[10px] font-black uppercase tracking-widest">
+                          {previewData.reading} min
+                        </span>
+                        <span className="px-3 py-1 rounded-full bg-white/5 border border-white/10 text-gray-300 text-[10px] font-black uppercase tracking-widest">
+                          {previewData.published ? "PUBLICADO" : "RASCUNHO"}
+                        </span>
+                      </div>
 
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setTab("AUTORES");
-                      setAuthorEditing({ name: "", role_label: "", avatar_url: "" });
-                      setMsg("Crie o autor e depois volte em POSTS.");
-                    }}
-                    className="px-4 py-3 rounded-2xl text-[12px] font-black bg-yellow-400 text-black"
-                    title="Criar autor"
-                  >
-                    +
-                  </button>
-                </div>
-              </div>
+                      <div className="text-2xl font-black leading-tight">{previewData.title}</div>
 
-              {/* Publicação + datas */}
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <div className={label}>Status</div>
-                  <label className="flex items-center gap-2 text-sm text-gray-200 mt-2">
-                    <input
-                      type="checkbox"
-                      checked={!!editing.published}
-                      onChange={(e) => setEditing({ ...editing, published: e.target.checked })}
-                    />
-                    Publicado
-                  </label>
-                </div>
+                      <div className="text-[11px] text-gray-400">
+                        {previewData.authorName} • {previewData.publishedAtText}
+                      </div>
 
-                <div>
-                  <div className={label}>Tempo de leitura (min)</div>
-                  <input
-                    className={input}
-                    type="number"
-                    min={1}
-                    value={Number(editing.reading_minutes ?? 5)}
-                    onChange={(e) => setEditing({ ...editing, reading_minutes: Number(e.target.value || 5) })}
-                  />
-                </div>
-              </div>
+                      {previewData.tLabels.length > 0 && (
+                        <div className="flex flex-wrap gap-2">
+                          {previewData.tLabels.map((x) => (
+                            <span
+                              key={x}
+                              className="text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full bg-white/5 border border-white/10 text-gray-300"
+                            >
+                              #{x}
+                            </span>
+                          ))}
+                        </div>
+                      )}
 
-              <div>
-                <div className={label}>Data/Hora de publicação</div>
-                <input
-                  className={input}
-                  type="datetime-local"
-                  value={toDatetimeLocal(editing.published_at)}
-                  onChange={(e) => setEditing({ ...editing, published_at: fromDatetimeLocal(e.target.value) as any })}
-                />
-              </div>
-
-              {/* Cover */}
-              <div>
-                <div className={label}>Imagem (cover_url)</div>
-                <input
-                  className={input}
-                  placeholder="URL da imagem"
-                  value={editing.cover_url ?? ""}
-                  onChange={(e) => setEditing({ ...editing, cover_url: e.target.value })}
-                />
-
-                {!!editing.cover_url?.trim() && (
-                  <div className="mt-3 rounded-2xl overflow-hidden border border-white/10">
-                    <img
-                      src={editing.cover_url}
-                      alt="cover preview"
-                      className="w-full h-[180px] object-cover"
-                      onError={(e) => {
-                        (e.currentTarget as HTMLImageElement).style.display = "none";
-                      }}
-                    />
-                    <div className="p-3 text-[10px] text-gray-400">Preview da capa</div>
+                      {previewData.excerpt ? (
+                        <div className="text-[13px] text-gray-300 whitespace-pre-wrap leading-relaxed">
+                          {previewData.excerpt}
+                        </div>
+                      ) : null}
+                    </div>
                   </div>
-                )}
-              </div>
 
-              {/* Excerpt */}
-              <div>
-                <div className={label}>Descrição / Excerpt</div>
-                <textarea
-                  className={`${input} min-h-[90px]`}
-                  placeholder="Descrição curta do post"
-                  value={editing.excerpt ?? ""}
-                  onChange={(e) => setEditing({ ...editing, excerpt: e.target.value })}
-                />
-              </div>
+                  <div className="bg-black/30 border border-white/10 rounded-[24px] p-4">
+                    <div className="text-[10px] font-black uppercase tracking-widest text-yellow-400">
+                      Conteúdo
+                    </div>
+                    <div className="mt-3 text-[14px] leading-relaxed text-gray-200 whitespace-pre-wrap">
+                      {previewData.content || "Sem conteúdo"}
+                    </div>
+                  </div>
 
-              {/* TAGS do post */}
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <div className={label}>Tags do post</div>
-                  <button
-                    onClick={() => setTagQuickOpen((v) => !v)}
-                    className="text-[10px] font-black uppercase tracking-widest px-3 py-2 rounded-2xl bg-white/5 border border-white/10 text-gray-200"
-                  >
-                    + Nova tag
-                  </button>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => setPostMode("EDIT")}
+                      className="flex-1 px-4 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest bg-white/5 border border-white/10"
+                    >
+                      Voltar para editar
+                    </button>
+                    <button
+                      onClick={saveArticle}
+                      className="flex-1 px-4 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest bg-yellow-400 text-black"
+                    >
+                      Salvar
+                    </button>
+                  </div>
                 </div>
+              ) : (
+                <>
+                  {/* Título + slug */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <div className={label}>Título</div>
+                      <input
+                        className={input}
+                        placeholder="Título"
+                        value={editing.title ?? ""}
+                        onChange={(e) => setEditing({ ...editing, title: e.target.value })}
+                      />
+                    </div>
 
-                {tagQuickOpen && (
-                  <div className="bg-black/30 border border-white/10 rounded-2xl p-3 space-y-2">
-                    <input
-                      className={input}
-                      placeholder="Label (ex: TRADE)"
-                      value={tagQuickLabel}
-                      onChange={(e) => setTagQuickLabel(e.target.value)}
-                    />
-                    <input
-                      className={input}
-                      placeholder="Slug (opcional)"
-                      value={tagQuickSlug}
-                      onChange={(e) => setTagQuickSlug(e.target.value)}
-                    />
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => {
-                          setTagQuickOpen(false);
-                          setTagQuickLabel("");
-                          setTagQuickSlug("");
-                        }}
-                        className="flex-1 px-4 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest bg-white/5 border border-white/10"
+                    <div>
+                      <div className={label}>Slug</div>
+                      <input
+                        className={input}
+                        placeholder="Slug (opcional)"
+                        value={editing.slug ?? ""}
+                        onChange={(e) => setEditing({ ...editing, slug: e.target.value })}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Categoria + */}
+                  <div>
+                    <div className={label}>Categoria</div>
+                    <div className="grid grid-cols-[1fr_auto] gap-2 items-center">
+                      <select
+                        className={input}
+                        value={editing.category ?? ""}
+                        onChange={(e) => setEditing({ ...editing, category: e.target.value })}
                       >
-                        Cancelar
-                      </button>
+                        {categoryOptions.map((c) => (
+                          <option key={c} value={c}>
+                            {c}
+                          </option>
+                        ))}
+                      </select>
                       <button
-                        onClick={quickCreateTag}
-                        className="flex-1 px-4 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest bg-yellow-400 text-black"
+                        type="button"
+                        onClick={() => setQuickCategoryOpen(true)}
+                        className="px-4 py-3 rounded-2xl text-[12px] font-black bg-yellow-400 text-black"
+                        title="Criar nova categoria"
                       >
-                        Criar
+                        +
                       </button>
                     </div>
                   </div>
-                )}
 
-                {loadingPostTags ? (
-                  <div className="text-[12px] text-gray-400">Carregando tags do post…</div>
-                ) : tags.length === 0 ? (
-                  <div className="text-[12px] text-gray-400">Você ainda não criou tags.</div>
-                ) : (
-                  <div className="flex flex-wrap gap-2">
-                    {tags.map((t) => {
-                      const active = selectedTagIds.includes(t.id);
-                      return (
-                        <button
-                          key={t.id}
-                          onClick={() => {
-                            setSelectedTagIds((prev) =>
-                              prev.includes(t.id) ? prev.filter((x) => x !== t.id) : [...prev, t.id]
-                            );
-                          }}
-                          className={`px-3 py-2 rounded-full text-[10px] font-black uppercase tracking-widest border transition ${
-                            active
-                              ? "bg-yellow-400 text-black border-yellow-400"
-                              : "bg-white/5 text-gray-300 border-white/10 hover:bg-white/10"
-                          }`}
-                          title={t.slug}
-                        >
-                          #{t.label}
-                        </button>
-                      );
-                    })}
+                  {/* Subcategoria */}
+                  <div>
+                    <div className={label}>Subcategoria</div>
+                    <select
+                      className={input}
+                      value={editing.subcategory ?? ""}
+                      onChange={(e) => setEditing({ ...editing, subcategory: e.target.value || null })}
+                    >
+                      <option value="">Sem subcategoria</option>
+                      {subcategoryOptions.map((s) => (
+                        <option key={s} value={s}>
+                          {s}
+                        </option>
+                      ))}
+                    </select>
                   </div>
-                )}
-              </div>
 
-              {/* Conteúdo */}
-              <div>
-                <div className={label}>Conteúdo</div>
-                <textarea
-                  className={`${input} min-h-[260px]`}
-                  placeholder="Conteúdo do post"
-                  value={editing.content ?? ""}
-                  onChange={(e) => setEditing({ ...editing, content: e.target.value })}
-                />
-              </div>
+                  {/* Autor */}
+                  <div>
+                    <div className={label}>Autor</div>
+                    <div className="grid grid-cols-[1fr_auto] gap-2 items-center">
+                      <select
+                        className={input}
+                        value={editing.author_id ?? ""}
+                        onChange={(e) => setEditing({ ...editing, author_id: e.target.value || null })}
+                      >
+                        <option value="">Sem autor</option>
+                        {authors.map((a) => (
+                          <option key={a.id} value={a.id}>
+                            {a.name}
+                          </option>
+                        ))}
+                      </select>
 
-              <div className="flex items-center justify-between pt-2">
-                <button
-                  onClick={closeEdit}
-                  className="px-4 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest bg-white/5 border border-white/10"
-                >
-                  Cancelar
-                </button>
-                <button
-                  onClick={saveArticle}
-                  className="px-4 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest bg-yellow-400 text-black"
-                >
-                  Salvar
-                </button>
-              </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setTab("AUTORES");
+                          setAuthorEditing({ name: "", role_label: "", avatar_url: "" });
+                          setMsg("Crie o autor e depois volte em POSTS.");
+                        }}
+                        className="px-4 py-3 rounded-2xl text-[12px] font-black bg-yellow-400 text-black"
+                        title="Criar autor"
+                      >
+                        +
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Publicação + leitura */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <div className={label}>Status</div>
+                      <label className="flex items-center gap-2 text-sm text-gray-200 mt-2">
+                        <input
+                          type="checkbox"
+                          checked={!!editing.published}
+                          onChange={(e) => setEditing({ ...editing, published: e.target.checked })}
+                        />
+                        Publicado
+                      </label>
+                    </div>
+
+                    <div>
+                      <div className={label}>Tempo de leitura (min)</div>
+                      <input
+                        className={input}
+                        type="number"
+                        min={1}
+                        value={Number(editing.reading_minutes ?? 5)}
+                        onChange={(e) => setEditing({ ...editing, reading_minutes: Number(e.target.value || 5) })}
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <div className={label}>Data/Hora de publicação</div>
+                    <input
+                      className={input}
+                      type="datetime-local"
+                      value={toDatetimeLocal(editing.published_at)}
+                      onChange={(e) => setEditing({ ...editing, published_at: fromDatetimeLocal(e.target.value) as any })}
+                    />
+                  </div>
+
+                  {/* Cover */}
+                  <div>
+                    <div className={label}>Imagem (cover_url)</div>
+                    <input
+                      className={input}
+                      placeholder="URL da imagem"
+                      value={editing.cover_url ?? ""}
+                      onChange={(e) => setEditing({ ...editing, cover_url: e.target.value })}
+                    />
+
+                    {!!editing.cover_url?.trim() && (
+                      <div className="mt-3 rounded-2xl overflow-hidden border border-white/10">
+                        <img
+                          src={editing.cover_url}
+                          alt="cover preview"
+                          className="w-full h-[180px] object-cover"
+                          onError={(e) => {
+                            (e.currentTarget as HTMLImageElement).style.display = "none";
+                          }}
+                        />
+                        <div className="p-3 text-[10px] text-gray-400">Preview da capa</div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Excerpt */}
+                  <div>
+                    <div className={label}>Descrição / Excerpt</div>
+                    <textarea
+                      className={`${input} min-h-[90px]`}
+                      placeholder="Descrição curta do post"
+                      value={editing.excerpt ?? ""}
+                      onChange={(e) => setEditing({ ...editing, excerpt: e.target.value })}
+                    />
+                  </div>
+
+                  {/* TAGS do post */}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <div className={label}>Tags do post</div>
+                      <button
+                        onClick={() => setTagQuickOpen((v) => !v)}
+                        className="text-[10px] font-black uppercase tracking-widest px-3 py-2 rounded-2xl bg-white/5 border border-white/10 text-gray-200"
+                      >
+                        + Nova tag
+                      </button>
+                    </div>
+
+                    {tagQuickOpen && (
+                      <div className="bg-black/30 border border-white/10 rounded-2xl p-3 space-y-2">
+                        <input
+                          className={input}
+                          placeholder="Label (ex: TRADE)"
+                          value={tagQuickLabel}
+                          onChange={(e) => setTagQuickLabel(e.target.value)}
+                        />
+                        <input
+                          className={input}
+                          placeholder="Slug (opcional)"
+                          value={tagQuickSlug}
+                          onChange={(e) => setTagQuickSlug(e.target.value)}
+                        />
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => {
+                              setTagQuickOpen(false);
+                              setTagQuickLabel("");
+                              setTagQuickSlug("");
+                            }}
+                            className="flex-1 px-4 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest bg-white/5 border border-white/10"
+                          >
+                            Cancelar
+                          </button>
+                          <button
+                            onClick={quickCreateTag}
+                            className="flex-1 px-4 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest bg-yellow-400 text-black"
+                          >
+                            Criar
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    {loadingPostTags ? (
+                      <div className="text-[12px] text-gray-400">Carregando tags do post…</div>
+                    ) : tags.length === 0 ? (
+                      <div className="text-[12px] text-gray-400">Você ainda não criou tags.</div>
+                    ) : (
+                      <div className="flex flex-wrap gap-2">
+                        {tags
+                          .slice()
+                          .sort((a, b) => a.label.localeCompare(b.label))
+                          .map((t) => {
+                            const active = selectedTagIds.includes(t.id);
+                            return (
+                              <button
+                                key={t.id}
+                                onClick={() => {
+                                  setSelectedTagIds((prev) =>
+                                    prev.includes(t.id) ? prev.filter((x) => x !== t.id) : [...prev, t.id]
+                                  );
+                                }}
+                                className={`px-3 py-2 rounded-full text-[10px] font-black uppercase tracking-widest border transition ${
+                                  active
+                                    ? "bg-yellow-400 text-black border-yellow-400"
+                                    : "bg-white/5 text-gray-300 border-white/10 hover:bg-white/10"
+                                }`}
+                                title={t.slug}
+                              >
+                                #{t.label}
+                              </button>
+                            );
+                          })}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Conteúdo */}
+                  <div>
+                    <div className={label}>Conteúdo</div>
+                    <textarea
+                      className={`${input} min-h-[260px]`}
+                      placeholder="Conteúdo do post"
+                      value={editing.content ?? ""}
+                      onChange={(e) => setEditing({ ...editing, content: e.target.value })}
+                    />
+                  </div>
+
+                  <div className="flex items-center justify-between pt-2">
+                    <button
+                      onClick={closeEdit}
+                      className="px-4 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest bg-white/5 border border-white/10"
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      onClick={saveArticle}
+                      className="px-4 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest bg-yellow-400 text-black"
+                    >
+                      Salvar
+                    </button>
+                  </div>
+                </>
+              )}
             </div>
           )}
 
@@ -1030,7 +1275,7 @@ const AdminPanel: React.FC = () => {
             </div>
           )}
 
-          {/* Lista de posts (com ações rápidas) */}
+          {/* Lista posts */}
           {filteredPosts.map((a) => {
             const tIds = articleTagMap.get(a.id) ?? [];
             const tagLabels = tIds.map((id) => tagById.get(id)?.label).filter(Boolean) as string[];
@@ -1191,12 +1436,66 @@ const AdminPanel: React.FC = () => {
         </div>
       )}
 
-      {/* TAGS */}
+      {/* TAGS (UPGRADE #1) */}
       {tab === "TAGS" && (
         <div className="mt-6 space-y-4">
-          <div className="text-[11px] text-gray-400">
-            Lista de tags (criação rápida fica no editor do post).
-          </div>
+          <button
+            onClick={() => setTagEditing({ label: "", slug: "" })}
+            className="w-full bg-yellow-400 text-black py-4 rounded-3xl font-black text-xs uppercase tracking-[0.2em]"
+          >
+            Nova Tag
+          </button>
+
+          {tagEditing && (
+            <div className="bg-white/5 border border-white/10 rounded-[28px] p-5 space-y-3">
+              <div className="text-[10px] font-black uppercase tracking-widest text-yellow-400">Editor de Tag</div>
+
+              <div>
+                <div className={label}>Label</div>
+                <input
+                  className={input}
+                  placeholder="Ex: TRADE"
+                  value={tagEditing.label ?? ""}
+                  onChange={(e) => setTagEditing({ ...tagEditing, label: e.target.value })}
+                />
+              </div>
+
+              <div>
+                <div className={label}>Slug</div>
+                <input
+                  className={input}
+                  placeholder="(opcional)"
+                  value={tagEditing.slug ?? ""}
+                  onChange={(e) => setTagEditing({ ...tagEditing, slug: e.target.value })}
+                />
+              </div>
+
+              <div className="flex gap-2 pt-2">
+                <button
+                  onClick={() => setTagEditing(null)}
+                  className="flex-1 px-4 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest bg-white/5 border border-white/10"
+                >
+                  Cancelar
+                </button>
+
+                {tagEditing.id ? (
+                  <button
+                    onClick={() => removeTag(tagEditing.id as string)}
+                    className="px-4 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest bg-white/5 border border-white/10 text-gray-200"
+                  >
+                    Apagar
+                  </button>
+                ) : null}
+
+                <button
+                  onClick={saveTag}
+                  className="flex-1 px-4 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest bg-yellow-400 text-black"
+                >
+                  Salvar
+                </button>
+              </div>
+            </div>
+          )}
 
           {tags.length === 0 ? (
             <div className="text-sm text-gray-400">Nenhuma tag criada ainda.</div>
@@ -1205,9 +1504,136 @@ const AdminPanel: React.FC = () => {
               .slice()
               .sort((a, b) => a.label.localeCompare(b.label))
               .map((t) => (
-                <div key={t.id} className="bg-white/5 border border-white/10 rounded-[24px] p-4">
-                  <div className="text-base font-black">{t.label}</div>
-                  <div className="text-[11px] text-gray-400 mt-1">{t.slug}</div>
+                <div key={t.id} className="bg-white/5 border border-white/10 rounded-[24px] p-4 flex items-center justify-between gap-3">
+                  <div>
+                    <div className="text-base font-black">{t.label}</div>
+                    <div className="text-[11px] text-gray-400 mt-1">{t.slug}</div>
+                  </div>
+                  <button
+                    onClick={() => setTagEditing(t)}
+                    className="px-3 py-2 rounded-2xl text-[10px] font-black uppercase tracking-widest bg-yellow-400 text-black"
+                  >
+                    Editar
+                  </button>
+                </div>
+              ))
+          )}
+        </div>
+      )}
+
+      {/* CATEGORIAS (UPGRADE #2) */}
+      {tab === "CATEGORIAS" && (
+        <div className="mt-6 space-y-4">
+          <button
+            onClick={() => setCategoryEditing({ name: "", slug: "", icon: "", sort_order: 0, is_active: true })}
+            className="w-full bg-yellow-400 text-black py-4 rounded-3xl font-black text-xs uppercase tracking-[0.2em]"
+          >
+            Nova Categoria
+          </button>
+
+          {categoryEditing && (
+            <div className="bg-white/5 border border-white/10 rounded-[28px] p-5 space-y-3">
+              <div className="text-[10px] font-black uppercase tracking-widest text-yellow-400">Editor de Categoria</div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <div className={label}>Nome</div>
+                  <input
+                    className={input}
+                    placeholder="Ex: REGRAS"
+                    value={categoryEditing.name ?? ""}
+                    onChange={(e) => setCategoryEditing({ ...categoryEditing, name: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <div className={label}>Slug</div>
+                  <input
+                    className={input}
+                    placeholder="(opcional)"
+                    value={categoryEditing.slug ?? ""}
+                    onChange={(e) => setCategoryEditing({ ...categoryEditing, slug: e.target.value })}
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <div className={label}>Ícone</div>
+                  <input
+                    className={input}
+                    placeholder="Ex: 🏀"
+                    value={(categoryEditing.icon ?? "") as any}
+                    onChange={(e) => setCategoryEditing({ ...categoryEditing, icon: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <div className={label}>Ordem</div>
+                  <input
+                    className={input}
+                    type="number"
+                    value={Number(categoryEditing.sort_order ?? 0)}
+                    onChange={(e) => setCategoryEditing({ ...categoryEditing, sort_order: Number(e.target.value || 0) })}
+                  />
+                </div>
+              </div>
+
+              <label className="flex items-center gap-2 text-sm text-gray-200 mt-2">
+                <input
+                  type="checkbox"
+                  checked={categoryEditing.is_active ?? true}
+                  onChange={(e) => setCategoryEditing({ ...categoryEditing, is_active: e.target.checked })}
+                />
+                Ativa (aparece nos selects)
+              </label>
+
+              <div className="flex gap-2 pt-2">
+                <button
+                  onClick={() => setCategoryEditing(null)}
+                  className="flex-1 px-4 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest bg-white/5 border border-white/10"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={saveCategory}
+                  className="flex-1 px-4 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest bg-yellow-400 text-black"
+                >
+                  Salvar
+                </button>
+              </div>
+            </div>
+          )}
+
+          {categories.length === 0 ? (
+            <div className="text-sm text-gray-400">Nenhuma categoria na tabela categories.</div>
+          ) : (
+            categories
+              .slice()
+              .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
+              .map((c) => (
+                <div key={c.id} className="bg-white/5 border border-white/10 rounded-[24px] p-4 flex items-start justify-between gap-3">
+                  <div className="flex-1">
+                    <div className="text-[10px] font-black uppercase tracking-widest text-yellow-400">
+                      {c.icon ? `${c.icon} ` : ""}{c.name}
+                    </div>
+                    <div className="text-[11px] text-gray-400 mt-1">
+                      slug: {c.slug} • ordem: {c.sort_order ?? 0} • {c.is_active ? "ATIVA" : "DESATIVADA"}
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col gap-2">
+                    <button
+                      onClick={() => setCategoryEditing(c)}
+                      className="px-3 py-2 rounded-2xl text-[10px] font-black uppercase tracking-widest bg-yellow-400 text-black"
+                    >
+                      Editar
+                    </button>
+                    <button
+                      onClick={() => toggleCategoryActive(c)}
+                      className="px-3 py-2 rounded-2xl text-[10px] font-black uppercase tracking-widest bg-white/5 border border-white/10 text-gray-200"
+                    >
+                      {c.is_active ? "Desativar" : "Ativar"}
+                    </button>
+                  </div>
                 </div>
               ))
           )}
