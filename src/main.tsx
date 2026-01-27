@@ -1,6 +1,7 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App";
+import { AdminProvider } from "./context/AdminContext";
 import "./index.css";
 
 const el = document.getElementById("root");
@@ -10,7 +11,9 @@ if (!el) {
 } else {
   ReactDOM.createRoot(el).render(
     <React.StrictMode>
-      <App />
+      <AdminProvider>
+        <App />
+      </AdminProvider>
     </React.StrictMode>
   );
 }

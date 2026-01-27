@@ -1,6 +1,8 @@
 
 import React from 'react';
 import { Bell, User, Sun, Moon } from 'lucide-react';
+import { useAdmin } from '../context/AdminContext';
+import { EditTrigger } from './admin/EditTrigger';
 
 interface HeaderProps {
   isDarkMode: boolean;
@@ -11,6 +13,7 @@ interface HeaderProps {
 }
 
 const Header: React.FC<HeaderProps> = ({ isDarkMode, onToggleTheme, onOpenNotifications, onOpenAuth, hasNewNotifications = true }) => {
+  const { toggleEditing, isEditing } = useAdmin();
   return (
     <header className={`px-6 pt-8 pb-4 sticky top-0 backdrop-blur-lg z-50 ${isDarkMode ? 'bg-black/80' : 'bg-[#FDFBF4]/80 border-b border-[#0B1D33]/5'}`}>
       <div className="flex justify-between items-center mb-1">
@@ -24,7 +27,7 @@ const Header: React.FC<HeaderProps> = ({ isDarkMode, onToggleTheme, onOpenNotifi
           </p>
         </div>
         <div className="flex items-center gap-3">
-          <button 
+          <button
             onClick={onOpenNotifications}
             className={`p-2 rounded-full transition-colors relative ${isDarkMode ? 'bg-gray-900 hover:bg-gray-800' : 'bg-[#F0F2F5] hover:bg-gray-200'}`}
           >
@@ -33,13 +36,22 @@ const Header: React.FC<HeaderProps> = ({ isDarkMode, onToggleTheme, onOpenNotifi
               <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-yellow-400 rounded-full border border-black animate-pulse"></span>
             )}
           </button>
-          <button 
+          <button
             onClick={onOpenAuth}
             className={`p-2 rounded-full transition-colors ${isDarkMode ? 'bg-gray-900 hover:bg-gray-800' : 'bg-[#F0F2F5] hover:bg-gray-200'}`}
           >
             <User size={20} className={isDarkMode ? 'text-white' : 'text-[#0B1D33]'} />
           </button>
-          <button 
+
+          {/* Admin Toggle */}
+          <EditTrigger
+            type="config"
+            size={20}
+            className={`p-2 !shadow-none !rounded-full transition-colors ${isDarkMode ? 'bg-transparent text-white hover:bg-gray-800' : 'bg-transparent text-[#0B1D33] hover:bg-gray-200'} ${isEditing ? '!text-yellow-400' : ''}`}
+            onClick={toggleEditing}
+          />
+
+          <button
             onClick={onToggleTheme}
             className={`p-2 rounded-full transition-colors ${isDarkMode ? 'bg-gray-900 hover:bg-gray-800' : 'bg-[#F0F2F5] hover:bg-gray-200'}`}
           >

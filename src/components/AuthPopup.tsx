@@ -1,6 +1,5 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { X, Dribbble, ChevronDown } from "lucide-react";
-import { NBA_TEAMS } from "../constants";
 import { supabase } from "../lib/supabase";
 
 interface AuthPopupProps {
@@ -11,6 +10,17 @@ interface AuthPopupProps {
 const AuthPopup: React.FC<AuthPopupProps> = ({ isOpen, onClose }) => {
   const [view, setView] = useState<"LOGIN" | "SIGNUP">("LOGIN");
   const [selectedTeam, setSelectedTeam] = useState("");
+  const [teams, setTeams] = useState<string[]>([]);
+
+  useEffect(() => {
+    import('../cms').then(({ listTeams }) => {
+      listTeams().then(({ data }) => {
+        if (data) {
+          setTeams((data as any[]).map(t => t.name));
+        }
+      });
+    });
+  }, []);
 
   const [loginEmail, setLoginEmail] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
@@ -185,7 +195,7 @@ const AuthPopup: React.FC<AuthPopupProps> = ({ isOpen, onClose }) => {
                   <option value="" disabled>
                     QUAL O SEU TIME?
                   </option>
-                  {NBA_TEAMS.map((team) => (
+                  {teams.map((team) => (
                     <option key={team} value={team}>
                       {team}
                     </option>

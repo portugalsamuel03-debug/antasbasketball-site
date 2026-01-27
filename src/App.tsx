@@ -17,10 +17,13 @@ import AdminPanel from "./components/AdminPanel";
 
 // ✅ novo
 import ProfilePopup from "./components/ProfilePopup";
+import { EditArticleModal } from "./components/admin/EditArticleModal";
+import { ArticleRow } from "./cms";
 
 // Home sections (opcionais)
 import FeaturedReaders from "./components/FeaturedReaders";
 import FeaturedAuthors from "./components/FeaturedAuthors";
+import HistoriaPage from "./components/HistoriaPage";
 
 // Data
 import { fetchPublishedArticlesJoined } from "./services/articles";
@@ -71,6 +74,9 @@ export default function App() {
   const [selectedArticle, setSelectedArticle] = useState<Article | null>(null);
   const [shareOpen, setShareOpen] = useState(false);
   const [shareArticle, setShareArticle] = useState<Article | null>(null);
+
+  // ✅ Feed Editing
+  const [editingArticleDetails, setEditingArticleDetails] = useState<Partial<ArticleRow> | null>(null);
 
   // /?admin=1 abre painel
   const isAdminRoute = useMemo(() => safeSearchParam("admin") === "1", []);
@@ -429,10 +435,19 @@ export default function App() {
   };
 
   const handleEditFromCard = (id: string) => {
-    const url = new URL(window.location.href);
-    url.searchParams.set("admin", "1");
-    url.searchParams.set("edit", id);
-    window.location.assign(url.toString());
+    const found = articles.find(a => a.id === id);
+    if (!found) return;
+
+    setEditingArticleDetails({
+      id: found.id,
+      title: found.title,
+      category: found.category,
+      content: found.content,
+      cover_url: found.imageUrl,
+      excerpt: found.description,
+      published: true,
+      reading_minutes: parseInt(found.readTime) || 5, // Parsing "5 MIN"
+    });
   };
 
   // ===== App shell =====
@@ -473,7 +488,15 @@ export default function App() {
             </>
           )}
 
-          {activeTab !== Category.INICIO && (
+          {activeTab === Category.HISTORIA ? (
+            <HistoriaPage
+              articles={filteredArticles}
+              isDarkMode={isDarkMode}
+              onArticleClick={setSelectedArticle}
+              onShare={onShare}
+              onEditArticle={handleEditFromCard}
+            />
+          ) : activeTab !== Category.INICIO && (
             <>
               <SectionTitle
                 title={String(activeTab)}
@@ -522,6 +545,17 @@ export default function App() {
 
         <NotificationPopup isOpen={notificationsOpen} onClose={() => setNotificationsOpen(false)} isDarkMode={isDarkMode} />
         <ShareModal isOpen={shareOpen} onClose={() => setShareOpen(false)} article={shareArticle} isDarkMode={isDarkMode} />
+
+        {editingArticleDetails && (
+          <EditArticleModal
+            article={editingArticleDetails}
+            isDarkMode={isDarkMode}
+            onClose={() => setEditingArticleDetails(null)}
+            onSaveSuccess={() => {
+              window.location.reload();
+            }}
+          />
+        )}
       </div>
     </div>
   );

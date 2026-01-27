@@ -54,10 +54,69 @@ export async function upsertAuthor(payload: Partial<AuthorRow>) {
   return supabase.from("authors").upsert(payload).select("*").single();
 }
 
+export async function deleteAuthor(id: string) {
+  return supabase.from("authors").delete().eq("id", id);
+}
+
 export async function listTags() {
   return supabase.from("tags").select("*").order("label");
 }
 
 export async function upsertTag(payload: Partial<TagRow>) {
   return supabase.from("tags").upsert(payload).select("*").single();
+}
+
+// Champions
+export async function listChampions() {
+  return supabase.from("champions").select("*").order("year", { ascending: false });
+}
+export async function upsertChampion(payload: Partial<any>) {
+  return supabase.from("champions").upsert(payload).select("*").single();
+}
+export async function deleteChampion(id: string) {
+  return supabase.from("champions").delete().eq("id", id);
+}
+
+// Hall of Fame
+export async function listHallOfFame() {
+  return supabase.from("hall_of_fame").select("*").order("year_inducted", { ascending: false });
+}
+export async function upsertHallOfFame(payload: Partial<any>) {
+  return supabase.from("hall_of_fame").upsert(payload).select("*").single();
+}
+export async function deleteHallOfFame(id: string) {
+  return supabase.from("hall_of_fame").delete().eq("id", id);
+}
+
+// Readers
+export async function listFeaturedReaders() {
+  return supabase.from("featured_readers").select("*").order("sort_order");
+}
+export async function upsertFeaturedReader(payload: Partial<any>) {
+  return supabase.from("featured_readers").upsert(payload).select("*").single();
+}
+export async function deleteFeaturedReader(id: string) {
+  return supabase.from("featured_readers").delete().eq("id", id);
+}
+
+// Tag Definitions
+export async function listTagDefinitions() {
+  return supabase.from("tag_definitions").select("*").order("label");
+}
+export async function upsertTagDefinition(payload: Partial<any>) {
+  return supabase.from("tag_definitions").upsert(payload).select("*").single();
+}
+export async function deleteTagDefinition(slug: string) {
+  return supabase.from("tag_definitions").delete().eq("slug", slug);
+}
+
+// Teams
+export async function listTeams() {
+  return supabase.from("team_list").select("*").order("name");
+}
+export async function upsertTeam(payload: Partial<any>) {
+  return supabase.from("team_list").upsert(payload).select("*").single();
+}
+export async function deleteTeam(id: string) {
+  return supabase.from("team_list").delete().eq("id", id);
 }

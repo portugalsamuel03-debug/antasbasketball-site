@@ -1,0 +1,234 @@
+import React, { useState, useEffect, useMemo } from 'react';
+import { ArticleRow, AuthorRow, listAuthors, upsertArticle, upsertAuthor } from '../../cms';
+import { supabase } from '../../lib/supabase';
+
+interface EditArticleModalProps {
+    article: Partial<ArticleRow>;
+    onClose: () => void;
+    onSaveSuccess: () => void;
+    isDarkMode: boolean;
+}
+
+const BUCKET = "article-covers";
+
+function slugify(input: string) {
+    return input
+        .toLowerCase()
+        .trim()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/(^-|-$)/g, "");
+}
+
+function safeExtFromFile(file: File) {
+    const name = file.name || "";
+    const dot = name.lastIndexOf(".");
+    const ext = dot >= 0 ? name.slice(dot + 1).toLowerCase() : "";
+    const clean = ext.replace(/[^a-z0-9]/g, "");
+    return clean || "jpg";
+}
+
+export const EditArticleModal: React.FC<EditArticleModalProps> = ({ article, onClose, onSaveSuccess, isDarkMode }) => {
+    const [editing, setEditing] = useState<Partial<ArticleRow>>({ ...article });
+    const [authors, setAuthors] = useState<AuthorRow[]>([]);
+    const [msg, setMsg] = useState<string | null>(null);
+
+    const [coverFile, setCoverFile] = useState<File | null>(null);
+    const [uploadingCover, setUploadingCover] = useState(false);
+
+    // Initial data fetch
+    useEffect(() => {
+        listAuthors().then(({ data }) => {
+            if (data) setAuthors(data as AuthorRow[]);
+        });
+    }, []);
+
+    const categoryOptions = useMemo(() => {
+        return ["NOTICIAS", "HISTORIA", "REGRAS", "PODCAST", "OPINIAO", "CURIOSIDADES", "TUTORIAIS"];
+    }, []);
+
+    const subcategoryOptions = useMemo(() => {
+        if (!editing.category) return [];
+        // Hardcoded generic options or could be fetched. For now, empty or simple.
+        // If we want dynamic subcategories, we'd need to fetch all articles to see what's used, like in AdminPanel.
+        // For simplicity in this modal, let's allow free text or standard ones.
+        return ["NBA", "NBB", "EUROLEAGUE", "WNBA", "DRAFT", "OFFSEASON", "TRADES", "INATIVIDADE", "DIVISOES"];
+    }, [editing.category]);
+
+    async function uploadCover() {
+        setMsg(null);
+        if (!coverFile) return;
+
+        if (!coverFile.type.startsWith("image/")) {
+            setMsg("Arquivo inválido. Envie uma imagem.");
+            return;
+        }
+        const maxMb = 6;
+        if (coverFile.size > maxMb * 1024 * 1024) {
+            setMsg(`Imagem muito grande. Máximo: ${maxMb}MB.`);
+            return;
+        }
+
+        setUploadingCover(true);
+
+        try {
+            const { data: auth } = await supabase.auth.getUser();
+            const uid = auth.user?.id;
+            if (!uid) {
+                setMsg("Você precisa estar logado para enviar imagem.");
+                return;
+            }
+
+            const ext = safeExtFromFile(coverFile);
+            const slug = slugify(editing.title || "post");
+            const stamp = Date.now();
+            const path = `${uid}/${slug}-${stamp}.${ext}`;
+
+            const { error: upErr } = await supabase.storage
+                .from(BUCKET)
+                .upload(path, coverFile, { upsert: true, contentType: coverFile.type });
+
+            if (upErr) throw upErr;
+
+            const { data: pub } = supabase.storage.from(BUCKET).getPublicUrl(path);
+            const publicUrl = pub?.publicUrl;
+
+            if (!publicUrl) throw new Error("Não consegui gerar publicUrl do Storage.");
+
+            setEditing(prev => ({ ...prev, cover_url: publicUrl }));
+            setMsg("Upload concluído ✅");
+            setCoverFile(null);
+        } catch (e: any) {
+            console.error(e);
+            setMsg(e?.message ?? "Erro ao enviar imagem.");
+        } finally {
+            setUploadingCover(false);
+        }
+    }
+
+    async function handleSave() {
+        if (!editing.title || !editing.category || !editing.content) {
+            setMsg("Preencha título, categoria e conteúdo.");
+            return;
+        }
+
+        const payload: Partial<ArticleRow> = {
+            ...editing,
+            slug: editing.slug?.trim() || slugify(editing.title),
+            published: editing.published ?? true,
+            reading_minutes: editing.reading_minutes ?? 5,
+            published_at: editing.published_at ?? new Date().toISOString(),
+            updated_at: new Date().toISOString() as any,
+        };
+
+        const { error } = await upsertArticle(payload);
+        if (error) {
+            console.error(error);
+            setMsg("Erro ao salvar artigo.");
+            return;
+        }
+
+        setMsg("Artigo salvo ✅");
+        // Short delay to show success message
+        setTimeout(() => {
+            onSaveSuccess();
+            onClose();
+        }, 800);
+    }
+
+    const inputClass = `w-full border rounded-2xl px-4 py-3 text-sm ${isDarkMode ? 'bg-black/30 border-white/10 text-white' : 'bg-white border-black/10 text-black'}`;
+
+    return (
+        <div className="fixed inset-0 z-[130] flex items-center justify-center px-4">
+            <div className="absolute inset-0 bg-black/80 backdrop-blur-md" onClick={onClose}></div>
+            <div className={`relative w-full max-w-2xl max-h-[90vh] overflow-y-auto border rounded-[32px] shadow-xl p-6 space-y-4 ${isDarkMode ? 'bg-[#121212] border-white/10' : 'bg-white'}`}>
+
+                <div className="flex justify-between items-center pb-2 border-b border-white/5">
+                    <h3 className={`text-xs font-black uppercase tracking-widest ${isDarkMode ? 'text-white' : 'text-black'}`}>
+                        {editing.id ? 'Editar Post' : 'Novo Post'}
+                    </h3>
+                    <button onClick={onClose} className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase ${isDarkMode ? 'bg-white/5 text-gray-400' : 'bg-black/5 text-gray-500'}`}>
+                        Fechar
+                    </button>
+                </div>
+
+                {msg && (
+                    <div className="text-[12px] font-bold bg-yellow-400/10 border border-yellow-400/30 rounded-2xl px-4 py-3 text-yellow-200">
+                        {msg}
+                    </div>
+                )}
+
+                <div className="grid grid-cols-2 gap-3">
+                    <input className={inputClass} placeholder="Título" value={editing.title || ''} onChange={e => setEditing({ ...editing, title: e.target.value })} />
+                    <input className={inputClass} placeholder="Slug (opcional)" value={editing.slug || ''} onChange={e => setEditing({ ...editing, slug: e.target.value })} />
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                    <select className={inputClass} value={editing.category || ''} onChange={e => setEditing({ ...editing, category: e.target.value })}>
+                        {categoryOptions.map(c => <option key={c} value={c}>{c}</option>)}
+                    </select>
+                    <select className={inputClass} value={editing.subcategory || ''} onChange={e => setEditing({ ...editing, subcategory: e.target.value || null })}>
+                        <option value="">Sem subcategoria</option>
+                        {subcategoryOptions.map(s => <option key={s} value={s}>{s}</option>)}
+                    </select>
+                </div>
+
+                <textarea
+                    className={`${inputClass} min-h-[80px]`}
+                    placeholder="Resumo (excerpt)"
+                    value={editing.excerpt || ''}
+                    onChange={e => setEditing({ ...editing, excerpt: e.target.value })}
+                />
+
+                {/* Cover Upload */}
+                <div className={`p-4 rounded-2xl border ${isDarkMode ? 'bg-black/20 border-white/5' : 'bg-gray-50 border-gray-200'}`}>
+                    <div className={`text-[10px] font-black uppercase mb-2 ${isDarkMode ? 'text-yellow-400' : 'text-gray-500'}`}>Capa</div>
+                    <div className="flex gap-2 items-center mb-2">
+                        <input type="file" accept="image/*" className="flex-1 text-[11px] text-gray-400" onChange={e => setCoverFile(e.target.files?.[0] ?? null)} />
+                        <button
+                            disabled={!coverFile || uploadingCover}
+                            onClick={uploadCover}
+                            className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase ${coverFile ? 'bg-yellow-400 text-black' : 'bg-white/5 text-gray-500'}`}
+                        >
+                            {uploadingCover ? 'Enviando...' : 'Upload'}
+                        </button>
+                    </div>
+                    {editing.cover_url && (
+                        <div className="h-24 w-full rounded-xl overflow-hidden mb-2">
+                            <img src={editing.cover_url} className="w-full h-full object-cover" />
+                        </div>
+                    )}
+                    <input className={inputClass} placeholder="URL da Capa" value={editing.cover_url || ''} onChange={e => setEditing({ ...editing, cover_url: e.target.value })} />
+                </div>
+
+                {/* Author */}
+                <select className={inputClass} value={editing.author_id || ''} onChange={e => setEditing({ ...editing, author_id: e.target.value || null })}>
+                    <option value="">Sem autor</option>
+                    {authors.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+                </select>
+
+                <textarea
+                    className={`${inputClass} min-h-[300px] font-mono text-[13px] leading-relaxed`}
+                    placeholder="# Conteúdo (Markdown)"
+                    value={editing.content || ''}
+                    onChange={e => setEditing({ ...editing, content: e.target.value })}
+                />
+
+                <div className="flex items-center justify-between pt-2">
+                    <label className={`flex items-center gap-2 text-sm ${isDarkMode ? 'text-gray-300' : 'text-gray-600'}`}>
+                        <input type="checkbox" checked={!!editing.published} onChange={e => setEditing({ ...editing, published: e.target.checked })} />
+                        Publicado
+                    </label>
+
+                    <button
+                        onClick={handleSave}
+                        className="px-6 py-3 rounded-2xl text-xs font-black uppercase tracking-widest bg-yellow-400 text-black shadow-lg shadow-yellow-400/20 active:scale-95 transition-transform"
+                    >
+                        Salvar Alterações
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+};

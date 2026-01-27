@@ -45,6 +45,7 @@ export interface Author {
 }
 
 export interface Champion {
+  id: string;
   year: string;
   team: string;
   mvp: string;
@@ -52,11 +53,39 @@ export interface Champion {
 }
 
 export interface HallOfFame {
+  id: string;
   name: string;
-  year: string;
+  year_inducted: string;
   role: string;
   achievement: string;
-  imageUrl: string;
+  image_url: string;
+}
+
+export type ChampionRow = Champion;
+export type HallOfFameRow = HallOfFame;
+
+export interface TeamRow {
+  id: string;
+  name: string;
+  logo_url?: string;
+}
+
+export interface TagDefinitionRow {
+  slug: string;
+  label: string;
+  description: string;
+}
+
+export interface FeaturedReaderRow {
+  id: string;
+  name: string;
+  avatar_url: string;
+  rank_label: string;
+  posts_read: number;
+  comments_made: number;
+  likes_given: number;
+  is_verified: boolean;
+  sort_order: number;
 }
 
 export interface Article {
