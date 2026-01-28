@@ -51,19 +51,6 @@ const AuthPopup: React.FC<AuthPopupProps> = ({ isOpen, onClose }) => {
 
       if (error) throw error;
 
-      // Small delay to ensure Supabase persists the session
-      await new Promise(resolve => setTimeout(resolve, 500));
-
-      // Check if admin to redirect
-      if (data.user?.email === ADMIN_EMAIL) {
-        if (!window.location.search.includes("admin=1")) {
-          const url = new URL(window.location.href);
-          url.searchParams.set("admin", "1");
-          window.location.href = url.toString();
-          return;
-        }
-      }
-
       onClose();
     } catch (e: any) {
       setErr(e?.message ?? "Erro ao entrar");
@@ -96,15 +83,6 @@ const AuthPopup: React.FC<AuthPopupProps> = ({ isOpen, onClose }) => {
             favorite_team: selectedTeam || null,
           })
           .eq("id", userId);
-      }
-
-      // Check if admin to redirect
-      const adminEmail = "portugalsamuel03@gmail.com";
-      if (data.user?.email === adminEmail) {
-        const url = new URL(window.location.href);
-        url.searchParams.set("admin", "1");
-        window.location.href = url.toString();
-        return;
       }
 
       onClose();
