@@ -70,7 +70,25 @@ export const AuthorDetailsModal: React.FC<AuthorDetailsModalProps> = ({ author, 
                             <input value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} className={`${inputClass} text-center font-black text-lg`} placeholder="Nome" />
                             <input value={formData.role_label || ''} onChange={e => setFormData({ ...formData, role_label: e.target.value })} className={`${inputClass} text-center text-xs uppercase`} placeholder="Cargo / Função" />
                             <input value={formData.avatar_url || ''} onChange={e => setFormData({ ...formData, avatar_url: e.target.value })} className={`${inputClass} text-center text-xs`} placeholder="Avatar URL" />
-                            {/* Placeholder for future bio/socials if db schema updates */}
+
+                            {/* Bio field */}
+                            <div className="mt-2">
+                                <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Bio (máx. 500 caracteres)</label>
+                                <textarea
+                                    value={(formData as any).bio || ''}
+                                    onChange={e => {
+                                        const text = e.target.value.slice(0, 500);
+                                        setFormData({ ...formData, bio: text } as any);
+                                    }}
+                                    className={`w-full px-3 py-2 rounded-xl text-xs leading-relaxed resize-none ${isDarkMode ? 'bg-white/5 text-white border border-white/10' : 'bg-black/5 text-black border border-black/10'}`}
+                                    placeholder="Escreva uma bio para o autor..."
+                                    rows={4}
+                                    maxLength={500}
+                                />
+                                <div className="text-[9px] text-gray-500 text-right mt-1">
+                                    {((formData as any).bio || '').length}/500
+                                </div>
+                            </div>}
 
                             <button onClick={handleSave} className="w-full py-3 mt-4 bg-yellow-400 text-black rounded-xl text-xs font-black uppercase tracking-widest shadow-lg shadow-yellow-400/20 active:scale-95 transition-transform">
                                 Salvar Alterações
@@ -90,9 +108,9 @@ export const AuthorDetailsModal: React.FC<AuthorDetailsModalProps> = ({ author, 
                             {/* Divider */}
                             <div className={`w-8 h-1 mx-auto rounded-full ${isDarkMode ? 'bg-white/10' : 'bg-black/10'}`} />
 
-                            {/* Bio Placeholder - static for now as DB might not have it yet, or use generic text */}
+                            {/* Bio */}
                             <p className={`text-xs leading-relaxed px-4 ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-                                Membro oficial da equipe Antas Basketball. Contribuindo com conteúdo de qualidade e paixão pelo basquete since 2017.
+                                {(author as any).bio || 'Membro oficial da equipe Antas Basketball. Contribuindo com conteúdo de qualidade e paixão pelo basquete since 2017.'}
                             </p>
                         </>
                     )}
