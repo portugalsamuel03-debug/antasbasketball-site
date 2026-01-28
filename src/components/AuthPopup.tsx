@@ -2,6 +2,8 @@ import React, { useState, useEffect } from "react";
 import { X, Dribbble, ChevronDown } from "lucide-react";
 import { supabase } from "../lib/supabase";
 
+export const ADMIN_EMAIL = "portugalsamuel03@gmail.com";
+
 interface AuthPopupProps {
   isOpen: boolean;
   onClose: () => void;
@@ -49,15 +51,16 @@ const AuthPopup: React.FC<AuthPopupProps> = ({ isOpen, onClose }) => {
 
       if (error) throw error;
 
+      // Small delay to ensure Supabase persists the session
+      await new Promise(resolve => setTimeout(resolve, 500));
+
       // Check if admin to redirect
-      const adminEmail = "portugalsamuel03@gmail.com";
-      if (data.user?.email === adminEmail) {
-        // Force URL param if not present
+      if (data.user?.email === ADMIN_EMAIL) {
         if (!window.location.search.includes("admin=1")) {
           const url = new URL(window.location.href);
           url.searchParams.set("admin", "1");
           window.location.href = url.toString();
-          return; // Redirecting will reload the app
+          return;
         }
       }
 
