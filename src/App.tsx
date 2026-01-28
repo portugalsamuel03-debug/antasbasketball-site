@@ -46,7 +46,7 @@ export default function App() {
   const [loadingArticles, setLoadingArticles] = useState(false);
   const [articlesError, setArticlesError] = useState<string | null>(null);
 
-  // Navigation
+  // Focus
   const [selectedArticle, setSelectedArticle] = useState<Article | null>(null);
   const [shareOpen, setShareOpen] = useState(false);
   const [shareArticle, setShareArticle] = useState<Article | null>(null);
@@ -88,12 +88,12 @@ export default function App() {
 
       const errStr = String(e?.message || e?.name || "");
       if (errStr.toLowerCase().includes('abort')) {
-        console.warn(`App [${myId}]: Interrupted.`);
+        console.warn(`App [${myId}]: Interrupted fetch.`);
         return;
       }
 
-      console.error(`App [${myId}]: Error:`, e);
-      setArticlesError(e?.message || "Erro na conexão. Tente novamente.");
+      console.error(`App [${myId}]: Error fetching articles:`, e);
+      setArticlesError(e?.message || "Erro ao carregar conteúdo. Tente novamente.");
     } finally {
       if (mountedRef.current && myId === lastLoadId.current) {
         setLoadingArticles(false);
@@ -104,8 +104,10 @@ export default function App() {
   // Sync articles with auth state
   useEffect(() => {
     if (!isAuthLoading) {
-      // Small debounce to let session settle
-      const timer = setTimeout(() => loadArticles(), 300);
+      // Small debounce to allow session to stabilize
+      const timer = setTimeout(() => {
+        if (mountedRef.current) loadArticles();
+      }, 300);
       return () => clearTimeout(timer);
     }
   }, [sessionUserId, isAuthLoading]);
@@ -168,13 +170,13 @@ export default function App() {
     return sorted;
   }, [articles, activeTab, searchQuery, sortOption]);
 
-  // Loading Splash
+  // Loading Screen
   if (isAuthLoading && articles.length === 0) {
     return (
       <div className={isDarkMode ? "bg-black text-white min-h-screen" : "bg-[#FDFBF4] text-[#0B1D33] min-h-screen"}>
         <div className="max-w-md mx-auto px-6 py-20 flex flex-col items-center">
           <div className="text-xs font-black uppercase tracking-widest text-yellow-400 animate-pulse">Antas Basketball</div>
-          <div className="mt-4 text-sm text-gray-400">Preparando a quadra...</div>
+          <div className="mt-4 text-sm text-gray-400">Preparando o elenco...</div>
         </div>
       </div>
     );
@@ -206,11 +208,11 @@ export default function App() {
 
           {articlesError && (
             <div className="px-6 mt-4">
-              <div className="flex flex-col items-center justify-center p-8 bg-black/10 rounded-3xl border border-red-500/20 text-center">
-                <div className="text-2xl mb-2">📡</div>
-                <div className="text-[10px] font-black uppercase tracking-widest text-red-100 mb-1">A conexão está lenta</div>
-                <div className="text-[11px] font-medium text-gray-500 mb-5">{articlesError}</div>
-                <button onClick={() => loadArticles()} className="px-6 py-3 bg-yellow-400 text-black text-[10px] font-black uppercase tracking-widest rounded-2xl shadow-lg active:scale-95 transition-all">Tentar Carregar</button>
+              <div className="flex flex-col items-center justify-center p-8 bg-black/10 rounded-[35px] border border-red-500/20 text-center">
+                <div className="text-2xl mb-2">🔭</div>
+                <div className="text-[10px] font-black uppercase tracking-widest text-red-200 mb-1">A quadra está ocupada</div>
+                <div className="text-[11px] font-medium text-gray-500 mb-5 leading-relaxed">{articlesError}</div>
+                <button onClick={() => loadArticles()} className="px-8 py-3 bg-yellow-400 text-black text-[10px] font-black uppercase tracking-widest rounded-2xl shadow-xl active:scale-95 transition-all">Tentar Carregar</button>
               </div>
             </div>
           )}
@@ -237,7 +239,7 @@ export default function App() {
                 </div>
               )}
               {loadingArticles && articles.length === 0 ? (
-                <div className="px-6 text-sm text-gray-400 animate-pulse">Entrando em quadra...</div>
+                <div className="px-6 text-sm text-gray-400 animate-pulse">Aquecendo motores...</div>
               ) : filteredArticles.length === 0 ? (
                 <div className="px-6 text-sm text-gray-400">Nada por aqui ainda {searchQuery ? `pra “${searchQuery}”.` : "nessa categoria."}</div>
               ) : (

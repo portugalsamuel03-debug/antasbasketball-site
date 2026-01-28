@@ -45,14 +45,14 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         return () => { mounted.current = false; };
     }, []);
 
-    // SAFETY ESCAPE HATCH: Ensure we never stay stuck on loading screen
+    // SAFETY ESCAPE HATCH
     useEffect(() => {
         const timer = setTimeout(() => {
             if (isLoading && mounted.current) {
-                console.warn("AdminContext: Loading safety timeout triggered. Forcing load completion.");
+                console.warn("AdminContext: Safety timeout triggered.");
                 setIsLoading(false);
             }
-        }, 6000);
+        }, 5000);
         return () => clearTimeout(timer);
     }, [isLoading]);
 
@@ -61,16 +61,25 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         const myId = ++currentRefreshId.current;
         isRefreshing.current = true;
 
-        try {
-            const { data: { session } } = await supabase.auth.getSession();
+        console.log(`AdminContext [${myId}]: Refresh start.`);
 
-            if (!mounted.current || myId !== currentRefreshId.current) return;
+        try {
+            const { data: { session }, error: sErr } = await supabase.auth.getSession();
+
+            if (!mounted.current) return;
+            if (myId !== currentRefreshId.current) {
+                console.log(`AdminContext [${myId}]: Superseded.`);
+                return;
+            }
+
+            if (sErr) throw sErr;
 
             const user = session?.user;
             const userId = user?.id ?? null;
             setSessionUserId(userId);
 
             if (!userId) {
+                console.log(`AdminContext [${myId}]: No user, reader role.`);
                 setRole('reader');
                 setIsEditing(false);
                 return;
@@ -80,7 +89,7 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
             const r = await getMyRole().catch((e) => {
                 const errStr = String(e?.message || e?.name || "");
                 if (!errStr.toLowerCase().includes('abort')) {
-                    console.warn(`AdminContext [${myId}]: getMyRole failed:`, e);
+                    console.warn(`AdminContext [${myId}]: Role lookup failed:`, e);
                 }
                 return null;
             });
@@ -88,6 +97,7 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
             if (!mounted.current || myId !== currentRefreshId.current) return;
 
             const finalRole = isUserAdminByEmail ? 'admin' : (r || 'reader');
+            console.log(`AdminContext [${myId}]: Final role: ${finalRole}`);
             setRole(finalRole);
 
             if (finalRole === 'admin') {
@@ -97,12 +107,13 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         } catch (e: any) {
             const errStr = String(e?.message || e?.name || "");
             if (!errStr.toLowerCase().includes('abort')) {
-                console.error(`AdminContext [${myId}]: Refresh error:`, e);
+                console.error(`AdminContext [${myId}]: Error:`, e);
             }
         } finally {
             if (mounted.current && myId === currentRefreshId.current) {
                 setIsLoading(false);
                 isRefreshing.current = false;
+                console.log(`AdminContext [${myId}]: Ready.`);
             }
         }
     };
@@ -111,10 +122,12 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         refreshRole();
 
         const { data } = supabase.auth.onAuthStateChange((event, session) => {
-            console.log("AdminContext: Auth Event:", event, session?.user?.email || 'guest');
-            if (event === 'SIGNED_IN' || event === 'SIGNED_OUT' || event === 'USER_UPDATED') {
-                // Short debounce to avoid noise
-                setTimeout(() => refreshRole(), 200);
+            console.log("AdminContext: Auth State:", event);
+            if (event === 'SIGNED_IN' || event === 'SIGNED_OUT' || event === 'USER_UPDATED' || event === 'INITIAL_SESSION') {
+                // Throttle refresh
+                setTimeout(() => {
+                    if (mounted.current) refreshRole();
+                }, 300);
             }
         });
 
