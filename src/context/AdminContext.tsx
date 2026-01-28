@@ -34,33 +34,40 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     const [sessionUserId, setSessionUserId] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const isRefreshing = useRef(false);
-
-    // Track current refresh call to avoid race conditions
     const currentRefreshId = useRef(0);
+    const mounted = useRef(true);
 
     useEffect(() => {
+        mounted.current = true;
         const saved = localStorage.getItem('antas_admin_edit_mode');
         if (saved === 'true') setIsEditing(true);
         else if (saved === 'false') setIsEditing(false);
+        return () => { mounted.current = false; };
     }, []);
 
+    // SAFETY ESCAPE HATCH: Ensure we never stay stuck on loading screen
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            if (isLoading && mounted.current) {
+                console.warn("AdminContext: Loading safety timeout triggered. Forcing load completion.");
+                setIsLoading(false);
+            }
+        }, 6000);
+        return () => clearTimeout(timer);
+    }, [isLoading]);
+
     const refreshRole = async () => {
+        if (!mounted.current) return;
         const myId = ++currentRefreshId.current;
         isRefreshing.current = true;
-        console.log(`AdminContext: Refreshing role (ID: ${myId})...`);
 
         try {
             const { data: { session } } = await supabase.auth.getSession();
 
-            // Check if a newer refresh started while we were waiting for session
-            if (myId !== currentRefreshId.current) {
-                console.log(`AdminContext: Obsolete refresh (ID: ${myId}) ignored.`);
-                return;
-            }
+            if (!mounted.current || myId !== currentRefreshId.current) return;
 
             const user = session?.user;
             const userId = user?.id ?? null;
-
             setSessionUserId(userId);
 
             if (!userId) {
@@ -71,17 +78,16 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
             const isUserAdminByEmail = user?.email?.toLowerCase() === ADMIN_EMAIL.toLowerCase();
             const r = await getMyRole().catch((e) => {
-                const errStr = String(e?.message || e?.name || e || "");
+                const errStr = String(e?.message || e?.name || "");
                 if (!errStr.toLowerCase().includes('abort')) {
                     console.warn(`AdminContext [${myId}]: getMyRole failed:`, e);
                 }
                 return null;
             });
 
-            if (myId !== currentRefreshId.current) return;
+            if (!mounted.current || myId !== currentRefreshId.current) return;
 
             const finalRole = isUserAdminByEmail ? 'admin' : (r || 'reader');
-            console.log(`AdminContext [${myId}]: Role settled as ${finalRole}`);
             setRole(finalRole);
 
             if (finalRole === 'admin') {
@@ -89,15 +95,14 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
                 if (saved === 'true' || saved === null) setIsEditing(true);
             }
         } catch (e: any) {
-            const errStr = String(e?.message || e?.name || e || "");
+            const errStr = String(e?.message || e?.name || "");
             if (!errStr.toLowerCase().includes('abort')) {
-                console.error(`AdminContext [${myId}]: refreshRole error:`, e);
+                console.error(`AdminContext [${myId}]: Refresh error:`, e);
             }
         } finally {
-            if (myId === currentRefreshId.current) {
+            if (mounted.current && myId === currentRefreshId.current) {
                 setIsLoading(false);
                 isRefreshing.current = false;
-                console.log(`AdminContext [${myId}]: Loaded.`);
             }
         }
     };
@@ -105,18 +110,17 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     useEffect(() => {
         refreshRole();
 
-        const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-            console.log("AdminContext: Auth Event:", event, session?.user?.email || 'no-user');
-
-            // We refresh on any event that might change permissions or session context
-            if (event === 'SIGNED_IN' || event === 'SIGNED_OUT' || event === 'USER_UPDATED' || event === 'TOKEN_REFRESHED' || event === 'INITIAL_SESSION') {
-                // We use a small delay only if it's a critical change to avoid too many AbortErrors
-                const delay = event === 'SIGNED_IN' ? 500 : 0;
-                setTimeout(() => refreshRole(), delay);
+        const { data } = supabase.auth.onAuthStateChange((event, session) => {
+            console.log("AdminContext: Auth Event:", event, session?.user?.email || 'guest');
+            if (event === 'SIGNED_IN' || event === 'SIGNED_OUT' || event === 'USER_UPDATED') {
+                // Short debounce to avoid noise
+                setTimeout(() => refreshRole(), 200);
             }
         });
 
-        return () => subscription.unsubscribe();
+        return () => {
+            if (data?.subscription) data.subscription.unsubscribe();
+        };
     }, []);
 
     const toggleEditing = () => {

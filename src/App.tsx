@@ -30,6 +30,7 @@ import { Article, Category, SortOption } from "./types";
 export default function App() {
   const { isEditing, userId: sessionUserId, isLoading: isAuthLoading } = useAdmin();
 
+  // Local UI State
   const [profileOpen, setProfileOpen] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(true);
   const [activeTab, setActiveTab] = useState<Category>(Category.INICIO);
@@ -40,10 +41,12 @@ export default function App() {
   const [searchQuery, setSearchQuery] = useState("");
   const [isAIProcessing, setIsAIProcessing] = useState(false);
 
+  // Articles state
   const [articles, setArticles] = useState<Article[]>([]);
   const [loadingArticles, setLoadingArticles] = useState(false);
   const [articlesError, setArticlesError] = useState<string | null>(null);
 
+  // Navigation
   const [selectedArticle, setSelectedArticle] = useState<Article | null>(null);
   const [shareOpen, setShareOpen] = useState(false);
   const [shareArticle, setShareArticle] = useState<Article | null>(null);
@@ -64,41 +67,33 @@ export default function App() {
     document.body.style.background = isDarkMode ? "#000" : "#FDFBF4";
   }, [isDarkMode]);
 
+  // Loading Logic
   const loadArticles = async () => {
     if (!mountedRef.current) return;
 
     const myId = ++lastLoadId.current;
     setLoadingArticles(true);
-    // Don't clear error immediately to avoid flickering error -> loading -> error
     console.log(`App [${myId}]: Loading articles...`);
 
     try {
-      // In a real high-perf setup, we'd pass an AbortSignal to Supabase here
       const arts = await fetchPublishedArticlesJoined();
 
-      if (!mountedRef.current) return;
-      if (myId !== lastLoadId.current) {
-        console.log(`App [${myId}]: Obsolete load ignored.`);
-        return;
-      }
+      if (!mountedRef.current || myId !== lastLoadId.current) return;
 
       setArticles(arts);
       setArticlesError(null);
       console.log(`App [${myId}]: Success.`);
     } catch (e: any) {
-      if (!mountedRef.current) return;
-      if (myId !== lastLoadId.current) return;
+      if (!mountedRef.current || myId !== lastLoadId.current) return;
 
-      const errorString = String(e?.message || e?.name || e || "");
-      const isAbort = errorString.toLowerCase().includes('abort') || e?.name === 'AbortError';
-
-      if (isAbort) {
-        console.warn(`App [${myId}]: Load aborted.`);
+      const errStr = String(e?.message || e?.name || "");
+      if (errStr.toLowerCase().includes('abort')) {
+        console.warn(`App [${myId}]: Interrupted.`);
         return;
       }
 
-      console.error(`App [${myId}]: Load error details:`, e);
-      setArticlesError(errorString || "Erro ao carregar artigos.");
+      console.error(`App [${myId}]: Error:`, e);
+      setArticlesError(e?.message || "Erro na conexão. Tente novamente.");
     } finally {
       if (mountedRef.current && myId === lastLoadId.current) {
         setLoadingArticles(false);
@@ -106,14 +101,16 @@ export default function App() {
     }
   };
 
+  // Sync articles with auth state
   useEffect(() => {
     if (!isAuthLoading) {
-      // Debounce load to ensure state settled
+      // Small debounce to let session settle
       const timer = setTimeout(() => loadArticles(), 300);
       return () => clearTimeout(timer);
     }
   }, [sessionUserId, isAuthLoading]);
 
+  // Handlers
   const onSearch = (q: string) => {
     setSearchQuery(q);
     setIsAIProcessing(true);
@@ -171,6 +168,7 @@ export default function App() {
     return sorted;
   }, [articles, activeTab, searchQuery, sortOption]);
 
+  // Loading Splash
   if (isAuthLoading && articles.length === 0) {
     return (
       <div className={isDarkMode ? "bg-black text-white min-h-screen" : "bg-[#FDFBF4] text-[#0B1D33] min-h-screen"}>
@@ -182,6 +180,7 @@ export default function App() {
     );
   }
 
+  // Detail View
   if (selectedArticle) {
     return (
       <>
@@ -209,9 +208,9 @@ export default function App() {
             <div className="px-6 mt-4">
               <div className="flex flex-col items-center justify-center p-8 bg-black/10 rounded-3xl border border-red-500/20 text-center">
                 <div className="text-2xl mb-2">📡</div>
-                <div className="text-[10px] font-black uppercase tracking-widest text-red-100 mb-1">A conexão está instável</div>
+                <div className="text-[10px] font-black uppercase tracking-widest text-red-100 mb-1">A conexão está lenta</div>
                 <div className="text-[11px] font-medium text-gray-500 mb-5">{articlesError}</div>
-                <button onClick={() => loadArticles()} className="px-6 py-3 bg-yellow-400 text-black text-[10px] font-black uppercase tracking-widest rounded-2xl shadow-lg active:scale-95 transition-all">Tentar Carregar Novamente</button>
+                <button onClick={() => loadArticles()} className="px-6 py-3 bg-yellow-400 text-black text-[10px] font-black uppercase tracking-widest rounded-2xl shadow-lg active:scale-95 transition-all">Tentar Carregar</button>
               </div>
             </div>
           )}
@@ -230,7 +229,7 @@ export default function App() {
               <SectionTitle title={String(activeTab)} sortOption={sortOption} onSortChange={setSortOption} isDarkMode={isDarkMode} />
               {isEditing && (
                 <div className="px-6 mb-4 flex justify-between items-center group/admin">
-                  <div className="text-[10px] font-black uppercase tracking-widest text-gray-500">Ferramentas de Post ({activeTab})</div>
+                  <div className="text-[10px] font-black uppercase tracking-widest text-gray-500">Admin Mode ({activeTab})</div>
                   <EditTrigger type="add" onClick={() => {
                     const dbMap: Record<string, string> = { 'INÍCIO': 'INICIO', 'NOTÍCIAS': 'NOTICIAS', 'HISTÓRIA': 'HISTORIA', 'REGRAS': 'REGRAS', 'PODCAST': 'PODCAST', 'STATUS': 'STATUS' };
                     setEditingArticleDetails({ category: dbMap[String(activeTab)] || String(activeTab) });
@@ -238,7 +237,7 @@ export default function App() {
                 </div>
               )}
               {loadingArticles && articles.length === 0 ? (
-                <div className="px-6 text-sm text-gray-400 animate-pulse">Carregando conteúdos...</div>
+                <div className="px-6 text-sm text-gray-400 animate-pulse">Entrando em quadra...</div>
               ) : filteredArticles.length === 0 ? (
                 <div className="px-6 text-sm text-gray-400">Nada por aqui ainda {searchQuery ? `pra “${searchQuery}”.` : "nessa categoria."}</div>
               ) : (
