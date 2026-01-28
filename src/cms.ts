@@ -1,4 +1,5 @@
 import { supabase } from "./lib/supabase";
+import { CategoryRow, SubcategoryRow } from "./types";
 
 export type AuthorRow = {
   id: string;
@@ -25,6 +26,7 @@ export type ArticleRow = {
   subcategory: string | null;
   reading_minutes: number;
   video_url: string | null;
+  is_featured: boolean;
   author_id: string | null;
   published: boolean;
   published_at: string;
@@ -218,16 +220,7 @@ export async function deleteTagDefinition(slug: string) {
   return supabase.from("tag_definitions").delete().eq("slug", slug);
 }
 
-// Teams
-export async function listTeams() {
-  return supabase.from("team_list").select("*").order("name");
-}
-export async function upsertTeam(payload: Partial<any>) {
-  return supabase.from("team_list").upsert(payload).select("*").single();
-}
-export async function deleteTeam(id: string) {
-  return supabase.from("team_list").delete().eq("id", id);
-}
+
 
 // Tag Management Helpers
 export async function manageArticleTags(articleId: string, tagLabels: string[]) {
@@ -380,4 +373,46 @@ export async function upsertTrade(payload: Partial<import("./types").TradeRow>) 
 
 export async function deleteTrade(id: string) {
   return supabase.from("trades").delete().eq("id", id);
+}
+
+// Categories & Subcategories
+export async function listCategories() {
+  return supabase.from("categories").select("*").order("sort_order", { ascending: true });
+}
+
+export async function upsertCategory(payload: Partial<CategoryRow>) {
+  if (payload.id) {
+    return supabase.from("categories").update(payload).eq("id", payload.id).select("*").single();
+  }
+  return supabase.from("categories").insert([payload]).select("*").single();
+}
+
+export async function deleteCategory(id: string) {
+  return supabase.from("categories").delete().eq("id", id);
+}
+
+export async function listSubcategories(categoryId: string) {
+  return supabase.from("subcategories").select("*").eq("category_id", categoryId).order("sort_order", { ascending: true });
+}
+
+export async function upsertSubcategory(payload: Partial<SubcategoryRow>) {
+  if (payload.id) {
+    return supabase.from("subcategories").update(payload).eq("id", payload.id).select("*").single();
+  }
+  return supabase.from("subcategories").insert([payload]).select("*").single();
+}
+
+export async function deleteSubcategory(id: string) {
+  return supabase.from("subcategories").delete().eq("id", id);
+}
+
+// Fetch featured article for Home
+export async function getFeaturedArticle() {
+  return supabase
+    .from("articles")
+    .select("*")
+    .eq("is_featured", true)
+    .order("published_at", { ascending: false })
+    .limit(1)
+    .single();
 }

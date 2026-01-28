@@ -116,6 +116,21 @@ export type ViewState = 'HOME' | 'SEARCH' | 'STORY' | 'PODCAST' | 'STATUS';
 export type HistoriaSubTab = 'ARTIGOS' | 'CAMPEOES' | 'HALL_OF_FAME' | 'AWARDS' | 'TRADES';
 
 export type RegrasSubTab = 'ARTIGOS' | 'TRADES' | 'INATIVIDADE' | 'DIVISOES' | 'DRAFT';
+export interface CategoryRow {
+  id: string;
+  slug: string;
+  label: string;
+  sort_order: number;
+  is_active: boolean;
+}
+
+export interface SubcategoryRow {
+  id: string;
+  category_id: string;
+  slug: string;
+  label: string;
+  sort_order: number;
+}
 
 export interface Team {
   id: string;
@@ -144,6 +159,5 @@ export interface Trade {
   description: string;
 }
 
-export type TeamRow = Team;
 export type AwardRow = Award;
 export type TradeRow = Trade;

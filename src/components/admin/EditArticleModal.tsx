@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { ArticleRow, AuthorRow, listAuthors, upsertArticle, upsertAuthor, getArticleTags, manageArticleTags } from '../../cms';
+import { ArticleRow, AuthorRow, listAuthors, upsertArticle, upsertAuthor, getArticleTags, manageArticleTags, listCategories, listSubcategories } from '../../cms';
+import { CategoryRow, SubcategoryRow } from '../../types';
 import { supabase } from '../../lib/supabase';
 
 interface EditArticleModalProps {
@@ -38,14 +38,18 @@ export const EditArticleModal: React.FC<EditArticleModalProps> = ({ article, onC
     const [uploadingCover, setUploadingCover] = useState(false);
     const [tagsInput, setTagsInput] = useState("");
 
+    const [availableCategories, setAvailableCategories] = useState<CategoryRow[]>([]);
+    const [availableSubcategories, setAvailableSubcategories] = useState<SubcategoryRow[]>([]);
+
     // Initial data fetch
     useEffect(() => {
         listAuthors().then(({ data }) => {
-            if (data) {
-                console.log("EditArticleModal: Authors loaded:", data);
-                setAuthors(data as AuthorRow[]);
-            }
+            if (data) setAuthors(data as AuthorRow[]);
         });
+        listCategories().then(({ data }) => {
+            if (data) setAvailableCategories(data);
+        });
+
         if (article.id) {
             getArticleTags(article.id).then(tags => setTagsInput(tags.join(", ")));
         } else {
@@ -53,17 +57,24 @@ export const EditArticleModal: React.FC<EditArticleModalProps> = ({ article, onC
         }
     }, [article]);
 
-    const categoryOptions = useMemo(() => {
-        return ["NOTICIAS", "HISTORIA", "REGRAS", "PODCAST", "OPINIAO", "CURIOSIDADES", "TUTORIAIS"];
-    }, []);
+    useEffect(() => {
+        if (editing.category && availableCategories.length > 0) {
+            // Find category ID by slug/label mapping
+            // Try exact match first, then clean match
+            const cat = availableCategories.find(c => c.slug === editing.category || c.label === editing.category);
+            if (cat) {
+                listSubcategories(cat.id).then(({ data }) => {
+                    setAvailableSubcategories(data || []);
+                });
+            } else {
+                setAvailableSubcategories([]);
+            }
+        } else {
+            setAvailableSubcategories([]);
+        }
+    }, [editing.category, availableCategories]);
 
-    const subcategoryOptions = useMemo(() => {
-        if (!editing.category) return [];
-        // Hardcoded generic options or could be fetched. For now, empty or simple.
-        // If we want dynamic subcategories, we'd need to fetch all articles to see what's used, like in AdminPanel.
-        // For simplicity in this modal, let's allow free text or standard ones.
-        return ["NBA", "NBB", "EUROLEAGUE", "WNBA", "DRAFT", "OFFSEASON", "TRADES", "INATIVIDADE", "DIVISOES"];
-    }, [editing.category]);
+
 
     async function uploadCover() {
         setMsg(null);
@@ -220,14 +231,15 @@ export const EditArticleModal: React.FC<EditArticleModalProps> = ({ article, onC
                     <div className="space-y-1">
                         <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-2">Categoria</label>
                         <select className={inputClass} value={editing.category || 'NOTICIAS'} onChange={e => setEditing({ ...editing, category: e.target.value })}>
-                            {categoryOptions.map(c => <option key={c} value={c}>{c}</option>)}
+                            {availableCategories.map(c => <option key={c.id} value={c.slug}>{c.label}</option>)}
+                            {availableCategories.length === 0 && <option value="NOTICIAS">Carregando...</option>}
                         </select>
                     </div>
                     <div className="space-y-1">
                         <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-2">Subcategoria</label>
                         <select className={inputClass} value={editing.subcategory || ''} onChange={e => setEditing({ ...editing, subcategory: e.target.value || null })}>
                             <option value="">Sem subcategoria</option>
-                            {subcategoryOptions.map(s => <option key={s} value={s}>{s}</option>)}
+                            {availableSubcategories.map(s => <option key={s.id} value={s.label}>{s.label}</option>)}
                         </select>
                     </div>
                 </div>
@@ -324,20 +336,23 @@ export const EditArticleModal: React.FC<EditArticleModalProps> = ({ article, onC
                     ) : <div />}
 
                     <div className="flex items-center gap-4">
-                        <label className={`flex items-center gap-2 text-[11px] font-black uppercase tracking-widest ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
-                            <input type="checkbox" checked={!!editing.published} onChange={e => setEditing({ ...editing, published: e.target.checked })} className="rounded border-gray-400" />
-                            Publicado
-                        </label>
+                        <input type="checkbox" checked={!!editing.published} onChange={e => setEditing({ ...editing, published: e.target.checked })} className="rounded border-gray-400" />
+                        Publicado
+                    </label>
+                    <label className={`flex items-center gap-2 text-[11px] font-black uppercase tracking-widest ${isDarkMode ? 'text-yellow-400' : 'text-yellow-600'}`}>
+                        <input type="checkbox" checked={!!editing.is_featured} onChange={e => setEditing({ ...editing, is_featured: e.target.checked })} className="rounded border-yellow-400" />
+                        Destaque (Home)
+                    </label>
 
-                        <button
-                            onClick={handleSave}
-                            className="px-8 py-4 rounded-2xl text-xs font-black uppercase tracking-widest bg-yellow-400 text-black shadow-lg shadow-yellow-400/20 active:scale-95 transition-transform"
-                        >
-                            Salvar Alterações
-                        </button>
-                    </div>
+                    <button
+                        onClick={handleSave}
+                        className="px-8 py-4 rounded-2xl text-xs font-black uppercase tracking-widest bg-yellow-400 text-black shadow-lg shadow-yellow-400/20 active:scale-95 transition-transform"
+                    >
+                        Salvar Alterações
+                    </button>
                 </div>
             </div>
         </div>
+        </div >
     );
 };

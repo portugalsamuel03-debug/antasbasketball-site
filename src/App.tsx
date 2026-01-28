@@ -22,6 +22,9 @@ import { EditTrigger } from "./components/admin/EditTrigger";
 import FeaturedReaders from "./components/FeaturedReaders";
 import FeaturedAuthors from "./components/FeaturedAuthors";
 import HistoriaPage from "./components/HistoriaPage";
+import { FeaturedPost } from "./components/FeaturedPost";
+import { CategoryManager } from "./components/admin/CategoryManager";
+import { List } from 'lucide-react';
 
 // Data
 import { fetchPublishedArticlesJoined } from "./services/articles";
@@ -50,6 +53,7 @@ export default function App() {
   const [selectedArticle, setSelectedArticle] = useState<Article | null>(null);
   const [shareOpen, setShareOpen] = useState(false);
   const [shareArticle, setShareArticle] = useState<Article | null>(null);
+  const [categoryManagerOpen, setCategoryManagerOpen] = useState(false);
   const [editingArticleDetails, setEditingArticleDetails] = useState<Partial<ArticleRow> | null>(null);
 
   const mountedRef = useRef(true);
@@ -219,6 +223,7 @@ export default function App() {
 
           {activeTab === Category.INICIO && (
             <>
+              <FeaturedPost isDarkMode={isDarkMode} onArticleClick={setSelectedArticle} onShare={onShare} />
               <FeaturedReaders isDarkMode={isDarkMode} />
               <FeaturedAuthors isDarkMode={isDarkMode} />
             </>
@@ -229,14 +234,19 @@ export default function App() {
           ) : activeTab !== Category.INICIO && (
             <>
               <SectionTitle title={String(activeTab)} sortOption={sortOption} onSortChange={setSortOption} isDarkMode={isDarkMode} />
-              {isEditing && (
-                <div className="px-6 mb-4 flex justify-between items-center group/admin">
-                  <div className="text-[10px] font-black uppercase tracking-widest text-gray-500">Admin Mode ({activeTab})</div>
+              <div className="px-6 mb-4 flex justify-between items-center group/admin">
+                <div className="text-[10px] font-black uppercase tracking-widest text-gray-500">Admin Mode ({activeTab})</div>
+                <div className="flex gap-2">
+                  {/* Open Category Manager */}
+                  <button onClick={() => setCategoryManagerOpen(true)} className="p-2 bg-gray-200 dark:bg-gray-800 rounded-full hover:scale-110 transition-transform">
+                    <List size={14} className={isDarkMode ? 'text-white' : 'text-black'} />
+                  </button>
                   <EditTrigger type="add" onClick={() => {
                     const dbMap: Record<string, string> = { 'INÍCIO': 'INICIO', 'NOTÍCIAS': 'NOTICIAS', 'HISTÓRIA': 'HISTORIA', 'REGRAS': 'REGRAS', 'PODCAST': 'PODCAST', 'STATUS': 'STATUS' };
                     setEditingArticleDetails({ category: dbMap[String(activeTab)] || String(activeTab) });
                   }} />
                 </div>
+              </div>
               )}
               {loadingArticles && articles.length === 0 ? (
                 <div className="px-6 text-sm text-gray-400 animate-pulse">Aquecendo motores...</div>
@@ -261,6 +271,8 @@ export default function App() {
         <ShareModal isOpen={shareOpen} onClose={() => setShareOpen(false)} article={shareArticle} isDarkMode={isDarkMode} />
 
         {editingArticleDetails && <EditArticleModal article={editingArticleDetails} isDarkMode={isDarkMode} onClose={() => setEditingArticleDetails(null)} onSaveSuccess={() => { window.location.reload(); }} />}
+
+        {categoryManagerOpen && <CategoryManager isDarkMode={isDarkMode} onClose={() => setCategoryManagerOpen(false)} />}
       </div>
     </div>
   );
