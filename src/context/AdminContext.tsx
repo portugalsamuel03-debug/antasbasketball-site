@@ -43,20 +43,34 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
     const refreshRole = async () => {
         const { data } = await supabase.auth.getSession();
-        const userId = data.session?.user?.id ?? null;
+        const user = data.session?.user;
+        const userId = user?.id ?? null;
         setSessionUserId(userId);
 
         if (!userId) {
-            setRole('reader'); // Default to reader if not logged in
+            setRole('reader');
+            setIsEditing(false);
             return;
         }
 
+        // Auto-detect admin by email
+        const adminEmail = "portugalsamuel03@gmail.com";
+        const isUserAdminByEmail = user?.email === adminEmail;
+
         try {
             const r = await getMyRole();
-            setRole(r || 'reader');
+            const finalRole = isUserAdminByEmail ? 'admin' : (r || 'reader');
+            setRole(finalRole);
+
+            // Auto-enable editing if admin and no preference saved yet
+            const saved = localStorage.getItem('antas_admin_edit_mode');
+            if (finalRole === 'admin' && saved === null) {
+                setIsEditing(true);
+                localStorage.setItem('antas_admin_edit_mode', 'true');
+            }
         } catch (e) {
             console.error('Failed to get role', e);
-            setRole('reader');
+            setRole(isUserAdminByEmail ? 'admin' : 'reader');
         }
     };
 

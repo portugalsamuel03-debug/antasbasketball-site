@@ -13,12 +13,10 @@ import ArticleView from "./components/ArticleView";
 import ShareModal from "./components/ShareModal";
 import NotificationPopup from "./components/NotificationPopup";
 import AuthPopup from "./components/AuthPopup";
-
-
-// ✅ novo
 import ProfilePopup from "./components/ProfilePopup";
 import { EditArticleModal } from "./components/admin/EditArticleModal";
 import { ArticleRow } from "./cms";
+import { useAdmin } from "./context/AdminContext";
 
 // Home sections (opcionais)
 import FeaturedReaders from "./components/FeaturedReaders";
@@ -45,7 +43,7 @@ export default function App() {
   const [authReady, setAuthReady] = useState(false);
   const [sessionUserId, setSessionUserId] = useState<string | null>(null);
 
-  const [role, setRole] = useState<RoleState>("unknown");
+  const { isAdmin, isEditing, role } = useAdmin();
   const [adminError, setAdminError] = useState<string | null>(null);
   const [roleChecking, setRoleChecking] = useState(false);
 
@@ -84,135 +82,14 @@ export default function App() {
   // evita corrida / setState depois de unmount
   const mountedRef = useRef(true);
 
-  // ===== Helpers: role cache + timeout =====
-  const roleCacheKey = useMemo(
-    () => (sessionUserId ? `antas_role:${sessionUserId}` : null),
-    [sessionUserId]
-  );
 
-  function getCachedRole(): Role | null {
-    if (!roleCacheKey) return null;
-    try {
-      const v = sessionStorage.getItem(roleCacheKey);
-      return v === "admin" || v === "reader" ? (v as Role) : null;
-    } catch {
-      return null;
-    }
-  }
-
-  function setCachedRole(r: Role) {
-    if (!roleCacheKey) return;
-    try {
-      sessionStorage.setItem(roleCacheKey, r);
-    } catch {
-      // ignore
-    }
-  }
-
-  async function getRoleWithTimeout(): Promise<Role> {
-    const controller = new AbortController();
-    const t = window.setTimeout(() => controller.abort(), 20000);
-
-    try {
-      // se seu getMyRole aceitar signal, pode trocar aqui depois
-      const r = await getMyRole();
-      const normalized = (r as Role) === "admin" ? "admin" : "reader";
-      return normalized;
-    } finally {
-      window.clearTimeout(t);
-    }
-  }
-
-  async function refreshRole(reason: string) {
-    if (!sessionUserId) return;
-
-    setRoleChecking(true);
-    setAdminError(null);
-
-    // 1) cache imediato
-    const cached = getCachedRole();
-    if (cached) setRole(cached);
-
-    // 2) revalida
-    try {
-      const r = await getRoleWithTimeout();
-      if (!mountedRef.current) return;
-
-      setRole(r);
-      setCachedRole(r);
-    } catch (e: any) {
-      console.error(`refreshRole error (${reason}):`, e);
-
-      if (!mountedRef.current) return;
-
-      const cached2 = getCachedRole();
-      if (cached2) setRole(cached2);
-      else setRole("unknown");
-
-      setAdminError(e?.message ?? "Falha ao validar permissão de admin (role).");
-    } finally {
-      if (mountedRef.current) setRoleChecking(false);
-    }
-  }
-
-  // ===== Boot session + role =====
+  // ===== Boot session =====
   useEffect(() => {
     mountedRef.current = true;
-
-    const load = async () => {
-      setAdminError(null);
-
-      try {
-        const { data } = await supabase.auth.getSession();
-        const userId = data.session?.user?.id ?? null;
-
-        if (!mountedRef.current) return;
-
-        setSessionUserId(userId);
-
-        if (!userId) {
-          setRole("unknown");
-          return;
-        }
-
-        const cached = getCachedRole();
-        if (cached) setRole(cached);
-        else setRole("unknown");
-
-        await refreshRole("boot");
-      } catch (e: any) {
-        console.error("boot auth error:", e);
-        if (!mountedRef.current) return;
-
-        setAdminError(e?.message ?? "Erro ao validar sessão (Supabase).");
-      } finally {
-        if (mountedRef.current) setAuthReady(true);
-      }
-    };
-
-    load();
-
-    const { data } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      const userId = session?.user?.id ?? null;
-      setSessionUserId(userId);
-
-      if (!userId) {
-        setRole("unknown");
-        return;
-      }
-
-      const cached = getCachedRole();
-      if (cached) setRole(cached);
-      else setRole("unknown");
-
-      await refreshRole("authStateChange");
-    });
-
+    setAuthReady(true); // AdminProvider handles role/session now
     return () => {
       mountedRef.current = false;
-      data.subscription.unsubscribe();
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // ===== Theme =====
@@ -443,7 +320,7 @@ export default function App() {
                       onClick={() => setSelectedArticle(a)}
                       onShare={onShare}
                       isDarkMode={isDarkMode}
-                      isAdmin={role === "admin"}
+                      isAdmin={isEditing}
                       onEdit={handleEditFromCard}
                     />
                   ))}
