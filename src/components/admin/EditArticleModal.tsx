@@ -140,40 +140,47 @@ export const EditArticleModal: React.FC<EditArticleModalProps> = ({ article, onC
             return;
         }
 
-        const payload: Partial<ArticleRow> = {
-            ...editing,
-            category: editing.category || "NOTICIAS",
-            published: editing.published ?? true,
-            reading_minutes: editing.reading_minutes ?? 5,
-            published_at: editing.published_at ?? new Date().toISOString(),
-            updated_at: new Date().toISOString() as any
-        };
-        if (payload.id === "") delete payload.id;
+        setMsg("Salvando...");
+        try {
+            const payload: Partial<ArticleRow> = {
+                ...editing,
+                category: editing.category || "NOTICIAS",
+                published: editing.published ?? true,
+                reading_minutes: editing.reading_minutes ?? 5,
+                published_at: editing.published_at ?? new Date().toISOString(),
+            };
+            if (payload.id === "") delete payload.id;
+            payload.slug = payload.slug?.trim() || slugify(payload.title);
 
-        payload.slug = payload.slug?.trim() || slugify(payload.title);
-        payload.published = payload.published ?? true;
-        payload.reading_minutes = payload.reading_minutes ?? 5;
-        payload.published_at = payload.published_at ?? new Date().toISOString();
-        payload.updated_at = new Date().toISOString() as any;
+            console.log("EditArticleModal: Saving article payload...", payload);
 
-        console.log("EditArticleModal: Saving article payload...", payload);
-        const { data: savedData, error } = await upsertArticle(payload);
-        if (error || !savedData) {
-            console.error("EditArticleModal: Upsert error:", error);
-            setMsg(`Erro ao salvar: ${error?.message || 'Verifique sua conexão ou se já existe um post com este título'}`);
-            return;
+            // Add a timeout to the upsert call to prevent infinite hang
+            const savePromise = upsertArticle(payload);
+            const timeoutPromise = new Promise((_, reject) =>
+                setTimeout(() => reject(new Error("Timeout ao salvar. Verifique sua internet.")), 15000)
+            );
+
+            const { data: savedData, error } = await Promise.race([savePromise, timeoutPromise]) as any;
+
+            if (error || !savedData) {
+                console.error("EditArticleModal: Upsert error:", error);
+                setMsg(`Erro ao salvar: ${error?.message || 'Verifique sua conexão ou duplicidade de título.'}`);
+                return;
+            }
+
+            // Save tags
+            const tagList = tagsInput.split(',').map(t => t.trim()).filter(Boolean);
+            await manageArticleTags(savedData.id, tagList);
+
+            setMsg("Artigo salvo ✅");
+            setTimeout(() => {
+                onSaveSuccess();
+                onClose();
+            }, 800);
+        } catch (e: any) {
+            console.error("EditArticleModal: Critical save error:", e);
+            setMsg(e.message || "Erro inesperado ao salvar.");
         }
-
-        // Save tags
-        const tagList = tagsInput.split(',').map(t => t.trim()).filter(Boolean);
-        await manageArticleTags(savedData.id, tagList);
-
-        setMsg("Artigo salvo ✅");
-        // Short delay to show success message
-        setTimeout(() => {
-            onSaveSuccess();
-            onClose();
-        }, 800);
     }
 
     const inputClass = `w-full border rounded-2xl px-4 py-3 text-sm ${isDarkMode ? 'bg-black/30 border-white/10 text-white' : 'bg-white border-black/10 text-black'}`;

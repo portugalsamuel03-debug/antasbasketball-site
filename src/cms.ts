@@ -49,21 +49,57 @@ export async function listArticles() {
 }
 
 export async function upsertArticle(payload: Partial<ArticleRow>) {
-  const isNew = !payload.id || payload.id === "";
-  const { data, error } = await supabase.from("articles").upsert(payload).select("*").single();
+  console.log("CMS: Starting upsertArticle", payload);
+  try {
+    const isNew = !payload.id || payload.id === "";
 
-  if (!error && isNew && data?.published) {
-    // Auto-create notification for new published articles
-    await createNotification({
-      title: data.category.toUpperCase(),
-      description: data.title,
-      type: 'noticia',
-      link: data.id,
-      is_global: true
-    });
+    // UI mapping: strip accents from category if needed
+    if (payload.category) {
+      const catMap: Record<string, string> = {
+        'INÍCIO': 'INICIO',
+        'NOTÍCIAS': 'NOTICIAS',
+        'HISTÓRIA': 'HISTORIA',
+        'REGRAS': 'REGRAS',
+        'PODCAST': 'PODCAST',
+        'STATUS': 'STATUS'
+      };
+      const mapped = catMap[payload.category.toUpperCase()];
+      if (mapped) payload.category = mapped;
+      else payload.category = payload.category.toUpperCase();
+    }
+
+    console.log("CMS: Construction of payload complete. Category mapped to:", payload.category);
+    console.log("CMS: Calling upsert...");
+    const { data, error } = await supabase.from("articles").upsert(payload).select("*").single();
+
+    if (error) {
+      console.error("CMS: Upsert error", error);
+      return { data: null, error };
+    }
+
+    console.log("CMS: Upsert success", data.id);
+
+    if (isNew && data?.published) {
+      console.log("CMS: Creating notification for new article...");
+      try {
+        await createNotification({
+          title: data.category.toUpperCase(),
+          description: data.title,
+          type: 'noticia',
+          link: data.id,
+          is_global: true
+        });
+        console.log("CMS: Notification created.");
+      } catch (e) {
+        console.warn("CMS: Failed to create notification", e);
+      }
+    }
+
+    return { data, error: null };
+  } catch (err) {
+    console.error("CMS: Critical error in upsertArticle", err);
+    return { data: null, error: err };
   }
-
-  return { data, error };
 }
 
 export async function deleteArticle(id: string) {
@@ -117,9 +153,12 @@ export async function deleteFeaturedReader(id: string) {
 }
 
 export async function listRankedReaders() {
-  // Get all likes and comments to compute ranking
-  const { data: likes } = await supabase.from('article_likes').select('user_id');
-  const { data: comments } = await supabase.from('article_comments').select('user_id');
+  console.log("CMS: Fetching ranked readers activity");
+  // Limit selection to user_id to avoid large payloads, and limit total rows if possible
+  const { data: likes, error: lErr } = await supabase.from('article_likes').select('user_id').limit(1000);
+  const { data: comments, error: cErr } = await supabase.from('article_comments').select('user_id').limit(1000);
+
+  if (lErr || cErr) console.warn("CMS: Error fetching participation", lErr, cErr);
 
   const stats: Record<string, { likes: number, comments: number }> = {};
 
@@ -141,10 +180,12 @@ export async function listRankedReaders() {
 
   if (sortedIds.length === 0) return { data: [], error: null };
 
-  const { data: profiles } = await supabase
+  const { data: profiles, error: pErr } = await supabase
     .from('profiles')
     .select('id, display_name, nickname, avatar_url')
     .in('id', sortedIds);
+
+  if (pErr) console.warn("CMS: Error fetching profiles for ranking", pErr);
 
   const result = sortedIds.map(id => {
     const p = profiles?.find(x => x.id === id);

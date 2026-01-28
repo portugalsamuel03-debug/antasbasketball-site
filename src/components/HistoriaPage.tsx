@@ -260,7 +260,7 @@ const HistoriaPage: React.FC<HistoriaPageProps> = ({ articles, isDarkMode, onArt
                     {isEditing && (
                         <div className="flex justify-between items-center mb-2">
                             <div className="text-[10px] font-black uppercase tracking-widest text-gray-500">Admin: Historia</div>
-                            <EditTrigger type="add" onClick={() => onEditArticle('')} />
+                            <EditTrigger type="add" onClick={() => onEditArticle('', 'HISTORIA')} />
                         </div>
                     )}
                     {articles.length === 0 ? (

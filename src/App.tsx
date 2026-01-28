@@ -114,7 +114,7 @@ export default function App() {
       setArticlesError(null);
 
       const timeoutPromise = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error("Timeout: A conexão com o banco está lenta.")), 20000)
+        setTimeout(() => reject(new Error("Timeout: A conexão com o banco está lenta ou inexistente.")), 40000)
       );
 
       try {
@@ -255,9 +255,9 @@ export default function App() {
     else setAuthOpen(true);
   };
 
-  const handleEditFromCard = (id: string) => {
+  const handleEditFromCard = (id: string, category?: string) => {
     if (id === "") {
-      setEditingArticleDetails({});
+      setEditingArticleDetails({ category });
       return;
     }
     const found = articles.find(a => a.id === id);
@@ -300,8 +300,11 @@ export default function App() {
 
           {articlesError && (
             <div className="px-6 mt-4">
-              <div className="text-[12px] font-bold bg-red-500/10 border border-red-500/30 rounded-2xl px-4 py-3 text-red-200">
-                {articlesError}
+              <div className="flex flex-col items-center justify-center p-8 bg-black/10 rounded-3xl border border-red-500/20 text-center">
+                <div className="text-2xl mb-2">📡</div>
+                <div className="text-[10px] font-black uppercase tracking-widest text-red-400 mb-1">Erro de Carregamento</div>
+                <div className="text-[12px] font-medium text-gray-500 mb-4">{articlesError}</div>
+                <button onClick={() => window.location.reload()} className="px-4 py-2 bg-yellow-400 text-black text-[10px] font-black uppercase tracking-widest rounded-xl active:scale-95 transition-all">Tentar Novamente</button>
               </div>
             </div>
           )}
@@ -333,7 +336,17 @@ export default function App() {
               {isEditing && (
                 <div className="px-6 mb-4 flex justify-between items-center group/admin">
                   <div className="text-[10px] font-black uppercase tracking-widest text-gray-500">Ferramentas de Post ({activeTab})</div>
-                  <EditTrigger type="add" onClick={() => setEditingArticleDetails({ category: String(activeTab) })} />
+                  <EditTrigger type="add" onClick={() => {
+                    const dbMap: Record<string, string> = {
+                      'INÍCIO': 'INICIO',
+                      'NOTÍCIAS': 'NOTICIAS',
+                      'HISTÓRIA': 'HISTORIA',
+                      'REGRAS': 'REGRAS',
+                      'PODCAST': 'PODCAST',
+                      'STATUS': 'STATUS'
+                    };
+                    setEditingArticleDetails({ category: dbMap[String(activeTab)] || String(activeTab) });
+                  }} />
                 </div>
               )}
 
