@@ -1,7 +1,6 @@
 // src/App.tsx
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "./lib/supabase";
-import { getMyRole } from "./admin";
 
 // UI components
 import Header from "./components/Header";
@@ -19,7 +18,7 @@ import { ArticleRow } from "./cms";
 import { useAdmin } from "./context/AdminContext";
 import { EditTrigger } from "./components/admin/EditTrigger";
 
-// Home sections (opcionais)
+// Home sections
 import FeaturedReaders from "./components/FeaturedReaders";
 import FeaturedAuthors from "./components/FeaturedAuthors";
 import HistoriaPage from "./components/HistoriaPage";
@@ -28,75 +27,39 @@ import HistoriaPage from "./components/HistoriaPage";
 import { fetchPublishedArticlesJoined } from "./services/articles";
 import { Article, Category, SortOption } from "./types";
 
-type Role = "admin" | "reader";
-type RoleState = Role | "unknown";
-
-function safeSearchParam(name: string) {
-  try {
-    return new URLSearchParams(window.location.search).get(name);
-  } catch {
-    return null;
-  }
-}
-
 export default function App() {
-  // ===== Auth / Role =====
-  const [authReady, setAuthReady] = useState(false);
+  const { isEditing, userId: sessionUserId, isLoading: isAuthLoading } = useAdmin();
 
-  const { isAdmin, isEditing, role, userId: sessionUserId, isLoading: isAuthLoading } = useAdmin();
-  const [adminError, setAdminError] = useState<string | null>(null);
-  const [roleChecking, setRoleChecking] = useState(false);
-
-  // Perfil
+  // Profile management
   const [profileOpen, setProfileOpen] = useState(false);
-
-  // ===== UI =====
   const [isDarkMode, setIsDarkMode] = useState(true);
-
-  // ✅ COMEÇA NO HOME (INICIO)
   const [activeTab, setActiveTab] = useState<Category>(Category.INICIO);
 
   const [authOpen, setAuthOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
-
   const [sortOption, setSortOption] = useState<SortOption>("RECENTES");
   const [searchQuery, setSearchQuery] = useState("");
   const [isAIProcessing, setIsAIProcessing] = useState(false);
 
-  // ===== Articles =====
+  // Articles state
   const [articles, setArticles] = useState<Article[]>([]);
   const [loadingArticles, setLoadingArticles] = useState(true);
   const [articlesError, setArticlesError] = useState<string | null>(null);
 
-  // ===== Article view / share =====
+  // Focus
   const [selectedArticle, setSelectedArticle] = useState<Article | null>(null);
   const [shareOpen, setShareOpen] = useState(false);
   const [shareArticle, setShareArticle] = useState<Article | null>(null);
-
-  // ✅ Feed Editing
   const [editingArticleDetails, setEditingArticleDetails] = useState<Partial<ArticleRow> | null>(null);
 
-  // /?admin=1 abre painel
-  const isAdminRoute = useMemo(() => safeSearchParam("admin") === "1", []);
-
-  // evita corrida / setState depois de unmount
   const mountedRef = useRef(true);
 
-
-  // ===== Boot session =====
+  // Initialize Theme
   useEffect(() => {
     mountedRef.current = true;
-    setAuthReady(true);
-    return () => {
-      mountedRef.current = false;
-    };
-  }, []);
-
-  // ===== Theme =====
-  useEffect(() => {
-    const saved = localStorage.getItem("antas_theme");
-    if (saved === "light") setIsDarkMode(false);
-    if (saved === "dark") setIsDarkMode(true);
+    const saved = localStorage.getItem("antas_theme") || "dark";
+    setIsDarkMode(saved === "dark");
+    return () => { mountedRef.current = false; };
   }, []);
 
   useEffect(() => {
@@ -104,84 +67,70 @@ export default function App() {
     document.body.style.background = isDarkMode ? "#000" : "#FDFBF4";
   }, [isDarkMode]);
 
-  // ===== Load articles =====
-  useEffect(() => {
-    let alive = true;
+  // Load logic
+  const loadArticles = async () => {
+    if (!mountedRef.current) return;
+    setLoadingArticles(true);
+    setArticlesError(null);
+    console.log("App: Loading articles...");
 
-    async function load() {
-      setLoadingArticles(true);
-      console.log("App: Loading articles...");
-      setArticlesError(null);
-
-      const timeoutPromise = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error("Timeout: A conexão com o banco está lenta ou inexistente.")), 40000)
-      );
-
-      try {
-        const arts = await Promise.race([
-          fetchPublishedArticlesJoined(),
-          timeoutPromise
-        ]) as Article[];
-
-        if (!alive) return;
+    try {
+      const arts = await fetchPublishedArticlesJoined();
+      if (mountedRef.current) {
         setArticles(arts);
-        setAuthReady(true);
-        console.log("App: Articles loaded.");
-      } catch (e: any) {
-        if (!alive) return;
-
-        // Ignore AbortError - it typically means navigation happened
-        if (e?.name === 'AbortError' || e?.message?.includes('aborted')) {
-          console.warn("App: Load aborted (likely navigation).");
-          return;
-        }
-
-        console.error("App: Load error details:", e);
-        const errMsg = typeof e === 'string' ? e : (e?.message || JSON.stringify(e));
-        setArticlesError(errMsg);
-        setAuthReady(true);
-      } finally {
-        if (alive) setLoadingArticles(false);
+        console.log("App: Articles loaded successfully.");
       }
+    } catch (e: any) {
+      if (mountedRef.current) {
+        console.error("App: Article load error:", e);
+        // Ignore AbortError which is usually non-critical navigation/react cleanup
+        if (e?.name !== 'AbortError' && !e?.message?.includes('aborted')) {
+          setArticlesError(e?.message || "Erro ao carregar artigos.");
+        }
+      }
+    } finally {
+      if (mountedRef.current) setLoadingArticles(false);
     }
+  };
 
-    load();
-
-    const { data } = supabase.auth.onAuthStateChange(() => {
-      load();
+  useEffect(() => {
+    loadArticles();
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(() => {
+      loadArticles();
     });
-
-    return () => {
-      alive = false;
-      data.subscription.unsubscribe();
-    };
+    return () => subscription.unsubscribe();
   }, []);
 
-  // ===== Search =====
   const onSearch = async (q: string) => {
     setSearchQuery(q);
     setIsAIProcessing(true);
     setTimeout(() => setIsAIProcessing(false), 450);
   };
 
-  // ===== Share =====
   const onShare = (a: Article) => {
     setShareArticle(a);
     setShareOpen(true);
   };
 
-  // ✅ abrir artigo pelo id (usado no ProfilePopup)
-  const openArticleById = (articleId: string) => {
-    const found = articles.find((a) => a.id === articleId) ?? null;
-    if (found) {
-      setProfileOpen(false);
-      setSelectedArticle(found);
+  const handleEditFromCard = (id: string, category?: string) => {
+    if (id === "") {
+      setEditingArticleDetails({ category });
       return;
     }
-    alert("Não encontrei esse post na lista atual. Atualize e tente novamente.");
+    const found = articles.find(a => a.id === id);
+    if (!found) return;
+    setEditingArticleDetails({
+      id: found.id,
+      title: found.title,
+      category: String(found.category),
+      content: found.content,
+      cover_url: found.imageUrl,
+      excerpt: found.description,
+      published: true,
+      reading_minutes: parseInt(found.readTime) || 5,
+    });
   };
 
-  // ===== Sorting + filtering =====
   const filteredArticles = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
     let list = articles;
@@ -192,9 +141,7 @@ export default function App() {
 
     if (q) {
       list = list.filter((a) => {
-        const hay = [a.title, a.description, a.content, a.author, ...(a.tags ?? [])]
-          .join(" ")
-          .toLowerCase();
+        const hay = [a.title, a.description, a.content, a.author, ...(a.tags ?? [])].join(" ").toLowerCase();
         return hay.includes(q);
       });
     }
@@ -203,116 +150,55 @@ export default function App() {
     sorted.sort((a, b) => {
       if (sortOption === "RECENTES") return (b.date ?? "").localeCompare(a.date ?? "");
       if (sortOption === "ANTIGOS") return (a.date ?? "").localeCompare(b.date ?? "");
-      if (sortOption === "CURTIDOS") return (b.likes ?? 0) - (a.likes ?? 0);
+      if (sortOption === "CURTIDOS" || sortOption === "SALVOS") return (b.likes ?? 0) - (a.likes ?? 0);
       if (sortOption === "COMENTADOS") return (b.commentsCount ?? 0) - (a.commentsCount ?? 0);
-      if (sortOption === "SALVOS") return (b.likes ?? 0) - (a.likes ?? 0);
       return 0;
     });
 
     return sorted;
   }, [articles, activeTab, searchQuery, sortOption]);
 
-  // ===== Loading screen =====
-  // We show the loading screen if:
-  // 1. Auth states are still reconciling AND articles aren't ready PLUS we aren't in a timeout.
-  // Actually, let's keep it simple but add a bypass if authReady is true and it's taking too long.
-  if (!authReady || isAuthLoading) {
+  if (isAuthLoading) {
     return (
       <div className={isDarkMode ? "bg-black text-white min-h-screen" : "bg-[#FDFBF4] text-[#0B1D33] min-h-screen"}>
-        <div className="max-w-md mx-auto px-6 py-10">
-          <div className="text-xs font-black uppercase tracking-widest text-yellow-400">Antas Basketball</div>
-          <div className="mt-3 text-sm text-gray-400">Carregando…</div>
+        <div className="max-w-md mx-auto px-6 py-20 flex flex-col items-center">
+          <div className="text-xs font-black uppercase tracking-widest text-yellow-400 animate-pulse">Antas Basketball</div>
+          <div className="mt-4 text-sm text-gray-400">Aquecendo para o jogo...</div>
         </div>
       </div>
     );
   }
 
-  // ===== Admin route removed per user request =====
-  // Inline editing is now the primary way to manage content.
-
-
-  // ===== Article opened =====
   if (selectedArticle) {
     return (
       <>
-        <ArticleView
-          article={selectedArticle}
-          onBack={() => setSelectedArticle(null)}
-          onShare={onShare}
-          isDarkMode={isDarkMode}
-        />
-
+        <ArticleView article={selectedArticle} onBack={() => setSelectedArticle(null)} onShare={onShare} isDarkMode={isDarkMode} />
         <ShareModal isOpen={shareOpen} onClose={() => setShareOpen(false)} article={shareArticle} isDarkMode={isDarkMode} />
         <AuthPopup isOpen={authOpen} onClose={() => setAuthOpen(false)} />
         <NotificationPopup isOpen={notificationsOpen} onClose={() => setNotificationsOpen(false)} isDarkMode={isDarkMode} />
-
-        {sessionUserId && (
-          <ProfilePopup
-            isOpen={profileOpen}
-            onClose={() => setProfileOpen(false)}
-            userId={sessionUserId}
-            onOpenArticle={(id) => openArticleById(id)}
-          />
-        )}
+        {sessionUserId && <ProfilePopup isOpen={profileOpen} onClose={() => setProfileOpen(false)} userId={sessionUserId} onOpenArticle={(id) => {
+          const found = articles.find(a => a.id === id);
+          if (found) { setProfileOpen(false); setSelectedArticle(found); }
+        }} />}
       </>
     );
   }
 
-  const handleUserClick = () => {
-    if (sessionUserId) setProfileOpen(true);
-    else setAuthOpen(true);
-  };
-
-  const handleEditFromCard = (id: string, category?: string) => {
-    if (id === "") {
-      setEditingArticleDetails({ category });
-      return;
-    }
-    const found = articles.find(a => a.id === id);
-    if (!found) return;
-
-    setEditingArticleDetails({
-      id: found.id,
-      title: found.title,
-      category: String(found.category),
-      content: found.content,
-      cover_url: found.imageUrl,
-      excerpt: found.description,
-      published: true,
-      reading_minutes: parseInt(found.readTime) || 5, // Parsing "5 MIN"
-    });
-  };
-
-  // ===== App shell =====
   return (
     <div className={isDarkMode ? "bg-black text-white min-h-screen" : "bg-[#FDFBF4] text-[#0B1D33] min-h-screen"}>
       <div className={`max-w-md mx-auto min-h-screen ${isDarkMode ? "bg-black" : "bg-[#FDFBF4]"}`}>
-        <Header
-          isDarkMode={isDarkMode}
-          onToggleTheme={() => setIsDarkMode((v) => !v)}
-          onOpenNotifications={() => setNotificationsOpen(true)}
-          onOpenAuth={handleUserClick}
-          hasNewNotifications={true}
-        />
+        <Header isDarkMode={isDarkMode} onToggleTheme={() => setIsDarkMode(v => !v)} onOpenNotifications={() => setNotificationsOpen(true)} onOpenAuth={() => sessionUserId ? setProfileOpen(true) : setAuthOpen(true)} />
 
         <main className="pb-28">
           <SearchBar onSearch={onSearch} isAIProcessing={isAIProcessing} isDarkMode={isDarkMode} />
-
-          {adminError && (
-            <div className="px-6">
-              <div className="text-[12px] font-bold bg-red-500/10 border border-red-500/30 rounded-2xl px-4 py-3 text-red-200">
-                {adminError}
-              </div>
-            </div>
-          )}
 
           {articlesError && (
             <div className="px-6 mt-4">
               <div className="flex flex-col items-center justify-center p-8 bg-black/10 rounded-3xl border border-red-500/20 text-center">
                 <div className="text-2xl mb-2">📡</div>
-                <div className="text-[10px] font-black uppercase tracking-widest text-red-400 mb-1">Erro de Carregamento</div>
+                <div className="text-[10px] font-black uppercase tracking-widest text-red-400 mb-1">Erro de Conexão</div>
                 <div className="text-[12px] font-medium text-gray-500 mb-4">{articlesError}</div>
-                <button onClick={() => window.location.reload()} className="px-4 py-2 bg-yellow-400 text-black text-[10px] font-black uppercase tracking-widest rounded-xl active:scale-95 transition-all">Tentar Novamente</button>
+                <button onClick={() => window.location.reload()} className="px-4 py-2 bg-yellow-400 text-black text-[10px] font-black uppercase tracking-widest rounded-xl">Tentar Novamente</button>
               </div>
             </div>
           )}
@@ -325,58 +211,26 @@ export default function App() {
           )}
 
           {activeTab === Category.HISTORIA ? (
-            <HistoriaPage
-              articles={filteredArticles}
-              isDarkMode={isDarkMode}
-              onArticleClick={setSelectedArticle}
-              onShare={onShare}
-              onEditArticle={handleEditFromCard}
-            />
+            <HistoriaPage articles={filteredArticles} isDarkMode={isDarkMode} onArticleClick={setSelectedArticle} onShare={onShare} onEditArticle={handleEditFromCard} />
           ) : activeTab !== Category.INICIO && (
             <>
-              <SectionTitle
-                title={String(activeTab)}
-                sortOption={sortOption}
-                onSortChange={setSortOption}
-                isDarkMode={isDarkMode}
-              />
-
+              <SectionTitle title={String(activeTab)} sortOption={sortOption} onSortChange={setSortOption} isDarkMode={isDarkMode} />
               {isEditing && (
                 <div className="px-6 mb-4 flex justify-between items-center group/admin">
                   <div className="text-[10px] font-black uppercase tracking-widest text-gray-500">Ferramentas de Post ({activeTab})</div>
                   <EditTrigger type="add" onClick={() => {
-                    const dbMap: Record<string, string> = {
-                      'INÍCIO': 'INICIO',
-                      'NOTÍCIAS': 'NOTICIAS',
-                      'HISTÓRIA': 'HISTORIA',
-                      'REGRAS': 'REGRAS',
-                      'PODCAST': 'PODCAST',
-                      'STATUS': 'STATUS'
-                    };
+                    const dbMap: Record<string, string> = { 'INÍCIO': 'INICIO', 'NOTÍCIAS': 'NOTICIAS', 'HISTÓRIA': 'HISTORIA', 'REGRAS': 'REGRAS', 'PODCAST': 'PODCAST', 'STATUS': 'STATUS' };
                     setEditingArticleDetails({ category: dbMap[String(activeTab)] || String(activeTab) });
                   }} />
                 </div>
               )}
-
-              {loadingArticles ? (
+              {loadingArticles && articles.length === 0 ? (
                 <div className="px-6 text-sm text-gray-400">Carregando posts…</div>
               ) : filteredArticles.length === 0 ? (
-                <div className="px-6 text-sm text-gray-400">
-                  Nada por aqui ainda {searchQuery ? `pra “${searchQuery}”.` : "nessa categoria."}
-                </div>
+                <div className="px-6 text-sm text-gray-400">Nada por aqui ainda {searchQuery ? `pra “${searchQuery}”.` : "nessa categoria."}</div>
               ) : (
                 <div className="px-6 space-y-4">
-                  {filteredArticles.map((a) => (
-                    <ArticleCard
-                      key={a.id}
-                      article={a}
-                      onClick={() => setSelectedArticle(a)}
-                      onShare={onShare}
-                      isDarkMode={isDarkMode}
-                      isAdmin={isEditing}
-                      onEdit={handleEditFromCard}
-                    />
-                  ))}
+                  {filteredArticles.map(a => <ArticleCard key={a.id} article={a} onClick={() => setSelectedArticle(a)} onShare={onShare} isDarkMode={isDarkMode} isAdmin={isEditing} onEdit={handleEditFromCard} />)}
                 </div>
               )}
             </>
@@ -384,32 +238,16 @@ export default function App() {
         </main>
 
         <BottomNav activeTab={activeTab} onTabChange={setActiveTab} isDarkMode={isDarkMode} />
-
         <AuthPopup isOpen={authOpen} onClose={() => setAuthOpen(false)} />
-
-        {sessionUserId && (
-          <ProfilePopup
-            isOpen={profileOpen}
-            onClose={() => setProfileOpen(false)}
-            userId={sessionUserId}
-            onOpenArticle={(id) => openArticleById(id)}
-          />
-        )}
-
+        {sessionUserId && <ProfilePopup isOpen={profileOpen} onClose={() => setProfileOpen(false)} userId={sessionUserId} onOpenArticle={(id) => {
+          const found = articles.find(a => a.id === id);
+          if (found) { setProfileOpen(false); setSelectedArticle(found); }
+        }} />}
         <NotificationPopup isOpen={notificationsOpen} onClose={() => setNotificationsOpen(false)} isDarkMode={isDarkMode} />
         <ShareModal isOpen={shareOpen} onClose={() => setShareOpen(false)} article={shareArticle} isDarkMode={isDarkMode} />
 
-        {editingArticleDetails && (
-          <EditArticleModal
-            article={editingArticleDetails}
-            isDarkMode={isDarkMode}
-            onClose={() => setEditingArticleDetails(null)}
-            onSaveSuccess={() => {
-              window.location.reload();
-            }}
-          />
-        )}
+        {editingArticleDetails && <EditArticleModal article={editingArticleDetails} isDarkMode={isDarkMode} onClose={() => setEditingArticleDetails(null)} onSaveSuccess={() => { window.location.reload(); }} />}
       </div>
-    </div >
+    </div>
   );
 }

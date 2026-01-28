@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState, useMemo } from 'react';
+import React, { createContext, useContext, useEffect, useState, useMemo, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { getMyRole } from '../admin';
 
@@ -26,41 +26,20 @@ const AdminContext = createContext<AdminContextType>({
 
 export const useAdmin = () => useContext(AdminContext);
 
+const ADMIN_EMAIL = "portugalsamuel03@gmail.com";
+
 export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const [role, setRole] = useState<Role | 'unknown'>('unknown');
     const [isEditing, setIsEditing] = useState(false);
     const [sessionUserId, setSessionUserId] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(true);
-    const isRefreshing = React.useRef(false);
+    const isRefreshing = useRef(false);
 
-    // Load persisted edit state
     useEffect(() => {
         const saved = localStorage.getItem('antas_admin_edit_mode');
-        if (saved === 'true') {
-            setIsEditing(true);
-        } else if (saved === 'false') {
-            setIsEditing(false);
-        }
+        if (saved === 'true') setIsEditing(true);
+        else if (saved === 'false') setIsEditing(false);
     }, []);
-
-    // Safety timeout to ensure loading screen doesn't get stuck forever
-    useEffect(() => {
-        const timer = setTimeout(() => {
-            if (isLoading) {
-                console.warn("AdminContext: Loading safety timeout triggered.");
-                setIsLoading(false);
-            }
-        }, 5000);
-        return () => clearTimeout(timer);
-    }, [isLoading]);
-
-    const toggleEditing = () => {
-        setIsEditing(prev => {
-            const next = !prev;
-            localStorage.setItem('antas_admin_edit_mode', String(next));
-            return next;
-        });
-    };
 
     const refreshRole = async () => {
         if (isRefreshing.current) return;
@@ -68,8 +47,8 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         console.log("AdminContext: Refreshing role...");
 
         try {
-            const { data } = await supabase.auth.getSession();
-            const user = data.session?.user;
+            const { data: { session } } = await supabase.auth.getSession();
+            const user = session?.user;
             const userId = user?.id ?? null;
 
             setSessionUserId(userId);
@@ -77,27 +56,18 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
             if (!userId) {
                 setRole('reader');
                 setIsEditing(false);
-                setIsLoading(false);
                 return;
             }
 
-            const adminEmail = "portugalsamuel03@gmail.com";
-            const isUserAdminByEmail = user?.email?.toLowerCase() === adminEmail.toLowerCase();
-
-            const r = await getMyRole().catch((e) => {
-                console.warn("AdminContext: getMyRole failed:", e);
-                return null;
-            });
+            const isUserAdminByEmail = user?.email?.toLowerCase() === ADMIN_EMAIL.toLowerCase();
+            const r = await getMyRole().catch(() => null);
             const finalRole = isUserAdminByEmail ? 'admin' : (r || 'reader');
+
             setRole(finalRole);
 
-            const saved = localStorage.getItem('antas_admin_edit_mode');
             if (finalRole === 'admin') {
-                if (saved === 'true' || saved === null) {
-                    setIsEditing(true);
-                } else {
-                    setIsEditing(false);
-                }
+                const saved = localStorage.getItem('antas_admin_edit_mode');
+                if (saved === 'true' || saved === null) setIsEditing(true);
             }
         } catch (e) {
             console.error('AdminContext: refreshRole error:', e);
@@ -110,23 +80,23 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     useEffect(() => {
         refreshRole();
 
-        const { data } = supabase.auth.onAuthStateChange(async (event, session) => {
-            console.log("Auth Event:", event, session?.user?.email);
-
-            if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION' || event === 'USER_UPDATED') {
+        const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+            console.log("AdminContext: Auth Event:", event);
+            if (event === 'SIGNED_IN' || event === 'SIGNED_OUT' || event === 'USER_UPDATED') {
                 refreshRole();
-            } else if (event === 'SIGNED_OUT') {
-                setRole('reader');
-                setSessionUserId(null);
-                setIsEditing(false);
-                setIsLoading(false);
             }
         });
 
-        return () => {
-            data.subscription.unsubscribe();
-        };
+        return () => subscription.unsubscribe();
     }, []);
+
+    const toggleEditing = () => {
+        setIsEditing(prev => {
+            const next = !prev;
+            localStorage.setItem('antas_admin_edit_mode', String(next));
+            return next;
+        });
+    };
 
     const value = useMemo(() => ({
         userId: sessionUserId,
