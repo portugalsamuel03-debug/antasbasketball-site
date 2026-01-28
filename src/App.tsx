@@ -247,7 +247,7 @@ export default function App() {
                 </div>
               </div>
             </>
-          )}
+          ) : null}
 
           {activeTab === Category.HISTORIA ? (
             <HistoriaPage articles={filteredArticles} isDarkMode={isDarkMode} onArticleClick={setSelectedArticle} onShare={onShare} onEditArticle={handleEditFromCard} />
