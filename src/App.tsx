@@ -81,13 +81,16 @@ export default function App() {
         console.log("App: Articles loaded successfully.");
       }
     } catch (e: any) {
-      if (mountedRef.current) {
-        console.error("App: Article load error:", e);
-        // Ignore AbortError which is usually non-critical navigation/react cleanup
-        if (e?.name !== 'AbortError' && !e?.message?.includes('aborted')) {
-          setArticlesError(e?.message || "Erro ao carregar artigos.");
-        }
+      if (!mountedRef.current) return;
+
+      const isAbort = e?.name === 'AbortError' || e?.message?.toLowerCase().includes('abort');
+      if (isAbort) {
+        console.warn("App: Load aborted (usually non-critical session sync).");
+        return;
       }
+
+      console.error("App: Article load error details:", e);
+      setArticlesError(e?.message || "Erro ao carregar artigos.");
     } finally {
       if (mountedRef.current) setLoadingArticles(false);
     }
@@ -96,7 +99,8 @@ export default function App() {
   useEffect(() => {
     loadArticles();
     const { data: { subscription } } = supabase.auth.onAuthStateChange(() => {
-      loadArticles();
+      // Small delay to allow session to stabilize
+      setTimeout(() => loadArticles(), 500);
     });
     return () => subscription.unsubscribe();
   }, []);

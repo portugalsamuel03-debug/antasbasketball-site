@@ -60,17 +60,25 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
             }
 
             const isUserAdminByEmail = user?.email?.toLowerCase() === ADMIN_EMAIL.toLowerCase();
-            const r = await getMyRole().catch(() => null);
-            const finalRole = isUserAdminByEmail ? 'admin' : (r || 'reader');
+            const r = await getMyRole().catch((e) => {
+                // Ignore AbortError in role check logs
+                if (e?.name !== 'AbortError' && !e?.message?.toLowerCase().includes('abort')) {
+                    console.warn("AdminContext: getMyRole failed:", e);
+                }
+                return null;
+            });
 
+            const finalRole = isUserAdminByEmail ? 'admin' : (r || 'reader');
             setRole(finalRole);
 
             if (finalRole === 'admin') {
                 const saved = localStorage.getItem('antas_admin_edit_mode');
                 if (saved === 'true' || saved === null) setIsEditing(true);
             }
-        } catch (e) {
-            console.error('AdminContext: refreshRole error:', e);
+        } catch (e: any) {
+            if (e?.name !== 'AbortError' && !e?.message?.toLowerCase().includes('abort')) {
+                console.error('AdminContext: refreshRole error:', e);
+            }
         } finally {
             setIsLoading(false);
             isRefreshing.current = false;
@@ -83,7 +91,8 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
             console.log("AdminContext: Auth Event:", event);
             if (event === 'SIGNED_IN' || event === 'SIGNED_OUT' || event === 'USER_UPDATED') {
-                refreshRole();
+                // Delay refresh to let session settle and avoid AbortErrors
+                setTimeout(() => refreshRole(), 300);
             }
         });
 
