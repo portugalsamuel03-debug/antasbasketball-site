@@ -51,6 +51,7 @@ export interface Champion {
   mvp: string;
   score: string;
   logo_url?: string;
+  team_id?: string;
 }
 
 export interface HallOfFame {
@@ -112,6 +113,37 @@ export type SortOption = 'RECENTES' | 'CURTIDOS' | 'COMENTADOS' | 'ANTIGOS' | 'S
 
 export type ViewState = 'HOME' | 'SEARCH' | 'STORY' | 'PODCAST' | 'STATUS';
 
-export type HistoriaSubTab = 'ARTIGOS' | 'CAMPEOES' | 'HALL_OF_FAME';
+export type HistoriaSubTab = 'ARTIGOS' | 'CAMPEOES' | 'HALL_OF_FAME' | 'AWARDS' | 'TRADES';
 
 export type RegrasSubTab = 'ARTIGOS' | 'TRADES' | 'INATIVIDADE' | 'DIVISOES' | 'DRAFT';
+
+export interface Team {
+  id: string;
+  name: string;
+  gm_name: string;
+  logo_url?: string;
+}
+
+export interface Award {
+  id: string;
+  year: string;
+  category: string;
+  winner_name: string;
+  team_id?: string;
+  team?: Team;
+}
+
+export interface Trade {
+  id: string;
+  season: string;
+  date: string;
+  team_a_id?: string;
+  team_b_id?: string;
+  team_a?: Team;
+  team_b?: Team;
+  description: string;
+}
+
+export type TeamRow = Team;
+export type AwardRow = Award;
+export type TradeRow = Trade;

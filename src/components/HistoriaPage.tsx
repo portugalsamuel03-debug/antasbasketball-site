@@ -8,6 +8,8 @@ import { EditTrigger } from './admin/EditTrigger';
 import { useAdmin } from '../context/AdminContext';
 import { Trophy, Crown } from 'lucide-react';
 import { HallOfFameDetailsModal } from './admin/HallOfFameDetailsModal';
+import { AwardsSection } from './admin/AwardsSection';
+import { TradesSection } from './admin/TradesSection';
 
 interface HistoriaPageProps {
     articles: Article[];
@@ -250,7 +252,7 @@ const HistoriaPage: React.FC<HistoriaPageProps> = ({ articles, isDarkMode, onArt
 
             {/* SubTabs */}
             <div className="px-6 mb-6 flex items-center gap-2 overflow-x-auto no-scrollbar">
-                {(['ARTIGOS', 'CAMPEOES', 'HALL_OF_FAME', 'TIMES'] as SubTab[]).map(tab => (
+                {(['ARTIGOS', 'CAMPEOES', 'HALL_OF_FAME', 'AWARDS', 'TRADES', 'TIMES'] as SubTab[]).map(tab => (
                     <button
                         key={tab}
                         onClick={() => setSubTab(tab)}
@@ -292,6 +294,8 @@ const HistoriaPage: React.FC<HistoriaPageProps> = ({ articles, isDarkMode, onArt
 
             {subTab === 'CAMPEOES' && <ChampionsSection isDarkMode={isDarkMode} />}
             {subTab === 'HALL_OF_FAME' && <HallOfFameSection isDarkMode={isDarkMode} />}
+            {subTab === 'AWARDS' && <AwardsSection isDarkMode={isDarkMode} />}
+            {subTab === 'TRADES' && <TradesSection isDarkMode={isDarkMode} />}
             {subTab === 'TIMES' && <TeamsSection isDarkMode={isDarkMode} />}
         </>
     );

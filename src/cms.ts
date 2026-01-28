@@ -293,3 +293,91 @@ export async function markAllNotificationsRead() {
   // For a simple global system, we can store 'last_read_at' in localStorage
   localStorage.setItem('antas_notifications_last_read', new Date().toISOString());
 }
+
+// Teams
+export async function listTeams() {
+  return supabase.from("teams").select("*").order("name", { ascending: true });
+}
+
+export async function getTeam(id: string) {
+  return supabase.from("teams").select("*").eq("id", id).single();
+}
+
+export async function upsertTeam(payload: Partial<import("./types").TeamRow>) {
+  if (payload.id) {
+    return supabase.from("teams").update(payload).eq("id", payload.id).select("*").single();
+  }
+  return supabase.from("teams").insert([payload]).select("*").single();
+}
+
+export async function deleteTeam(id: string) {
+  return supabase.from("teams").delete().eq("id", id);
+}
+
+// Awards
+export async function listAwards() {
+  return supabase
+    .from("awards")
+    .select(`
+      *,
+      team:teams(id, name, gm_name, logo_url)
+    `)
+    .order("year", { ascending: false });
+}
+
+export async function getAward(id: string) {
+  return supabase
+    .from("awards")
+    .select(`
+      *,
+      team:teams(id, name, gm_name, logo_url)
+    `)
+    .eq("id", id)
+    .single();
+}
+
+export async function upsertAward(payload: Partial<import("./types").AwardRow>) {
+  if (payload.id) {
+    return supabase.from("awards").update(payload).eq("id", payload.id).select("*").single();
+  }
+  return supabase.from("awards").insert([payload]).select("*").single();
+}
+
+export async function deleteAward(id: string) {
+  return supabase.from("awards").delete().eq("id", id);
+}
+
+// Trades
+export async function listTrades() {
+  return supabase
+    .from("trades")
+    .select(`
+      *,
+      team_a:team_a_id(id, name, gm_name, logo_url),
+      team_b:team_b_id(id, name, gm_name, logo_url)
+    `)
+    .order("date", { ascending: false });
+}
+
+export async function getTrade(id: string) {
+  return supabase
+    .from("trades")
+    .select(`
+      *,
+      team_a:team_a_id(id, name, gm_name, logo_url),
+      team_b:team_b_id(id, name, gm_name, logo_url)
+    `)
+    .eq("id", id)
+    .single();
+}
+
+export async function upsertTrade(payload: Partial<import("./types").TradeRow>) {
+  if (payload.id) {
+    return supabase.from("trades").update(payload).eq("id", payload.id).select("*").single();
+  }
+  return supabase.from("trades").insert([payload]).select("*").single();
+}
+
+export async function deleteTrade(id: string) {
+  return supabase.from("trades").delete().eq("id", id);
+}
