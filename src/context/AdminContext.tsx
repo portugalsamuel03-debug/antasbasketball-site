@@ -5,6 +5,7 @@ import { getMyRole } from '../admin';
 type Role = 'admin' | 'reader';
 
 interface AdminContextType {
+    userId: string | null;
     role: Role | 'unknown';
     isAdmin: boolean;
     isEditing: boolean;
@@ -13,6 +14,7 @@ interface AdminContextType {
 }
 
 const AdminContext = createContext<AdminContextType>({
+    userId: null,
     role: 'unknown',
     isAdmin: false,
     isEditing: false,
@@ -57,6 +59,14 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         const adminEmail = "portugalsamuel03@gmail.com";
         const isUserAdminByEmail = user?.email === adminEmail;
 
+        // Auto-redirect admin to ?admin=1 if not present
+        if (isUserAdminByEmail && !window.location.search.includes("admin=1")) {
+            const url = new URL(window.location.href);
+            url.searchParams.set("admin", "1");
+            window.location.replace(url.toString());
+            return;
+        }
+
         try {
             const r = await getMyRole();
             const finalRole = isUserAdminByEmail ? 'admin' : (r || 'reader');
@@ -87,12 +97,13 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }, []);
 
     const value = useMemo(() => ({
+        userId: sessionUserId,
         role,
         isAdmin: role === 'admin',
         isEditing: role === 'admin' && isEditing,
         toggleEditing,
         refreshRole
-    }), [role, isEditing]);
+    }), [sessionUserId, role, isEditing]);
 
     return (
         <AdminContext.Provider value={value}>
