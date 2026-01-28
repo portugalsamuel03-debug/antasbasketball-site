@@ -111,6 +111,24 @@ export const EditArticleModal: React.FC<EditArticleModalProps> = ({ article, onC
         }
     }
 
+    async function handleDelete() {
+        if (!editing.id) return;
+        if (!confirm('Tem certeza que deseja excluir permanentemente este post?')) return;
+
+        try {
+            const { deleteArticle } = await import('../../cms');
+            await deleteArticle(editing.id);
+            setMsg("Artigo excluído ✅");
+            setTimeout(() => {
+                onSaveSuccess();
+                onClose();
+            }, 800);
+        } catch (e: any) {
+            console.error(e);
+            setMsg("Erro ao excluir.");
+        }
+    }
+
     async function handleSave() {
         if (!editing.title || !editing.category || !editing.content) {
             setMsg("Preencha título, categoria e conteúdo.");
@@ -230,18 +248,29 @@ export const EditArticleModal: React.FC<EditArticleModalProps> = ({ article, onC
                     onChange={e => setEditing({ ...editing, content: e.target.value })}
                 />
 
-                <div className="flex items-center justify-between pt-2">
-                    <label className={`flex items-center gap-2 text-sm ${isDarkMode ? 'text-gray-300' : 'text-gray-600'}`}>
-                        <input type="checkbox" checked={!!editing.published} onChange={e => setEditing({ ...editing, published: e.target.checked })} />
-                        Publicado
-                    </label>
+                <div className="flex items-center justify-between pt-4 border-t border-white/5">
+                    {editing.id ? (
+                        <button
+                            onClick={handleDelete}
+                            className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border transition-all ${isDarkMode ? 'border-red-500/30 text-red-500 hover:bg-red-500/10' : 'border-red-200 text-red-600 hover:bg-red-50'}`}
+                        >
+                            Excluir Permanentemente
+                        </button>
+                    ) : <div />}
 
-                    <button
-                        onClick={handleSave}
-                        className="px-6 py-3 rounded-2xl text-xs font-black uppercase tracking-widest bg-yellow-400 text-black shadow-lg shadow-yellow-400/20 active:scale-95 transition-transform"
-                    >
-                        Salvar Alterações
-                    </button>
+                    <div className="flex items-center gap-4">
+                        <label className={`flex items-center gap-2 text-[11px] font-black uppercase tracking-widest ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                            <input type="checkbox" checked={!!editing.published} onChange={e => setEditing({ ...editing, published: e.target.checked })} className="rounded border-gray-400" />
+                            Publicado
+                        </label>
+
+                        <button
+                            onClick={handleSave}
+                            className="px-8 py-4 rounded-2xl text-xs font-black uppercase tracking-widest bg-yellow-400 text-black shadow-lg shadow-yellow-400/20 active:scale-95 transition-transform"
+                        >
+                            Salvar Alterações
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>

@@ -257,6 +257,12 @@ const HistoriaPage: React.FC<HistoriaPageProps> = ({ articles, isDarkMode, onArt
 
             {subTab === 'ARTIGOS' && (
                 <div className="px-6 space-y-4 pb-20">
+                    {isEditing && (
+                        <div className="flex justify-between items-center mb-2">
+                            <div className="text-[10px] font-black uppercase tracking-widest text-gray-500">Admin: Historia</div>
+                            <EditTrigger type="add" onClick={() => onEditArticle('')} />
+                        </div>
+                    )}
                     {articles.length === 0 ? (
                         <div className="text-sm text-gray-400">Nenhum artigo de história ainda.</div>
                     ) : (
@@ -267,7 +273,7 @@ const HistoriaPage: React.FC<HistoriaPageProps> = ({ articles, isDarkMode, onArt
                                 onClick={() => onArticleClick(a)}
                                 onShare={onShare}
                                 isDarkMode={isDarkMode}
-                                isAdmin={isEditing} // show edit button if global edit mode is on
+                                isAdmin={isEditing}
                                 onEdit={onEditArticle}
                             />
                         ))
