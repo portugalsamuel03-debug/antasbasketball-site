@@ -12,7 +12,7 @@ type Props = {
   onEdit?: (id: string) => void;
 };
 
-export default function ArticleCard({ article, onClick, onShare, isDarkMode, isAdmin, onEdit }: Props) {
+const ArticleCard: React.FC<Props> = ({ article, onClick, onShare, isDarkMode, isAdmin, onEdit }) => {
   const [sessionUserId, setSessionUserId] = useState<string | null>(null);
 
   const [liked, setLiked] = useState(false);
@@ -148,9 +148,8 @@ export default function ArticleCard({ article, onClick, onShare, isDarkMode, isA
   return (
     <div
       onClick={onClick}
-      className={`rounded-[28px] border p-5 mb-5 cursor-pointer transition-all shadow-[0_16px_60px_rgba(0,0,0,0.25)] ${
-        isDarkMode ? "bg-white/5 border-white/10 hover:bg-white/10" : "bg-white border-black/10 hover:bg-black/5"
-      }`}
+      className={`rounded-[28px] border p-5 mb-5 cursor-pointer transition-all shadow-[0_16px_60px_rgba(0,0,0,0.25)] ${isDarkMode ? "bg-white/5 border-white/10 hover:bg-white/10" : "bg-white border-black/10 hover:bg-black/5"
+        }`}
     >
       <div className="flex justify-between items-start gap-4">
         <div className="flex-1">
@@ -172,9 +171,8 @@ export default function ArticleCard({ article, onClick, onShare, isDarkMode, isA
             {(article.tags ?? []).slice(0, 3).map((t) => (
               <span
                 key={t}
-                className={`text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full ${
-                  isDarkMode ? "bg-white/5 text-gray-300" : "bg-black/5 text-gray-600"
-                }`}
+                className={`text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full ${isDarkMode ? "bg-white/5 text-gray-300" : "bg-black/5 text-gray-600"
+                  }`}
               >
                 #{t}
               </span>
@@ -191,9 +189,8 @@ export default function ArticleCard({ article, onClick, onShare, isDarkMode, isA
         <div className="flex items-center gap-4">
           <button
             onClick={toggleLike}
-            className={`flex items-center gap-2 text-[11px] font-black uppercase tracking-widest ${
-              liked ? "text-red-500" : isDarkMode ? "text-gray-300 hover:text-white" : "text-gray-600 hover:text-[#0B1D33]"
-            }`}
+            className={`flex items-center gap-2 text-[11px] font-black uppercase tracking-widest ${liked ? "text-red-500" : isDarkMode ? "text-gray-300 hover:text-white" : "text-gray-600 hover:text-[#0B1D33]"
+              }`}
             title="Curtir"
           >
             <Heart size={16} strokeWidth={2.5} fill={liked ? "currentColor" : "none"} />
@@ -209,13 +206,12 @@ export default function ArticleCard({ article, onClick, onShare, isDarkMode, isA
         <div className="flex items-center gap-2">
           <button
             onClick={toggleSaved}
-            className={`p-2 rounded-xl border transition-all active:scale-95 ${
-              saved
-                ? "bg-yellow-400 text-black border-yellow-400"
-                : isDarkMode
+            className={`p-2 rounded-xl border transition-all active:scale-95 ${saved
+              ? "bg-yellow-400 text-black border-yellow-400"
+              : isDarkMode
                 ? "bg-white/5 text-white border-white/10 hover:bg-white/10"
                 : "bg-black/5 text-[#0B1D33] border-black/10 hover:bg-black/10"
-            }`}
+              }`}
             title={saved ? "Salvo" : "Salvar"}
           >
             <Bookmark size={16} strokeWidth={2.5} fill={saved ? "currentColor" : "none"} />
@@ -226,9 +222,8 @@ export default function ArticleCard({ article, onClick, onShare, isDarkMode, isA
               e.stopPropagation();
               onShare?.(article);
             }}
-            className={`p-2 rounded-xl border transition-all active:scale-95 ${
-              isDarkMode ? "bg-white/5 text-white border-white/10 hover:bg-white/10" : "bg-black/5 text-[#0B1D33] border-black/10 hover:bg-black/10"
-            }`}
+            className={`p-2 rounded-xl border transition-all active:scale-95 ${isDarkMode ? "bg-white/5 text-white border-white/10 hover:bg-white/10" : "bg-black/5 text-[#0B1D33] border-black/10 hover:bg-black/10"
+              }`}
             title="Compartilhar"
           >
             <Share2 size={16} strokeWidth={2.5} />
@@ -240,9 +235,8 @@ export default function ArticleCard({ article, onClick, onShare, isDarkMode, isA
                 e.stopPropagation();
                 onEdit(article.id);
               }}
-              className={`p-2 rounded-xl border transition-all active:scale-95 ${
-                isDarkMode ? "bg-yellow-400 text-black border-yellow-400" : "bg-[#0B1D33] text-white border-[#0B1D33]"
-              }`}
+              className={`p-2 rounded-xl border transition-all active:scale-95 ${isDarkMode ? "bg-yellow-400 text-black border-yellow-400" : "bg-[#0B1D33] text-white border-[#0B1D33]"
+                }`}
               title="Editar (Admin)"
             >
               <Pencil size={16} strokeWidth={2.5} />
@@ -252,4 +246,6 @@ export default function ArticleCard({ article, onClick, onShare, isDarkMode, isA
       </div>
     </div>
   );
-}
+};
+
+export default ArticleCard;

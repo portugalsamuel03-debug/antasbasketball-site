@@ -108,26 +108,44 @@ export default function App() {
   useEffect(() => {
     let alive = true;
 
-    const load = async () => {
+    async function load() {
       setLoadingArticles(true);
+      console.log("App: Loading articles...");
       setArticlesError(null);
 
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error("Timeout fetching articles")), 10000)
+      );
+
       try {
-        const list = await fetchPublishedArticlesJoined();
+        const arts = await Promise.race([
+          fetchPublishedArticlesJoined(),
+          timeoutPromise
+        ]) as Article[];
+
         if (!alive) return;
-        setArticles(list);
+        setArticles(arts);
+        setAuthReady(true);
+        console.log("App: Articles loaded.");
       } catch (e: any) {
-        console.error("fetchPublishedArticlesJoined error:", e);
+        console.error("App: Load error:", e);
         if (!alive) return;
         setArticlesError(e?.message ?? "Erro ao carregar artigos.");
+        setAuthReady(true);
       } finally {
         if (alive) setLoadingArticles(false);
       }
-    };
+    }
 
     load();
+
+    const { data } = supabase.auth.onAuthStateChange(() => {
+      load();
+    });
+
     return () => {
       alive = false;
+      data.subscription.unsubscribe();
     };
   }, []);
 
@@ -187,6 +205,9 @@ export default function App() {
   }, [articles, activeTab, searchQuery, sortOption]);
 
   // ===== Loading screen =====
+  // We show the loading screen if:
+  // 1. Auth states are still reconciling AND articles aren't ready PLUS we aren't in a timeout.
+  // Actually, let's keep it simple but add a bypass if authReady is true and it's taking too long.
   if (!authReady || isAuthLoading) {
     return (
       <div className={isDarkMode ? "bg-black text-white min-h-screen" : "bg-[#FDFBF4] text-[#0B1D33] min-h-screen"}>

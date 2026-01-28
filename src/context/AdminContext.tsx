@@ -31,6 +31,7 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     const [isEditing, setIsEditing] = useState(false);
     const [sessionUserId, setSessionUserId] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(true);
+    const isRefreshing = React.useRef(false);
 
     // Load persisted edit state
     useEffect(() => {
@@ -41,6 +42,17 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         }
     }, []);
 
+    // Safety timeout to ensure loading screen doesn't get stuck forever
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            if (isLoading) {
+                console.warn("AdminContext: Loading safety timeout triggered.");
+                setIsLoading(false);
+            }
+        }, 4000); // 4 seconds safety
+        return () => clearTimeout(timer);
+    }, [isLoading]);
+
     const toggleEditing = () => {
         setIsEditing(prev => {
             const next = !prev;
@@ -50,6 +62,10 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     };
 
     const refreshRole = async () => {
+        if (isRefreshing.current) return;
+        isRefreshing.current = true;
+        console.log("AdminContext: Refreshing role...");
+
         try {
             const { data } = await supabase.auth.getSession();
             const user = data.session?.user;
@@ -93,6 +109,7 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
             console.error('refreshRole error:', e);
         } finally {
             setIsLoading(false);
+            isRefreshing.current = false;
         }
     };
 
@@ -103,13 +120,13 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         const { data } = supabase.auth.onAuthStateChange(async (event, session) => {
             console.log("Auth Event:", event, session?.user?.email);
 
-            // If signed in, ensure we refresh role and handle potential redirection
-            if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION') {
+            if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION' || event === 'USER_UPDATED') {
                 await refreshRole();
             } else if (event === 'SIGNED_OUT') {
                 setRole('reader');
                 setSessionUserId(null);
                 setIsEditing(false);
+                setIsLoading(false);
             }
         });
 
