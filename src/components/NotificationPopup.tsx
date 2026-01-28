@@ -1,3 +1,5 @@
+import React, { useState } from 'react';
+import { X, Settings, CheckCircle, BellRing, History, Radio, TrendingUp, Newspaper, Trophy, MessageSquare, Trash2, Plus } from 'lucide-react';
 import { listNotifications, createNotification, deleteNotification, NotificationRow } from '../cms';
 import { useAdmin } from '../context/AdminContext';
 
