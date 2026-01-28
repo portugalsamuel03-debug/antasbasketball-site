@@ -120,3 +120,49 @@ export async function upsertTeam(payload: Partial<any>) {
 export async function deleteTeam(id: string) {
   return supabase.from("team_list").delete().eq("id", id);
 }
+
+// Tag Management Helpers
+export async function manageArticleTags(articleId: string, tagLabels: string[]) {
+  // 1. Ensure all tags exist and get IDs
+  const tagIds: string[] = [];
+
+  for (const label of tagLabels) {
+    const slug = label.toLowerCase().trim().replace(/ /g, '-').replace(/[^\w-]/g, '');
+    // Upsert tag
+    const { data, error } = await supabase.from('tags').select('id').eq('slug', slug).maybeSingle();
+
+    let tid = data?.id;
+    if (!tid) {
+      const { data: newTag, error: createErr } = await supabase.from('tags').insert({
+        slug,
+        label: label.trim()
+      }).select('id').single();
+
+      if (createErr) {
+        // Try fetching again in case of race condition or just ignore
+        console.error("Error creating tag", createErr);
+        continue;
+      }
+      tid = newTag.id;
+    }
+    if (tid) tagIds.push(tid);
+  }
+
+  // 2. Clear existing links
+  await supabase.from('article_tags').delete().eq('article_id', articleId);
+
+  // 3. Insert new links
+  if (tagIds.length > 0) {
+    const links = tagIds.map(tid => ({ article_id: articleId, tag_id: tid }));
+    await supabase.from('article_tags').insert(links);
+  }
+}
+
+export async function getArticleTags(articleId: string) {
+  const { data } = await supabase
+    .from('article_tags')
+    .select(`tag:tags(label)`)
+    .eq('article_id', articleId);
+
+  return data?.map((d: any) => d.tag.label) || [];
+}

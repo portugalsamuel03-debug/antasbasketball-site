@@ -13,7 +13,7 @@ import ArticleView from "./components/ArticleView";
 import ShareModal from "./components/ShareModal";
 import NotificationPopup from "./components/NotificationPopup";
 import AuthPopup from "./components/AuthPopup";
-import AdminPanel from "./components/AdminPanel";
+
 
 // ✅ novo
 import ProfilePopup from "./components/ProfilePopup";
@@ -321,86 +321,9 @@ export default function App() {
     );
   }
 
-  // ===== Admin route =====
-  if (isAdminRoute) {
-    if (role === "unknown") {
-      return (
-        <div className={isDarkMode ? "bg-black text-white min-h-screen" : "bg-[#FDFBF4] text-[#0B1D33] min-h-screen"}>
-          <div className="max-w-md mx-auto px-6 py-10">
-            <div className="text-xs font-black uppercase tracking-widest text-yellow-400">Verificando acesso…</div>
-            <div className="mt-3 text-sm text-gray-400">
-              Estamos validando sua permissão de <span className="text-yellow-400 font-bold">admin</span>.
-            </div>
+  // ===== Admin route removed per user request =====
+  // Inline editing is now the primary way to manage content.
 
-            {adminError && (
-              <div className="mt-4 text-[12px] font-bold bg-red-500/10 border border-red-500/30 rounded-2xl px-4 py-3 text-red-200">
-                {adminError}
-              </div>
-            )}
-
-            <button
-              onClick={() => refreshRole("manualRetry")}
-              disabled={roleChecking}
-              className="mt-6 w-full bg-yellow-400 text-black py-4 rounded-3xl font-black text-xs uppercase tracking-[0.2em] disabled:opacity-60"
-            >
-              {roleChecking ? "VERIFICANDO..." : "TENTAR NOVAMENTE"}
-            </button>
-          </div>
-        </div>
-      );
-    }
-
-    if (role !== "admin") {
-      return (
-        <div className={isDarkMode ? "bg-black text-white min-h-screen" : "bg-[#FDFBF4] text-[#0B1D33] min-h-screen"}>
-          <div className="max-w-md mx-auto px-6 py-10">
-            <div className="text-xs font-black uppercase tracking-widest text-yellow-400">Acesso negado</div>
-            <div className="mt-3 text-sm text-gray-400">
-              Você precisa estar logado como <span className="text-yellow-400 font-bold">admin</span>.
-            </div>
-
-            {adminError && (
-              <div className="mt-4 text-[12px] font-bold bg-red-500/10 border border-red-500/30 rounded-2xl px-4 py-3 text-red-200">
-                {adminError}
-              </div>
-            )}
-
-            <button
-              onClick={() => setAuthOpen(true)}
-              className="mt-6 w-full bg-yellow-400 text-black py-4 rounded-3xl font-black text-xs uppercase tracking-[0.2em]"
-            >
-              Entrar
-            </button>
-
-            <button
-              onClick={() => refreshRole("manualRetryDenied")}
-              disabled={roleChecking}
-              className="mt-3 w-full bg-white/10 text-white py-4 rounded-3xl font-black text-xs uppercase tracking-[0.2em] disabled:opacity-60"
-            >
-              {roleChecking ? "VERIFICANDO..." : "Revalidar permissão"}
-            </button>
-          </div>
-
-          <AuthPopup isOpen={authOpen} onClose={() => setAuthOpen(false)} />
-        </div>
-      );
-    }
-
-    return (
-      <div className="bg-black min-h-screen">
-        <AdminPanel />
-
-        {sessionUserId && (
-          <ProfilePopup
-            isOpen={profileOpen}
-            onClose={() => setProfileOpen(false)}
-            userId={sessionUserId}
-            onOpenArticle={(id) => openArticleById(id)}
-          />
-        )}
-      </div>
-    );
-  }
 
   // ===== Article opened =====
   if (selectedArticle) {

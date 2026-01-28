@@ -7,6 +7,7 @@ import SectionTitle from './SectionTitle';
 import { EditTrigger } from './admin/EditTrigger';
 import { useAdmin } from '../context/AdminContext';
 import { Trophy, Crown } from 'lucide-react';
+import { HallOfFameDetailsModal } from './admin/HallOfFameDetailsModal';
 
 interface HistoriaPageProps {
     articles: Article[];
@@ -111,34 +112,12 @@ const ChampionsSection: React.FC<{ isDarkMode: boolean }> = ({ isDarkMode }) => 
 };
 
 // --- HALL OF FAME SECTION ---
-const EditHoFModal: React.FC<{ member: Partial<HallOfFame>, isDarkMode: boolean, onClose: () => void, onSave: (d: Partial<HallOfFame>) => void }> = ({ member, isDarkMode, onClose, onSave }) => {
-    const [formData, setFormData] = useState(member);
-    return (
-        <div className="fixed inset-0 z-[130] flex items-center justify-center px-4">
-            <div className="absolute inset-0 bg-black/80 backdrop-blur-md" onClick={onClose}></div>
-            <div className={`relative w-full max-w-sm border rounded-[32px] overflow-hidden shadow-xl p-6 space-y-4 ${isDarkMode ? 'bg-[#121212] border-white/10' : 'bg-white'}`}>
-                <h3 className={`text-xs font-black uppercase tracking-widest ${isDarkMode ? 'text-white' : 'text-black'}`}>
-                    {member.id ? 'Editar Lenda' : 'Nova Lenda'}
-                </h3>
-                <input className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm" placeholder="Nome" value={formData.name || ''} onChange={e => setFormData({ ...formData, name: e.target.value })} />
-                <input className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm" placeholder="Ano de Indução" value={formData.year_inducted || ''} onChange={e => setFormData({ ...formData, year_inducted: e.target.value })} />
-                <input className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm" placeholder="Função / Role" value={formData.role || ''} onChange={e => setFormData({ ...formData, role: e.target.value })} />
-                <input className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm" placeholder="Conquista / Achievement" value={formData.achievement || ''} onChange={e => setFormData({ ...formData, achievement: e.target.value })} />
-                <input className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm" placeholder="Image URL" value={formData.image_url || ''} onChange={e => setFormData({ ...formData, image_url: e.target.value })} />
-
-                <div className="flex gap-2 pt-2">
-                    <button onClick={onClose} className="flex-1 py-3 bg-white/5 rounded-xl text-xs font-black uppercase">Cancelar</button>
-                    <button onClick={() => onSave(formData)} className="flex-1 py-3 bg-yellow-400 text-black rounded-xl text-xs font-black uppercase">Salvar</button>
-                </div>
-            </div>
-        </div>
-    );
-}
-
+// --- HALL OF FAME SECTION ---
 const HallOfFameSection: React.FC<{ isDarkMode: boolean }> = ({ isDarkMode }) => {
     const [hofMembers, setHofMembers] = useState<HallOfFame[]>([]);
     const { isEditing } = useAdmin();
-    const [editingItem, setEditingItem] = useState<Partial<HallOfFame> | null>(null);
+    // Reusing the same name for state, though now it handles both viewing and editing via the unified modal
+    const [selectedMember, setSelectedMember] = useState<HallOfFame | null>(null);
 
     const fetchHoF = async () => {
         const { data } = await listHallOfFame();
@@ -147,12 +126,11 @@ const HallOfFameSection: React.FC<{ isDarkMode: boolean }> = ({ isDarkMode }) =>
 
     useEffect(() => { fetchHoF(); }, []);
 
-    const handleSave = async (data: Partial<HallOfFame>) => {
-        if (!data?.name) return;
-        await upsertHallOfFame(data);
-        setEditingItem(null);
-        fetchHoF();
-    };
+    const handleCreate = () => {
+        // Create dummy member
+        const newMember: HallOfFame = { id: '', name: '', year_inducted: '2026', role: '', achievement: '', image_url: '' };
+        setSelectedMember(newMember);
+    }
 
     const handleDelete = async (id: string, e: React.MouseEvent) => {
         e.stopPropagation();
@@ -166,15 +144,18 @@ const HallOfFameSection: React.FC<{ isDarkMode: boolean }> = ({ isDarkMode }) =>
         <div className="space-y-4 px-6 pb-20">
             <div className="flex justify-between items-center">
                 <div className="text-xs font-black uppercase tracking-widest text-gray-500">Lendas do Antas</div>
-                <EditTrigger type="add" onClick={() => setEditingItem({})} />
+                {isEditing && <EditTrigger type="add" onClick={handleCreate} />}
             </div>
 
             <div className="grid grid-cols-2 gap-4">
                 {hofMembers.map((m) => (
-                    <div key={m.id} className={`relative p-4 rounded-[24px] border flex flex-col items-center text-center gap-3 group ${isDarkMode ? 'bg-white/5 border-white/10' : 'bg-white border-[#0B1D33]/10'}`}>
+                    <div
+                        key={m.id}
+                        onClick={() => setSelectedMember(m)}
+                        className={`relative p-4 rounded-[24px] border flex flex-col items-center text-center gap-3 group cursor-pointer transition-all active:scale-95 ${isDarkMode ? 'bg-white/5 border-white/10 hover:bg-white/10' : 'bg-white border-[#0B1D33]/10 hover:bg-[#0B1D33]/5'}`}
+                    >
                         {isEditing && (
                             <div className="absolute -top-2 -right-2 z-10 flex gap-1">
-                                <EditTrigger type="edit" size={14} onClick={() => setEditingItem(m)} />
                                 <EditTrigger type="delete" size={14} onClick={(e) => handleDelete(m.id, e)} />
                             </div>
                         )}
@@ -195,12 +176,15 @@ const HallOfFameSection: React.FC<{ isDarkMode: boolean }> = ({ isDarkMode }) =>
                 ))}
             </div>
 
-            {editingItem && (
-                <EditHoFModal
-                    member={editingItem}
+            {selectedMember && (
+                <HallOfFameDetailsModal
+                    member={selectedMember}
                     isDarkMode={isDarkMode}
-                    onClose={() => setEditingItem(null)}
-                    onSave={handleSave}
+                    onClose={() => setSelectedMember(null)}
+                    onUpdate={() => {
+                        setSelectedMember(null);
+                        fetchHoF();
+                    }}
                 />
             )}
         </div>

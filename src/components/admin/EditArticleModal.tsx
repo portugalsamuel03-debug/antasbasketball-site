@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { ArticleRow, AuthorRow, listAuthors, upsertArticle, upsertAuthor } from '../../cms';
+import { ArticleRow, AuthorRow, listAuthors, upsertArticle, upsertAuthor, getArticleTags, manageArticleTags } from '../../cms';
 import { supabase } from '../../lib/supabase';
 
 interface EditArticleModalProps {
@@ -36,13 +36,17 @@ export const EditArticleModal: React.FC<EditArticleModalProps> = ({ article, onC
 
     const [coverFile, setCoverFile] = useState<File | null>(null);
     const [uploadingCover, setUploadingCover] = useState(false);
+    const [tagsInput, setTagsInput] = useState("");
 
     // Initial data fetch
     useEffect(() => {
         listAuthors().then(({ data }) => {
             if (data) setAuthors(data as AuthorRow[]);
         });
-    }, []);
+        if (article.id) {
+            getArticleTags(article.id).then(tags => setTagsInput(tags.join(", ")));
+        }
+    }, [article.id]);
 
     const categoryOptions = useMemo(() => {
         return ["NOTICIAS", "HISTORIA", "REGRAS", "PODCAST", "OPINIAO", "CURIOSIDADES", "TUTORIAIS"];
@@ -122,12 +126,16 @@ export const EditArticleModal: React.FC<EditArticleModalProps> = ({ article, onC
             updated_at: new Date().toISOString() as any,
         };
 
-        const { error } = await upsertArticle(payload);
-        if (error) {
+        const { data: savedData, error } = await upsertArticle(payload);
+        if (error || !savedData) {
             console.error(error);
             setMsg("Erro ao salvar artigo.");
             return;
         }
+
+        // Save tags
+        const tagList = tagsInput.split(',').map(t => t.trim()).filter(Boolean);
+        await manageArticleTags(savedData.id, tagList);
 
         setMsg("Artigo salvo ✅");
         // Short delay to show success message
@@ -173,6 +181,13 @@ export const EditArticleModal: React.FC<EditArticleModalProps> = ({ article, onC
                         {subcategoryOptions.map(s => <option key={s} value={s}>{s}</option>)}
                     </select>
                 </div>
+
+                <input
+                    className={inputClass}
+                    placeholder="Tags (separadas por vírgula)"
+                    value={tagsInput}
+                    onChange={e => setTagsInput(e.target.value)}
+                />
 
                 <textarea
                     className={`${inputClass} min-h-[80px]`}
