@@ -1,3 +1,4 @@
+import React, { useState, useEffect, useMemo } from 'react';
 import { ArticleRow, AuthorRow, listAuthors, upsertArticle, upsertAuthor, getArticleTags, manageArticleTags, listCategories, listSubcategories } from '../../cms';
 import { CategoryRow, SubcategoryRow } from '../../types';
 import { supabase } from '../../lib/supabase';
@@ -336,13 +337,16 @@ export const EditArticleModal: React.FC<EditArticleModalProps> = ({ article, onC
                     ) : <div />}
 
                     <div className="flex items-center gap-4">
-                        <input type="checkbox" checked={!!editing.published} onChange={e => setEditing({ ...editing, published: e.target.checked })} className="rounded border-gray-400" />
-                        Publicado
-                    </label>
-                    <label className={`flex items-center gap-2 text-[11px] font-black uppercase tracking-widest ${isDarkMode ? 'text-yellow-400' : 'text-yellow-600'}`}>
-                        <input type="checkbox" checked={!!editing.is_featured} onChange={e => setEditing({ ...editing, is_featured: e.target.checked })} className="rounded border-yellow-400" />
-                        Destaque (Home)
-                    </label>
+                        <label className="flex items-center gap-2 text-[11px] font-black uppercase tracking-widest text-gray-500">
+                            <input type="checkbox" checked={!!editing.published} onChange={e => setEditing({ ...editing, published: e.target.checked })} className="rounded border-gray-400" />
+                            Publicado
+                        </label>
+
+                        <label className={`flex items-center gap-2 text-[11px] font-black uppercase tracking-widest ${isDarkMode ? 'text-yellow-400' : 'text-yellow-600'}`}>
+                            <input type="checkbox" checked={!!editing.is_featured} onChange={e => setEditing({ ...editing, is_featured: e.target.checked })} className="rounded border-yellow-400" />
+                            Fixar no Início ⭐
+                        </label>
+                    </div>
 
                     <button
                         onClick={handleSave}
@@ -353,6 +357,5 @@ export const EditArticleModal: React.FC<EditArticleModalProps> = ({ article, onC
                 </div>
             </div>
         </div>
-        </div >
     );
 };

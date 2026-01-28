@@ -15,10 +15,12 @@ export interface Reaction {
 
 export interface Comment {
   id: string;
+  userId?: string;
   author: string;
   avatar: string;
   content: string;
   date: string;
+  editedAt?: string;
   likes: number;
   reactions: Reaction[];
 }
@@ -42,6 +44,7 @@ export interface Author {
   avatar: string;
   role: string;
   isVerified?: boolean;
+  bio?: string;
 }
 
 export interface Champion {
@@ -107,6 +110,7 @@ export interface Article {
   comments: Comment[];
   tags: string[];
   video_url?: string;
+  isFeatured?: boolean;
 }
 
 export type SortOption = 'RECENTES' | 'CURTIDOS' | 'COMENTADOS' | 'ANTIGOS' | 'SALVOS';

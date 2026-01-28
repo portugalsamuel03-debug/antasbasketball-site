@@ -8,9 +8,14 @@ import {
   MoreHorizontal,
   Smile,
   Check,
+  Edit2,
+  Trash2,
 } from "lucide-react";
 import { supabase } from "../lib/supabase";
 import { Article, Comment, Reaction } from "../types";
+
+// Removed local Comment interface extension as types.ts is updated.
+
 import { EditTrigger } from "./admin/EditTrigger";
 import { useAdmin } from "../context/AdminContext";
 import { EditArticleModal } from "./admin/EditArticleModal";
@@ -23,16 +28,20 @@ interface ArticleViewProps {
   isDarkMode: boolean;
 }
 
-type DbCommentViewRow = {
-  id: string;
-  article_id: string;
-  user_id: string;
-  body: string;
-  created_at: string;
-  display_name: string | null;
-  nickname: string | null;
-  avatar_url: string | null;
-};
+
+
+// ... (existing code for FALLBACK_AVATAR, formatDate, ReactionPicker, CommentItem, PodcastPreview) ...
+
+// IMPORTANT: We must NOT replace the whole file, just the top imports and the loadComments function if possible.
+// But the target range in previous step was huge.
+// Let's target specific blocks.
+
+// Block 1: Imports and Interface
+// Block 2: loadComments function
+
+
+// DbCommentViewRow defined above
+
 
 const FALLBACK_AVATAR = "https://api.dicebear.com/7.x/avataaars/svg?seed=User";
 
@@ -86,12 +95,20 @@ const ReactionPicker: React.FC<{
   );
 };
 
-const CommentItem: React.FC<{ comment: Comment; isDarkMode: boolean }> = ({ comment, isDarkMode }) => {
+const CommentItem: React.FC<{ comment: Comment; isDarkMode: boolean; meId?: string; isAdmin: boolean; onDelete: (id: string) => void; onEdit: (id: string, newBody: string) => void }> = ({ comment, isDarkMode, meId, isAdmin, onDelete, onEdit }) => {
   const [liked, setLiked] = useState(false);
   const [showPicker, setShowPicker] = useState(false);
   const [localReactions, setLocalReactions] = useState<Reaction[]>(comment.reactions ?? []);
   const [userReactions, setUserReactions] = useState<string[]>([]);
   const [likeScale, setLikeScale] = useState(1);
+
+  // Edit state
+  const [isEditing, setIsEditing] = useState(false);
+  const [editBody, setEditBody] = useState(comment.content);
+
+  const isOwner = meId && meId === comment.userId; // We need to ensure comment has userId or we pass it down
+  // Actually the comment object in ArticleView is mapped from DB row which has user_id. 
+  // We need to make sure Comment type includes userId or we add it to the mapping.
 
   const handleLike = () => {
     setLiked(!liked);
@@ -101,7 +118,6 @@ const CommentItem: React.FC<{ comment: Comment; isDarkMode: boolean }> = ({ comm
 
   const handleReact = (emoji: string) => {
     const isReacted = userReactions.includes(emoji);
-
     if (isReacted) {
       setUserReactions(userReactions.filter((e) => e !== emoji));
       setLocalReactions(
@@ -120,6 +136,13 @@ const CommentItem: React.FC<{ comment: Comment; isDarkMode: boolean }> = ({ comm
     }
   };
 
+  const handleSaveEdit = () => {
+    if (editBody.trim() !== comment.content) {
+      onEdit(comment.id, editBody);
+    }
+    setIsEditing(false);
+  };
+
   return (
     <div className="flex gap-4 group/comment animate-in fade-in slide-in-from-left-2 duration-500">
       <div className="w-10 h-10 rounded-full overflow-hidden border-2 flex-shrink-0 shadow-lg border-white/5">
@@ -127,26 +150,59 @@ const CommentItem: React.FC<{ comment: Comment; isDarkMode: boolean }> = ({ comm
       </div>
       <div className="flex-1 space-y-2">
         <div
-          className={`border rounded-2xl px-5 py-4 shadow-inner ${isDarkMode ? "bg-[#161616] border-white/5" : "bg-[#F0F2F5] border-[#0B1D33]/5"
-            }`}
+          className={`border rounded-2xl px-5 py-4 shadow-inner relative group ${isDarkMode ? "bg-[#161616] border-white/5" : "bg-[#F0F2F5] border-[#0B1D33]/5"}`}
         >
           <div className="flex justify-between items-center mb-1.5">
             <span className={`text-xs font-black uppercase tracking-wider ${isDarkMode ? "text-white" : "text-[#0B1D33]"}`}>
               {comment.author}
             </span>
-            <span className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">{comment.date}</span>
+            <div className="flex items-center gap-2">
+              {comment.editedAt && (
+                <span className="text-[9px] text-gray-500 font-bold uppercase tracking-widest">(editado)</span>
+              )}
+              <span className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">{comment.date}</span>
+            </div>
           </div>
-          <p className={`text-[13px] leading-relaxed font-medium ${isDarkMode ? "text-gray-300" : "text-gray-700"}`}>
-            {comment.content}
-          </p>
+
+          {isEditing ? (
+            <div className="flex flex-col gap-2">
+              <textarea
+                value={editBody}
+                onChange={e => setEditBody(e.target.value)}
+                className={`w-full bg-transparent border-b ${isDarkMode ? 'border-white/20 text-white' : 'border-black/20 text-black'} focus:outline-none p-2 text-[13px] font-medium resize-none`}
+                autoFocus
+              />
+              <div className="flex gap-2 justify-end">
+                <button onClick={() => setIsEditing(false)} className="text-[10px] uppercase font-bold text-gray-500">Cancelar</button>
+                <button onClick={handleSaveEdit} className="text-[10px] uppercase font-black text-yellow-500">Salvar</button>
+              </div>
+            </div>
+          ) : (
+            <p className={`text-[13px] leading-relaxed font-medium whitespace-pre-wrap ${isDarkMode ? "text-gray-300" : "text-gray-700"}`}>
+              {comment.content}
+            </p>
+          )}
+
+          {/* Actions for Owner or Admin */}
+          {(isOwner || isAdmin) && !isEditing && (
+            <div className="absolute top-4 right-4 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+              {isOwner && (
+                <button onClick={() => setIsEditing(true)} className="text-gray-500 hover:text-yellow-500 transition-colors" title="Editar">
+                  <Edit2 size={12} />
+                </button>
+              )}
+              <button onClick={() => onDelete(comment.id)} className="text-gray-500 hover:text-red-500 transition-colors" title="Excluir">
+                <Trash2 size={12} />
+              </button>
+            </div>
+          )}
         </div>
 
         <div className="flex items-center gap-5 px-1 relative">
           <button
             onClick={handleLike}
             style={{ transform: `scale(${likeScale})` }}
-            className={`flex items-center gap-1.5 text-[10px] font-black transition-all uppercase ${liked ? "text-red-500" : "text-gray-500 hover:text-red-400"
-              }`}
+            className={`flex items-center gap-1.5 text-[10px] font-black transition-all uppercase ${liked ? "text-red-500" : "text-gray-500 hover:text-red-400"}`}
           >
             <Heart size={14} fill={liked ? "currentColor" : "none"} strokeWidth={liked ? 0 : 2.5} />
             <span className="tabular-nums">{(comment.likes ?? 0) + (liked ? 1 : 0)}</span>
@@ -155,8 +211,7 @@ const CommentItem: React.FC<{ comment: Comment; isDarkMode: boolean }> = ({ comm
           <div className="relative">
             <button
               onClick={() => setShowPicker(!showPicker)}
-              className={`flex items-center gap-1.5 text-[10px] font-black transition-colors uppercase ${showPicker ? (isDarkMode ? "text-yellow-400" : "text-[#0B1D33]") : "text-gray-500 hover:text-yellow-400"
-                }`}
+              className={`flex items-center gap-1.5 text-[10px] font-black transition-colors uppercase ${showPicker ? (isDarkMode ? "text-yellow-400" : "text-[#0B1D33]") : "text-gray-500 hover:text-yellow-400"}`}
             >
               <Smile size={14} strokeWidth={2.5} />
               REAGIR
@@ -308,38 +363,15 @@ const ArticleView: React.FC<ArticleViewProps> = ({ article, onBack, onShare, isD
   // ✅ AGORA LÊ DA VIEW (já vem profile junto, sem relationship)
   async function loadComments() {
     setErrorMsg(null);
-
-    const { data, error } = await supabase
-      .from("v_article_comments_with_profile")
-      .select("id,article_id,user_id,body,created_at,display_name,nickname,avatar_url")
-      .eq("article_id", article.id)
-      .order("created_at", { ascending: true });
-
-    if (error) {
+    try {
+      const { fetchArticleComments } = await import("../services/articles");
+      const ui = await fetchArticleComments(article.id);
+      setComments(ui);
+      setCommentsCount(ui.length);
+    } catch (error) {
       console.error("loadComments error:", error);
       setErrorMsg("Não foi possível carregar os comentários.");
-      return;
     }
-
-    const rows = (data ?? []) as DbCommentViewRow[];
-
-    const ui: Comment[] = rows.map((r) => {
-      const author = (r.nickname || r.display_name || "Usuário") as string;
-      const avatar = (r.avatar_url || FALLBACK_AVATAR) as string;
-
-      return {
-        id: r.id,
-        author,
-        avatar,
-        date: formatDate(r.created_at),
-        content: r.body,
-        likes: 0,
-        reactions: [],
-      };
-    });
-
-    setComments(ui);
-    setCommentsCount(ui.length);
   }
 
   async function toggleLike() {
@@ -681,7 +713,28 @@ const ArticleView: React.FC<ArticleViewProps> = ({ article, onBack, onShare, isD
               {comments.length === 0 ? (
                 <div className="text-sm text-gray-500">Seja o primeiro a comentar.</div>
               ) : (
-                comments.map((c) => <CommentItem isDarkMode={isDarkMode} key={c.id} comment={c} />)
+                comments.map((c) => (
+                  <CommentItem
+                    key={c.id}
+                    comment={c}
+                    isDarkMode={isDarkMode}
+                    meId={me?.id}
+                    isAdmin={isEditing} // 'isEditing' from useAdmin context actually means "isAdmin mode enabled", effectively admin check
+                    onDelete={async (commentId) => {
+                      if (confirm("Apagar comentário?")) {
+                        const { deleteComment } = await import('../cms');
+                        await deleteComment(commentId);
+                        setComments(comments.filter(x => x.id !== commentId));
+                        setCommentsCount(c => Math.max(0, c - 1));
+                      }
+                    }}
+                    onEdit={async (commentId, newBody) => {
+                      const { updateComment } = await import('../cms');
+                      await updateComment(commentId, newBody);
+                      setComments(comments.map(x => x.id === commentId ? { ...x, content: newBody, editedAt: new Date().toISOString() } : x));
+                    }}
+                  />
+                ))
               )}
             </div>
           </div>

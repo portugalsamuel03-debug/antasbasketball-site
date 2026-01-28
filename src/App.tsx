@@ -226,6 +226,26 @@ export default function App() {
               <FeaturedPost isDarkMode={isDarkMode} onArticleClick={setSelectedArticle} onShare={onShare} />
               <FeaturedReaders isDarkMode={isDarkMode} />
               <FeaturedAuthors isDarkMode={isDarkMode} />
+
+              <div className="mt-8">
+                <SectionTitle title="Últimas do Antas" sortOption="RECENTES" isDarkMode={isDarkMode} />
+                <div className="px-6 space-y-4">
+                  {articles
+                    .filter(a => !a.isFeatured)
+                    .slice(0, 5)
+                    .map(a => (
+                      <ArticleCard
+                        key={a.id}
+                        article={a}
+                        onClick={() => setSelectedArticle(a)}
+                        onShare={onShare}
+                        isDarkMode={isDarkMode}
+                        isAdmin={isEditing}
+                        onEdit={handleEditFromCard}
+                      />
+                    ))}
+                </div>
+              </div>
             </>
           )}
 
@@ -247,7 +267,7 @@ export default function App() {
                   }} />
                 </div>
               </div>
-              )}
+
               {loadingArticles && articles.length === 0 ? (
                 <div className="px-6 text-sm text-gray-400 animate-pulse">Aquecendo motores...</div>
               ) : filteredArticles.length === 0 ? (

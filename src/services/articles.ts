@@ -27,6 +27,7 @@ type DbArticleRow = {
   subcategory: string | null;
   reading_minutes: number | null;
   video_url: string | null;
+  is_featured: boolean;
 
   // colunas do seu "articles"
   likes: number | null;
@@ -54,6 +55,7 @@ type DbArticleCommentRow = {
   user_id: string;
   body: string;
   created_at: string;
+  edited_at: string | null;
   profiles: DbProfileMini | null;
 };
 
@@ -124,6 +126,7 @@ function toUiArticle(row: DbArticleRow): Article {
     comments: [], // carregamos via fetchArticleComments no ArticleView
     tags,
     video_url: row.video_url ?? undefined,
+    isFeatured: row.is_featured,
   };
 }
 
@@ -133,7 +136,7 @@ export async function fetchPublishedArticlesJoined(): Promise<Article[]> {
     .select(
       `
       id, slug, title, excerpt, content, cover_url, category, subcategory,
-      reading_minutes, video_url, likes, comments_count, author_id, published, published_at,
+      reading_minutes, video_url, is_featured, likes, comments_count, author_id, published, published_at,
       author:authors ( id, slug, name, role_label, avatar_url ),
       article_tags ( tag:tags ( id, slug, label ) )
     `
@@ -268,7 +271,7 @@ export async function fetchArticleComments(articleId: string): Promise<Comment[]
     .from("article_comments")
     .select(
       `
-      id, article_id, user_id, body, created_at,
+      id, article_id, user_id, body, created_at, edited_at,
       profiles:profiles ( id, display_name, nickname, avatar_url )
     `
     )
@@ -285,10 +288,12 @@ export async function fetchArticleComments(articleId: string): Promise<Comment[]
 
     return {
       id: r.id,
+      userId: r.user_id,
       author: nick,
       avatar,
       content: r.body,
       date: formatDateYYYYMMDD(r.created_at),
+      editedAt: r.edited_at ? formatDateYYYYMMDD(r.edited_at) : undefined,
       likes: 0,
       reactions: [],
     } as Comment;
@@ -344,6 +349,7 @@ export async function addArticleComment(params: {
 
   const comment: Comment = {
     id: inserted.id,
+    userId: params.userId,
     author: nick,
     avatar,
     content: inserted.body,

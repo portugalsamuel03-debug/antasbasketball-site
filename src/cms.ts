@@ -7,6 +7,7 @@ export type AuthorRow = {
   name: string;
   role_label: string | null;
   avatar_url: string | null;
+  bio?: string | null;
 };
 
 export type TagRow = {
@@ -416,3 +417,18 @@ export async function getFeaturedArticle() {
     .limit(1)
     .single();
 }
+
+// Comments
+export async function updateComment(id: string, body: string) {
+  return supabase
+    .from("article_comments")
+    .update({ body, edited_at: new Date().toISOString() })
+    .eq("id", id)
+    .select()
+    .single();
+}
+
+export async function deleteComment(id: string) {
+  return supabase.from("article_comments").delete().eq("id", id);
+}
+
