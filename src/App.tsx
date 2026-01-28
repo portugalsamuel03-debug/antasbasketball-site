@@ -30,7 +30,7 @@ import { Article, Category, SortOption } from "./types";
 export default function App() {
   const { isEditing, userId: sessionUserId, isLoading: isAuthLoading } = useAdmin();
 
-  // Profile management
+  // Local UI State
   const [profileOpen, setProfileOpen] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(true);
   const [activeTab, setActiveTab] = useState<Category>(Category.INICIO);
@@ -43,10 +43,10 @@ export default function App() {
 
   // Articles state
   const [articles, setArticles] = useState<Article[]>([]);
-  const [loadingArticles, setLoadingArticles] = useState(true);
+  const [loadingArticles, setLoadingArticles] = useState(false);
   const [articlesError, setArticlesError] = useState<string | null>(null);
 
-  // Focus
+  // Navigation / Detail view
   const [selectedArticle, setSelectedArticle] = useState<Article | null>(null);
   const [shareOpen, setShareOpen] = useState(false);
   const [shareArticle, setShareArticle] = useState<Article | null>(null);
@@ -54,7 +54,7 @@ export default function App() {
 
   const mountedRef = useRef(true);
 
-  // Initialize Theme
+  // 1. Initial Theme & Mount Ref
   useEffect(() => {
     mountedRef.current = true;
     const saved = localStorage.getItem("antas_theme") || "dark";
@@ -62,14 +62,16 @@ export default function App() {
     return () => { mountedRef.current = false; };
   }, []);
 
+  // 2. Sync Theme to persist and Body
   useEffect(() => {
     localStorage.setItem("antas_theme", isDarkMode ? "dark" : "light");
     document.body.style.background = isDarkMode ? "#000" : "#FDFBF4";
   }, [isDarkMode]);
 
-  // Load logic
+  // 3. Robust Loading Logic
   const loadArticles = async () => {
     if (!mountedRef.current) return;
+
     setLoadingArticles(true);
     setArticlesError(null);
     console.log("App: Loading articles...");
@@ -83,32 +85,36 @@ export default function App() {
     } catch (e: any) {
       if (!mountedRef.current) return;
 
-      const isAbort = e?.name === 'AbortError' || e?.message?.toLowerCase().includes('abort');
+      const errorString = String(e?.message || e?.name || e || "");
+      const isAbort = errorString.toLowerCase().includes('abort');
+
       if (isAbort) {
         console.warn("App: Load aborted (usually non-critical session sync).");
+        // Keep current articles if we have them, don't show error
         return;
       }
 
       console.error("App: Article load error details:", e);
-      setArticlesError(e?.message || "Erro ao carregar artigos.");
+      setArticlesError(errorString || "Erro ao carregar artigos.");
     } finally {
       if (mountedRef.current) setLoadingArticles(false);
     }
   };
 
+  // 4. Reload articles when auth state settles or changes
   useEffect(() => {
-    loadArticles();
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(() => {
-      // Small delay to allow session to stabilize
-      setTimeout(() => loadArticles(), 500);
-    });
-    return () => subscription.unsubscribe();
-  }, []);
+    if (!isAuthLoading) {
+      // Small delay to allow the DB permissions to propagate if just signed in
+      const timer = setTimeout(() => loadArticles(), 200);
+      return () => clearTimeout(timer);
+    }
+  }, [sessionUserId, isAuthLoading]);
 
-  const onSearch = async (q: string) => {
+  // UI Handlers
+  const onSearch = (q: string) => {
     setSearchQuery(q);
     setIsAIProcessing(true);
-    setTimeout(() => setIsAIProcessing(false), 450);
+    setTimeout(() => { if (mountedRef.current) setIsAIProcessing(false); }, 450);
   };
 
   const onShare = (a: Article) => {
@@ -162,7 +168,8 @@ export default function App() {
     return sorted;
   }, [articles, activeTab, searchQuery, sortOption]);
 
-  if (isAuthLoading) {
+  // Loading screen (Initial Boot)
+  if (isAuthLoading && articles.length === 0) {
     return (
       <div className={isDarkMode ? "bg-black text-white min-h-screen" : "bg-[#FDFBF4] text-[#0B1D33] min-h-screen"}>
         <div className="max-w-md mx-auto px-6 py-20 flex flex-col items-center">
@@ -173,6 +180,7 @@ export default function App() {
     );
   }
 
+  // Detail View
   if (selectedArticle) {
     return (
       <>
@@ -188,6 +196,7 @@ export default function App() {
     );
   }
 
+  // Main Listing
   return (
     <div className={isDarkMode ? "bg-black text-white min-h-screen" : "bg-[#FDFBF4] text-[#0B1D33] min-h-screen"}>
       <div className={`max-w-md mx-auto min-h-screen ${isDarkMode ? "bg-black" : "bg-[#FDFBF4]"}`}>
@@ -202,7 +211,7 @@ export default function App() {
                 <div className="text-2xl mb-2">📡</div>
                 <div className="text-[10px] font-black uppercase tracking-widest text-red-400 mb-1">Erro de Conexão</div>
                 <div className="text-[12px] font-medium text-gray-500 mb-4">{articlesError}</div>
-                <button onClick={() => window.location.reload()} className="px-4 py-2 bg-yellow-400 text-black text-[10px] font-black uppercase tracking-widest rounded-xl">Tentar Novamente</button>
+                <button onClick={() => window.location.reload()} className="px-4 py-2 bg-yellow-400 text-black text-[10px] font-black uppercase tracking-widest rounded-xl shadow-lg active:scale-95 transition-all">Tentar Novamente</button>
               </div>
             </div>
           )}
