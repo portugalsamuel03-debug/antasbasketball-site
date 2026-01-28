@@ -31,8 +31,11 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
     // Load persisted edit state
     useEffect(() => {
+        const isAdminUrl = window.location.search.includes('admin');
         const saved = localStorage.getItem('antas_admin_edit_mode');
-        if (saved === 'true') setIsEditing(true);
+        if (isAdminUrl || saved === 'true') {
+            setIsEditing(true);
+        }
     }, []);
 
     const toggleEditing = () => {
@@ -57,10 +60,10 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
         // Auto-detect admin by email
         const adminEmail = "portugalsamuel03@gmail.com";
-        const isUserAdminByEmail = user?.email === adminEmail;
+        const isUserAdminByEmail = user?.email?.toLowerCase() === adminEmail.toLowerCase();
 
-        // Auto-redirect admin to ?admin=1 if not present
-        if (isUserAdminByEmail && !window.location.search.includes("admin=1")) {
+        // Auto-redirect admin to ?admin if not present
+        if (isUserAdminByEmail && !window.location.search.includes("admin")) {
             const url = new URL(window.location.href);
             url.searchParams.set("admin", "1");
             window.location.replace(url.toString());
@@ -85,10 +88,20 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     };
 
     useEffect(() => {
+        // Initial check
         refreshRole();
 
-        const { data } = supabase.auth.onAuthStateChange(() => {
-            refreshRole();
+        const { data } = supabase.auth.onAuthStateChange(async (event, session) => {
+            console.log("Auth Event:", event, session?.user?.email);
+
+            // If signed in, ensure we refresh role and handle potential redirection
+            if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION') {
+                await refreshRole();
+            } else if (event === 'SIGNED_OUT') {
+                setRole('reader');
+                setSessionUserId(null);
+                setIsEditing(false);
+            }
         });
 
         return () => {
