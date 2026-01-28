@@ -17,36 +17,15 @@ interface HistoriaPageProps {
     onEditArticle: (id: string) => void;
 }
 
-type SubTab = 'ARTIGOS' | 'CAMPEOES' | 'HALL_OF_FAME';
+type SubTab = 'ARTIGOS' | 'CAMPEOES' | 'HALL_OF_FAME' | 'TIMES';
 
 // --- CHAMPIONS SECTION ---
-const EditChampionModal: React.FC<{ champion: Partial<Champion>, isDarkMode: boolean, onClose: () => void, onSave: (d: Partial<Champion>) => void }> = ({ champion, isDarkMode, onClose, onSave }) => {
-    const [formData, setFormData] = useState(champion);
-    return (
-        <div className="fixed inset-0 z-[130] flex items-center justify-center px-4">
-            <div className="absolute inset-0 bg-black/80 backdrop-blur-md" onClick={onClose}></div>
-            <div className={`relative w-full max-w-sm border rounded-[32px] overflow-hidden shadow-xl p-6 space-y-4 ${isDarkMode ? 'bg-[#121212] border-white/10' : 'bg-white'}`}>
-                <h3 className={`text-xs font-black uppercase tracking-widest ${isDarkMode ? 'text-white' : 'text-black'}`}>
-                    {champion.id ? 'Editar Campeão' : 'Novo Campeão'}
-                </h3>
-                <input className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm" placeholder="Ano" value={formData.year || ''} onChange={e => setFormData({ ...formData, year: e.target.value })} />
-                <input className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm" placeholder="Time Campeão" value={formData.team || ''} onChange={e => setFormData({ ...formData, team: e.target.value })} />
-                <input className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm" placeholder="MVP" value={formData.mvp || ''} onChange={e => setFormData({ ...formData, mvp: e.target.value })} />
-                <input className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm" placeholder="Placar (ex: 102 - 98)" value={formData.score || ''} onChange={e => setFormData({ ...formData, score: e.target.value })} />
-
-                <div className="flex gap-2 pt-2">
-                    <button onClick={onClose} className="flex-1 py-3 bg-white/5 rounded-xl text-xs font-black uppercase">Cancelar</button>
-                    <button onClick={() => onSave(formData)} className="flex-1 py-3 bg-yellow-400 text-black rounded-xl text-xs font-black uppercase">Salvar</button>
-                </div>
-            </div>
-        </div>
-    );
-}
+import { ChampionDetailsModal } from './admin/ChampionDetailsModal';
 
 const ChampionsSection: React.FC<{ isDarkMode: boolean }> = ({ isDarkMode }) => {
     const [champions, setChampions] = useState<Champion[]>([]);
     const { isEditing } = useAdmin();
-    const [editingItem, setEditingItem] = useState<Partial<Champion> | null>(null);
+    const [selectedChampion, setSelectedChampion] = useState<Partial<Champion> | null>(null);
 
     const fetchChampions = async () => {
         const { data } = await listChampions();
@@ -54,13 +33,6 @@ const ChampionsSection: React.FC<{ isDarkMode: boolean }> = ({ isDarkMode }) => 
     };
 
     useEffect(() => { fetchChampions(); }, []);
-
-    const handleSave = async (data: Partial<Champion>) => {
-        if (!data?.year) return;
-        await upsertChampion(data);
-        setEditingItem(null);
-        fetchChampions();
-    };
 
     const handleDelete = async (id: string, e: React.MouseEvent) => {
         e.stopPropagation();
@@ -74,15 +46,18 @@ const ChampionsSection: React.FC<{ isDarkMode: boolean }> = ({ isDarkMode }) => 
         <div className="space-y-4 px-6 pb-20">
             <div className="flex justify-between items-center">
                 <div className="text-xs font-black uppercase tracking-widest text-gray-500">Galeria de Campeões</div>
-                <EditTrigger type="add" onClick={() => setEditingItem({})} />
+                {isEditing && <EditTrigger type="add" onClick={() => setSelectedChampion({})} />}
             </div>
 
             <div className="grid gap-4">
                 {champions.map((c) => (
-                    <div key={c.id} className={`relative p-5 rounded-[24px] border ${isDarkMode ? 'bg-white/5 border-white/10' : 'bg-white border-[#0B1D33]/10'} flex items-center justify-between group`}>
+                    <div
+                        key={c.id}
+                        onClick={() => setSelectedChampion(c)}
+                        className={`relative p-5 rounded-[24px] border cursor-pointer transition-all active:scale-95 ${isDarkMode ? 'bg-white/5 border-white/10 hover:bg-white/10' : 'bg-white border-[#0B1D33]/10 hover:bg-[#0B1D33]/5'} flex items-center justify-between group`}
+                    >
                         {isEditing && (
                             <div className="absolute -top-2 -right-2 z-10 flex gap-1">
-                                <EditTrigger type="edit" size={14} onClick={() => setEditingItem(c)} />
                                 <EditTrigger type="delete" size={14} onClick={(e) => handleDelete(c.id, e)} />
                             </div>
                         )}
@@ -99,24 +74,84 @@ const ChampionsSection: React.FC<{ isDarkMode: boolean }> = ({ isDarkMode }) => 
                 ))}
             </div>
 
-            {editingItem && (
-                <EditChampionModal
-                    champion={editingItem}
+            {selectedChampion && (
+                <ChampionDetailsModal
+                    champion={selectedChampion}
                     isDarkMode={isDarkMode}
-                    onClose={() => setEditingItem(null)}
-                    onSave={handleSave}
+                    onClose={() => setSelectedChampion(null)}
+                    onUpdate={fetchChampions}
                 />
             )}
         </div>
     );
 };
 
-// --- HALL OF FAME SECTION ---
+// --- TEAMS SECTION ---
+import { TeamDetailsModal } from './admin/TeamDetailsModal';
+
+const TeamsSection: React.FC<{ isDarkMode: boolean }> = ({ isDarkMode }) => {
+    const [teams, setTeams] = useState<TeamRow[]>([]);
+    const { isEditing } = useAdmin();
+    const [selectedTeam, setSelectedTeam] = useState<Partial<TeamRow> | null>(null);
+
+    const fetchTeams = async () => {
+        const { data } = await listTeams();
+        if (data) setTeams(data as TeamRow[]);
+    };
+
+    useEffect(() => { fetchTeams(); }, []);
+
+    const handleDelete = async (id: string, e: React.MouseEvent) => {
+        e.stopPropagation();
+        if (confirm('Apagar este time?')) {
+            await deleteTeam(id);
+            fetchTeams();
+        }
+    };
+
+    return (
+        <div className="space-y-4 px-6 pb-20">
+            <div className="flex justify-between items-center">
+                <div className="text-xs font-black uppercase tracking-widest text-gray-500">Lista de Times</div>
+                {isEditing && <EditTrigger type="add" onClick={() => setSelectedTeam({})} />}
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+                {teams.map((t) => (
+                    <div
+                        key={t.id}
+                        onClick={() => setSelectedTeam(t)}
+                        className={`relative p-5 rounded-[24px] border flex flex-col items-center text-center gap-3 cursor-pointer transition-all active:scale-95 ${isDarkMode ? 'bg-white/5 border-white/10 hover:bg-white/10' : 'bg-white border-[#0B1D33]/10 hover:bg-[#0B1D33]/5'}`}
+                    >
+                        {isEditing && (
+                            <div className="absolute -top-2 -right-2 z-10">
+                                <EditTrigger type="delete" size={14} onClick={(e) => handleDelete(t.id, e)} />
+                            </div>
+                        )}
+                        <div className="w-16 h-16 rounded-2xl bg-white/5 flex items-center justify-center p-2">
+                            {t.logo_url ? <img src={t.logo_url} className="w-full h-full object-contain" /> : <Trophy className="text-yellow-500/20" />}
+                        </div>
+                        <div className={`text-xs font-black uppercase ${isDarkMode ? 'text-white' : 'text-[#0B1D33]'}`}>{t.name}</div>
+                    </div>
+                ))}
+            </div>
+
+            {selectedTeam && (
+                <TeamDetailsModal
+                    team={selectedTeam}
+                    isDarkMode={isDarkMode}
+                    onClose={() => setSelectedTeam(null)}
+                    onUpdate={fetchTeams}
+                />
+            )}
+        </div>
+    );
+}
+
 // --- HALL OF FAME SECTION ---
 const HallOfFameSection: React.FC<{ isDarkMode: boolean }> = ({ isDarkMode }) => {
     const [hofMembers, setHofMembers] = useState<HallOfFame[]>([]);
     const { isEditing } = useAdmin();
-    // Reusing the same name for state, though now it handles both viewing and editing via the unified modal
     const [selectedMember, setSelectedMember] = useState<HallOfFame | null>(null);
 
     const fetchHoF = async () => {
@@ -127,7 +162,6 @@ const HallOfFameSection: React.FC<{ isDarkMode: boolean }> = ({ isDarkMode }) =>
     useEffect(() => { fetchHoF(); }, []);
 
     const handleCreate = () => {
-        // Create dummy member
         const newMember: HallOfFame = { id: '', name: '', year_inducted: '2026', role: '', achievement: '', image_url: '' };
         setSelectedMember(newMember);
     }
@@ -191,6 +225,7 @@ const HallOfFameSection: React.FC<{ isDarkMode: boolean }> = ({ isDarkMode }) =>
     );
 };
 
+
 const HistoriaPage: React.FC<HistoriaPageProps> = ({ articles, isDarkMode, onArticleClick, onShare, onEditArticle }) => {
     const { isEditing } = useAdmin();
     const [subTab, setSubTab] = useState<SubTab>('ARTIGOS');
@@ -206,7 +241,7 @@ const HistoriaPage: React.FC<HistoriaPageProps> = ({ articles, isDarkMode, onArt
 
             {/* SubTabs */}
             <div className="px-6 mb-6 flex items-center gap-2 overflow-x-auto no-scrollbar">
-                {(['ARTIGOS', 'CAMPEOES', 'HALL_OF_FAME'] as SubTab[]).map(tab => (
+                {(['ARTIGOS', 'CAMPEOES', 'HALL_OF_FAME', 'TIMES'] as SubTab[]).map(tab => (
                     <button
                         key={tab}
                         onClick={() => setSubTab(tab)}
@@ -242,6 +277,7 @@ const HistoriaPage: React.FC<HistoriaPageProps> = ({ articles, isDarkMode, onArt
 
             {subTab === 'CAMPEOES' && <ChampionsSection isDarkMode={isDarkMode} />}
             {subTab === 'HALL_OF_FAME' && <HallOfFameSection isDarkMode={isDarkMode} />}
+            {subTab === 'TIMES' && <TeamsSection isDarkMode={isDarkMode} />}
         </>
     );
 };
