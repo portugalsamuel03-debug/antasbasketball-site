@@ -11,6 +11,7 @@ type ProfileRow = {
   avatar_url: string | null;
   favorite_team: string | null;
   role: Role | null;
+  bio?: string | null;
 };
 
 type MiniArticle = {
@@ -74,6 +75,7 @@ export default function ProfilePopup({
   const [displayName, setDisplayName] = useState("");
   const [nickname, setNickname] = useState("");
   const [avatarUrl, setAvatarUrl] = useState("");
+  const [bio, setBio] = useState("");
 
   const [likedArticles, setLikedArticles] = useState<MiniArticle[]>([]);
   const [savedArticles, setSavedArticles] = useState<MiniArticle[]>([]);
@@ -107,9 +109,10 @@ export default function ProfilePopup({
         setDisplayName(p?.display_name ?? "");
         setNickname(p?.nickname ?? "");
         setAvatarUrl(p?.avatar_url ?? "");
+        setBio(p?.bio ?? "");
 
         // se perfil vazio -> abre direto em editar
-        const hasAny = !!(p?.display_name || p?.nickname || p?.avatar_url);
+        const hasAny = !!(p?.display_name || p?.nickname);
         setEditMode(!hasAny);
         setTab("PERFIL");
       } catch (e: any) {
@@ -186,12 +189,16 @@ export default function ProfilePopup({
 
     try {
       const payload = {
+        id: userId, // Ensure ID is present for upsert if needed, though update uses .eq
         display_name: displayName.trim() || null,
         nickname: nickname.trim() || null,
         avatar_url: avatarUrl.trim() || null,
+        bio: bio.trim() || null,
+        updated_at: new Date().toISOString()
       };
 
-      const { error } = await supabase.from("profiles").update(payload).eq("id", userId);
+      // Use upsert to be safe, or stick to update
+      const { error } = await supabase.from("profiles").upsert(payload);
       if (error) throw error;
 
       setEditMode(false);
@@ -215,8 +222,7 @@ export default function ProfilePopup({
     "w-full bg-[#F0F4F8] border-none rounded-2xl py-4 px-6 text-sm text-[#0B1D33] focus:ring-2 focus:ring-[#0B1D33]/20 outline-none transition-all placeholder:text-gray-400 font-medium";
 
   const tabBtn = (t: Tab) =>
-    `px-4 py-2 rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] border transition ${
-      tab === t ? "bg-yellow-400 text-black border-yellow-400" : "bg-black/5 text-[#0B1D33]/70 border-black/10 hover:bg-black/10"
+    `px-4 py-2 rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] border transition ${tab === t ? "bg-yellow-400 text-black border-yellow-400" : "bg-black/5 text-[#0B1D33]/70 border-black/10 hover:bg-black/10"
     }`;
 
   return (
@@ -263,101 +269,154 @@ export default function ProfilePopup({
 
           {/* PERFIL */}
           {tab === "PERFIL" && (
-            <>
+            <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
               {!editMode ? (
-                <div className="space-y-3">
-                  <div className="bg-black/5 rounded-2xl px-4 py-4">
-                    <div className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-500">Nome</div>
-                    <div className="text-sm font-black text-[#0B1D33] mt-1">{displayName || "—"}</div>
+                <div className="space-y-6">
+                  {/* Hero Section */}
+                  <div className="flex flex-col items-center text-center">
+                    <div className="relative group">
+                      <div className="w-24 h-24 rounded-full overflow-hidden border-4 border-yellow-400 shadow-2xl transition-transform group-hover:scale-105">
+                        <img src={effectiveAvatar} className="w-full h-full object-cover" />
+                      </div>
+                      <div className="absolute -bottom-1 -right-1 bg-[#0B1D33] text-white p-1.5 rounded-full border-2 border-white shadow-lg">
+                        <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse" />
+                      </div>
+                    </div>
+
+                    <div className="mt-4">
+                      <h3 className="text-xl font-black italic text-[#0B1D33] tracking-tight truncate max-w-[200px]">
+                        {displayName || "Novo Atleta"}
+                      </h3>
+                      <p className="text-[10px] font-black text-yellow-500 uppercase tracking-widest mt-1">
+                        @{nickname || "antas_user"}
+                      </p>
+                    </div>
+
+                    {bio && (
+                      <p className="mt-3 text-[11px] font-medium text-gray-500 max-w-[240px] italic">
+                        "{bio}"
+                      </p>
+                    )}
                   </div>
 
-                  <div className="bg-black/5 rounded-2xl px-4 py-4">
-                    <div className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-500">Nickname</div>
-                    <div className="text-sm font-black text-[#0B1D33] mt-1">{nickname || "—"}</div>
-                  </div>
-
-                  <div className="bg-black/5 rounded-2xl px-4 py-4">
-                    <div className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-500">Avatar</div>
-                    <div className="text-[12px] font-bold text-gray-600 mt-1 break-all">{avatarUrl || "Automático (Dicebear)"}</div>
-                  </div>
-
-                  <button
-                    onClick={() => setEditMode(true)}
-                    className="w-full bg-yellow-400 text-black py-4 rounded-3xl font-black text-xs uppercase tracking-[0.2em]"
-                  >
-                    Editar
-                  </button>
-
-                  <button
-                    onClick={signOut}
-                    className="w-full bg-[#0B1D33]/5 text-[#0B1D33] py-4 rounded-3xl font-black text-xs uppercase tracking-[0.2em]"
-                  >
-                    Sair da conta
-                  </button>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  <input
-                    className={inputClasses}
-                    placeholder="Seu nome"
-                    value={displayName}
-                    onChange={(e) => setDisplayName(e.target.value)}
-                    disabled={loading}
-                  />
-
-                  <input
-                    className={inputClasses}
-                    placeholder="Nickname (pra comentários)"
-                    value={nickname}
-                    onChange={(e) => setNickname(e.target.value)}
-                    disabled={loading}
-                  />
-
-                  <div className="space-y-2">
-                    <input
-                      className={inputClasses}
-                      placeholder="URL da foto (avatar)"
-                      value={avatarUrl}
-                      onChange={(e) => setAvatarUrl(e.target.value)}
-                      disabled={loading}
-                    />
-
-                    <div className="flex gap-2">
-                      <button
-                        type="button"
-                        onClick={() => setAvatarUrl(dicebear(nickname || displayName || "User"))}
-                        className="flex-1 py-3 rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] bg-[#0B1D33]/5 text-[#0B1D33]"
-                      >
-                        Gerar automático
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setAvatarUrl("")}
-                        className="py-3 px-4 rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] bg-black/5 text-[#0B1D33]"
-                        title="Voltar para automático"
-                      >
-                        Limpar
-                      </button>
+                  {/* Stats Grid */}
+                  <div className="grid grid-cols-3 gap-3">
+                    <div className="bg-[#F0F4F8] rounded-3xl p-4 text-center">
+                      <div className="text-lg font-black text-[#0B1D33] leading-none">{likedArticles.length}</div>
+                      <div className="text-[8px] font-black text-gray-400 uppercase tracking-widest mt-1">CURTIDAS</div>
+                    </div>
+                    <div className="bg-[#F0F4F8] rounded-3xl p-4 text-center">
+                      <div className="text-lg font-black text-[#0B1D33] leading-none">{savedArticles.length}</div>
+                      <div className="text-[8px] font-black text-gray-400 uppercase tracking-widest mt-1">SALVOS</div>
+                    </div>
+                    <div className="bg-[#F0F4F8] rounded-3xl p-4 text-center border-2 border-yellow-400/20">
+                      <div className="text-lg font-black text-[#0B1D33] leading-none">MVP</div>
+                      <div className="text-[8px] font-black text-yellow-500 uppercase tracking-widest mt-1">RANK</div>
                     </div>
                   </div>
 
-                  <button
-                    onClick={save}
-                    disabled={loading}
-                    className="w-full bg-[#5C6773] text-white py-4 rounded-3xl font-black text-xs uppercase tracking-[0.2em] disabled:opacity-60"
-                  >
-                    {loading ? "SALVANDO..." : "SALVAR"}
-                  </button>
+                  <div className="space-y-2 pt-2">
+                    <button
+                      onClick={() => setEditMode(true)}
+                      className="w-full bg-[#0B1D33] text-white py-4 rounded-[24px] font-black text-[11px] uppercase tracking-[0.2em] shadow-xl shadow-[#0B1D33]/20 active:scale-[0.98] transition-all"
+                    >
+                      Editar Perfil
+                    </button>
 
-                  <button
-                    onClick={() => setEditMode(false)}
-                    className="w-full bg-black/5 text-[#0B1D33] py-4 rounded-3xl font-black text-xs uppercase tracking-[0.2em]"
-                  >
-                    Cancelar
-                  </button>
+                    <button
+                      onClick={signOut}
+                      className="w-full bg-black/5 text-gray-500 py-4 rounded-[24px] font-black text-[11px] uppercase tracking-[0.2em] hover:bg-red-50 hover:text-red-500 transition-all"
+                    >
+                      Sair da conta
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <div className="flex justify-center mb-6">
+                    <div className="w-20 h-20 rounded-full overflow-hidden border-2 border-yellow-400 p-0.5">
+                      <img src={effectiveAvatar} className="w-full h-full rounded-full object-cover" />
+                    </div>
+                  </div>
+
+                  <div className="space-y-3">
+                    <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-4">Informações Básicas</label>
+                    <input
+                      className={inputClasses}
+                      placeholder="Seu Nome Real"
+                      value={displayName}
+                      onChange={(e) => setDisplayName(e.target.value)}
+                      disabled={loading}
+                    />
+
+                    <input
+                      className={inputClasses}
+                      placeholder="Nickname (Ex: @samu)"
+                      value={nickname}
+                      onChange={(e) => setNickname(e.target.value.substring(0, 20))}
+                      disabled={loading}
+                      maxLength={20}
+                    />
+
+                    <textarea
+                      className={`${inputClasses} h-24 resize-none`}
+                      placeholder="Bio curta..."
+                      value={bio}
+                      onChange={(e) => setBio(e.target.value.substring(0, 160))}
+                      disabled={loading}
+                      maxLength={160}
+                    />
+
+                    <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-4 block mt-4">Avatar da Conta</label>
+                    <div className="space-y-2">
+                      <input
+                        className={inputClasses}
+                        placeholder="URL da sua foto (PNG/JPG)"
+                        value={avatarUrl}
+                        onChange={(e) => setAvatarUrl(e.target.value.substring(0, 500))}
+                        disabled={loading}
+                        maxLength={500}
+                      />
+
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setAvatarUrl(dicebear(nickname || displayName || "User"))}
+                          className="flex-1 py-3 rounded-2xl font-black text-[9px] uppercase tracking-[0.2em] bg-[#0B1D33]/5 text-[#0B1D33] hover:bg-[#0B1D33]/10 transition-colors"
+                        >
+                          Gerar Random
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setAvatarUrl("")}
+                          className="py-3 px-4 rounded-2xl font-black text-[9px] uppercase tracking-[0.2em] bg-black/5 text-gray-400 hover:text-red-500"
+                          title="Voltar para automático"
+                        >
+                          Limpar
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="pt-6 space-y-3">
+                    <button
+                      onClick={save}
+                      disabled={loading}
+                      className="w-full bg-yellow-400 text-black py-4 rounded-[24px] font-black text-[11px] uppercase tracking-[0.2em] shadow-xl shadow-yellow-400/20 disabled:opacity-60 active:scale-[0.98] transition-all"
+                    >
+                      {loading ? "SALVANDO..." : "SALVAR ALTERAÇÕES"}
+                    </button>
+
+                    <button
+                      onClick={() => setEditMode(false)}
+                      className="w-full text-gray-400 py-2 font-black text-[9px] uppercase tracking-[0.2em] hover:text-[#0B1D33] transition-colors"
+                    >
+                      Voltar
+                    </button>
+                  </div>
                 </div>
               )}
-            </>
+            </div>
           )}
 
           {/* CURTIDOS / SALVOS */}

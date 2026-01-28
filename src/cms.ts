@@ -31,6 +31,16 @@ export type ArticleRow = {
   updated_at: string;
 };
 
+export type NotificationRow = {
+  id: string;
+  created_at: string;
+  title: string;
+  description: string;
+  type: string;
+  link?: string | null;
+  is_global: boolean;
+};
+
 export async function listArticles() {
   return supabase
     .from("articles")
@@ -39,7 +49,21 @@ export async function listArticles() {
 }
 
 export async function upsertArticle(payload: Partial<ArticleRow>) {
-  return supabase.from("articles").upsert(payload).select("*").single();
+  const isNew = !payload.id || payload.id === "";
+  const { data, error } = await supabase.from("articles").upsert(payload).select("*").single();
+
+  if (!error && isNew && data?.published) {
+    // Auto-create notification for new published articles
+    await createNotification({
+      title: data.category.toUpperCase(),
+      description: data.title,
+      type: 'noticia',
+      link: data.id,
+      is_global: true
+    });
+  }
+
+  return { data, error };
 }
 
 export async function deleteArticle(id: string) {
@@ -165,4 +189,23 @@ export async function getArticleTags(articleId: string) {
     .eq('article_id', articleId);
 
   return data?.map((d: any) => d.tag.label) || [];
+}
+
+// Notifications
+export async function listNotifications() {
+  return supabase.from("notifications").select("*").order("created_at", { ascending: false }).limit(20);
+}
+
+export async function createNotification(payload: Partial<NotificationRow>) {
+  return supabase.from("notifications").insert([payload]).select("*").single();
+}
+
+export async function deleteNotification(id: string) {
+  return supabase.from("notifications").delete().eq("id", id);
+}
+
+export async function markAllNotificationsRead() {
+  // Ideally this would be server side or per user. 
+  // For a simple global system, we can store 'last_read_at' in localStorage
+  localStorage.setItem('antas_notifications_last_read', new Date().toISOString());
 }
