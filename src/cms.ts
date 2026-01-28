@@ -112,15 +112,57 @@ export async function deleteHallOfFame(id: string) {
   return supabase.from("hall_of_fame").delete().eq("id", id);
 }
 
-// Readers
-export async function listFeaturedReaders() {
-  return supabase.from("featured_readers").select("*").order("sort_order");
-}
-export async function upsertFeaturedReader(payload: Partial<any>) {
-  return supabase.from("featured_readers").upsert(payload).select("*").single();
-}
 export async function deleteFeaturedReader(id: string) {
   return supabase.from("featured_readers").delete().eq("id", id);
+}
+
+export async function listRankedReaders() {
+  // Get all likes and comments to compute ranking
+  const { data: likes } = await supabase.from('article_likes').select('user_id');
+  const { data: comments } = await supabase.from('article_comments').select('user_id');
+
+  const stats: Record<string, { likes: number, comments: number }> = {};
+
+  likes?.forEach(l => {
+    if (!stats[l.user_id]) stats[l.user_id] = { likes: 0, comments: 0 };
+    stats[l.user_id].likes++;
+  });
+
+  comments?.forEach(c => {
+    if (!stats[c.user_id]) stats[c.user_id] = { likes: 0, comments: 0 };
+    stats[c.user_id].comments++;
+  });
+
+  const sortedIds = Object.keys(stats).sort((a, b) => {
+    const scoreA = stats[a].likes + stats[a].comments * 2;
+    const scoreB = stats[b].likes + stats[b].comments * 2;
+    return scoreB - scoreA;
+  }).slice(0, 10);
+
+  if (sortedIds.length === 0) return { data: [], error: null };
+
+  const { data: profiles } = await supabase
+    .from('profiles')
+    .select('id, display_name, nickname, avatar_url')
+    .in('id', sortedIds);
+
+  const result = sortedIds.map(id => {
+    const p = profiles?.find(x => x.id === id);
+    const s = stats[id];
+    return {
+      id,
+      name: p?.nickname || p?.display_name || 'Atleta',
+      avatar_url: p?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${id}`,
+      posts_read: s.likes,
+      comments_made: s.comments,
+      likes_given: s.likes,
+      rank_label: s.likes + s.comments > 10 ? 'VETERANO' : 'CALOURO',
+      is_verified: s.likes + s.comments > 20,
+      sort_order: 0
+    };
+  });
+
+  return { data: result, error: null };
 }
 
 // Tag Definitions

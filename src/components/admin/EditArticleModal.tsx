@@ -135,12 +135,19 @@ export const EditArticleModal: React.FC<EditArticleModalProps> = ({ article, onC
     }
 
     async function handleSave() {
-        if (!editing.title || !editing.category || !editing.content) {
-            setMsg("Preencha título, categoria e conteúdo.");
+        if (!editing.title || !editing.content) {
+            setMsg("Preencha ao menos o título e o conteúdo.");
             return;
         }
 
-        const payload: Partial<ArticleRow> = { ...editing };
+        const payload: Partial<ArticleRow> = {
+            ...editing,
+            category: editing.category || "NOTICIAS",
+            published: editing.published ?? true,
+            reading_minutes: editing.reading_minutes ?? 5,
+            published_at: editing.published_at ?? new Date().toISOString(),
+            updated_at: new Date().toISOString() as any
+        };
         if (payload.id === "") delete payload.id;
 
         payload.slug = payload.slug?.trim() || slugify(payload.title);
@@ -192,67 +199,102 @@ export const EditArticleModal: React.FC<EditArticleModalProps> = ({ article, onC
                 )}
 
                 <div className="grid grid-cols-2 gap-3">
-                    <input className={inputClass} placeholder="Título" value={editing.title || ''} onChange={e => setEditing({ ...editing, title: e.target.value })} />
-                    <input className={inputClass} placeholder="Slug (opcional)" value={editing.slug || ''} onChange={e => setEditing({ ...editing, slug: e.target.value })} />
+                    <div className="space-y-1">
+                        <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-2">Título *</label>
+                        <input className={inputClass} placeholder="Título do post" value={editing.title || ''} onChange={e => setEditing({ ...editing, title: e.target.value })} />
+                    </div>
+                    <div className="space-y-1">
+                        <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-2">Slug</label>
+                        <input className={inputClass} placeholder="slug-do-post" value={editing.slug || ''} onChange={e => setEditing({ ...editing, slug: e.target.value })} />
+                    </div>
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
-                    <select className={inputClass} value={editing.category || ''} onChange={e => setEditing({ ...editing, category: e.target.value })}>
-                        {categoryOptions.map(c => <option key={c} value={c}>{c}</option>)}
-                    </select>
-                    <select className={inputClass} value={editing.subcategory || ''} onChange={e => setEditing({ ...editing, subcategory: e.target.value || null })}>
-                        <option value="">Sem subcategoria</option>
-                        {subcategoryOptions.map(s => <option key={s} value={s}>{s}</option>)}
-                    </select>
+                    <div className="space-y-1">
+                        <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-2">Categoria</label>
+                        <select className={inputClass} value={editing.category || 'NOTICIAS'} onChange={e => setEditing({ ...editing, category: e.target.value })}>
+                            {categoryOptions.map(c => <option key={c} value={c}>{c}</option>)}
+                        </select>
+                    </div>
+                    <div className="space-y-1">
+                        <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-2">Subcategoria</label>
+                        <select className={inputClass} value={editing.subcategory || ''} onChange={e => setEditing({ ...editing, subcategory: e.target.value || null })}>
+                            <option value="">Sem subcategoria</option>
+                            {subcategoryOptions.map(s => <option key={s} value={s}>{s}</option>)}
+                        </select>
+                    </div>
                 </div>
 
-                <input
-                    className={inputClass}
-                    placeholder="Tags (separadas por vírgula)"
-                    value={tagsInput}
-                    onChange={e => setTagsInput(e.target.value)}
-                />
+                <div className="space-y-1">
+                    <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-2">Tags</label>
+                    <input
+                        className={inputClass}
+                        placeholder="NBA, Lakers, Notícias"
+                        value={tagsInput}
+                        onChange={e => setTagsInput(e.target.value)}
+                    />
+                </div>
 
-                <textarea
-                    className={`${inputClass} min-h-[80px]`}
-                    placeholder="Resumo (excerpt)"
-                    value={editing.excerpt || ''}
-                    onChange={e => setEditing({ ...editing, excerpt: e.target.value })}
-                />
+                <div className="space-y-1">
+                    <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-2">Resumo</label>
+                    <textarea
+                        className={`${inputClass} min-h-[60px]`}
+                        placeholder="Uma breve descrição para o card..."
+                        value={editing.excerpt || ''}
+                        onChange={e => setEditing({ ...editing, excerpt: e.target.value })}
+                    />
+                </div>
 
                 {/* Cover Upload */}
-                <div className={`p-4 rounded-2xl border ${isDarkMode ? 'bg-black/20 border-white/5' : 'bg-gray-50 border-gray-200'}`}>
-                    <div className={`text-[10px] font-black uppercase mb-2 ${isDarkMode ? 'text-yellow-400' : 'text-gray-500'}`}>Capa</div>
-                    <div className="flex gap-2 items-center mb-2">
+                <div className={`p-4 rounded-3xl border ${isDarkMode ? 'bg-black/20 border-white/5' : 'bg-gray-50 border-gray-200'}`}>
+                    <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-2 mb-2 block">Imagem de Capa</label>
+                    <div className="flex gap-2 items-center mb-3">
                         <input type="file" accept="image/*" className="flex-1 text-[11px] text-gray-400" onChange={e => setCoverFile(e.target.files?.[0] ?? null)} />
                         <button
                             disabled={!coverFile || uploadingCover}
                             onClick={uploadCover}
-                            className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase ${coverFile ? 'bg-yellow-400 text-black' : 'bg-white/5 text-gray-500'}`}
+                            className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest ${coverFile ? 'bg-yellow-400 text-black' : 'bg-white/5 text-gray-500'}`}
                         >
-                            {uploadingCover ? 'Enviando...' : 'Upload'}
+                            {uploadingCover ? 'Enviando...' : 'Fazer Upload'}
                         </button>
                     </div>
                     {editing.cover_url && (
-                        <div className="h-24 w-full rounded-xl overflow-hidden mb-2">
+                        <div className="h-32 w-full rounded-2xl overflow-hidden mb-3 border border-white/5">
                             <img src={editing.cover_url} className="w-full h-full object-cover" />
                         </div>
                     )}
-                    <input className={inputClass} placeholder="URL da Capa" value={editing.cover_url || ''} onChange={e => setEditing({ ...editing, cover_url: e.target.value })} />
+                    <input className={inputClass} placeholder="Ou cole a URL da imagem aqui" value={editing.cover_url || ''} onChange={e => setEditing({ ...editing, cover_url: e.target.value })} />
                 </div>
 
-                {/* Author */}
-                <select className={inputClass} value={editing.author_id || ''} onChange={e => setEditing({ ...editing, author_id: e.target.value || null })}>
-                    <option value="">Sem autor</option>
-                    {authors.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
-                </select>
+                <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                        <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-2">Autor</label>
+                        <select className={inputClass} value={editing.author_id || ''} onChange={e => setEditing({ ...editing, author_id: e.target.value || null })}>
+                            <option value="">Sem autor</option>
+                            {authors.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+                        </select>
+                    </div>
+                    <div className="space-y-1">
+                        <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-2">Tempo de Leitura</label>
+                        <input
+                            type="number"
+                            className={inputClass}
+                            placeholder="Minutos"
+                            value={editing.reading_minutes || 5}
+                            onChange={e => setEditing({ ...editing, reading_minutes: parseInt(e.target.value) || 5 })}
+                        />
+                    </div>
+                </div>
 
-                <textarea
-                    className={`${inputClass} min-h-[300px] font-mono text-[13px] leading-relaxed`}
-                    placeholder="# Conteúdo (Markdown)"
-                    value={editing.content || ''}
-                    onChange={e => setEditing({ ...editing, content: e.target.value })}
-                />
+                <div className="space-y-1">
+                    <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-2">Conteúdo *</label>
+                    <textarea
+                        className={`${inputClass} min-h-[400px] font-mono text-[13px] leading-relaxed resize-y`}
+                        placeholder="# Escreva aqui seu post em Markdown..."
+                        value={editing.content || ''}
+                        onChange={e => setEditing({ ...editing, content: e.target.value })}
+                    />
+                </div>
 
                 <div className="flex items-center justify-between pt-4 border-t border-white/5">
                     {editing.id ? (

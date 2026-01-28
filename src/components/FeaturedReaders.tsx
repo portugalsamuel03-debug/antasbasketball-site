@@ -1,9 +1,8 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { BadgeCheck, X, Trophy, MessageSquare, BookOpen, ChevronRight, ChevronLeft } from 'lucide-react';
-import { listFeaturedReaders, upsertFeaturedReader, deleteFeaturedReader } from '../cms';
+import { listRankedReaders } from '../cms';
 import { FeaturedReaderRow } from '../types';
-import { EditTrigger } from './admin/EditTrigger';
 import { useAdmin } from '../context/AdminContext';
 
 const StatsModal: React.FC<{ readers: FeaturedReaderRow[], onClose: () => void, isDarkMode: boolean }> = ({ readers, onClose, isDarkMode }) => {
@@ -57,7 +56,7 @@ const FeaturedReaders: React.FC<{ isDarkMode: boolean }> = ({ isDarkMode }) => {
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const fetchData = async () => {
-    const { data } = await listFeaturedReaders();
+    const { data } = await listRankedReaders();
     if (data) setReaders(data as FeaturedReaderRow[]);
   };
 
@@ -71,37 +70,26 @@ const FeaturedReaders: React.FC<{ isDarkMode: boolean }> = ({ isDarkMode }) => {
     }
   };
 
-  const handleDelete = async (id: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (confirm('Apagar leitor?')) {
-      await deleteFeaturedReader(id);
-      fetchData();
-    }
-  };
 
   return (
     <div className="py-2 relative group/featured">
       <div className="px-6 flex justify-between items-center mb-4">
         <div className="flex items-center gap-2">
-          <h3 className="text-[10px] font-black tracking-[0.2em] text-gray-500 uppercase">Leitores em destaque</h3>
-          {isEditing && <EditTrigger type="add" onClick={() => setSelectedReader({})} />}
+          <h3 className="text-[10px] font-black tracking-[0.2em] text-gray-500 uppercase">Ranking de Atletas</h3>
         </div>
         <button onClick={() => setShowStats(true)} className={`text-[10px] font-black uppercase tracking-widest hover:underline ${isDarkMode ? 'text-yellow-400' : 'text-[#0B1D33]'}`}>Ver estatísticas</button>
       </div>
 
       <div className="relative px-6">
         <div ref={scrollRef} className="flex gap-4 overflow-x-auto no-scrollbar scroll-smooth mask-horizontal pb-4">
-          {readers.map((reader) => (
+          {readers.length === 0 ? (
+            <div className="text-[10px] text-gray-400 uppercase font-black tracking-widest py-4">Sem dados de atividade ainda.</div>
+          ) : readers.map((reader) => (
             <div
               key={reader.id}
               onClick={() => setSelectedReader(reader)}
               className="flex flex-col items-center gap-2 flex-shrink-0 group relative cursor-pointer"
             >
-              {isEditing && (
-                <div className="absolute -top-2 -right-2 z-10 flex gap-1">
-                  <EditTrigger type="delete" size={14} onClick={(e) => handleDelete(reader.id, e)} />
-                </div>
-              )}
               <div className="relative">
                 <div className={`w-16 h-16 rounded-full p-0.5 group-hover:scale-110 transition-transform shadow-lg ${isDarkMode ? 'bg-gradient-to-tr from-yellow-400 to-yellow-600' : 'bg-gradient-to-tr from-[#0B1D33] to-[#1e3a5f]'}`}>
                   <div className={`w-full h-full rounded-full p-0.5 ${isDarkMode ? 'bg-black' : 'bg-white'}`}>

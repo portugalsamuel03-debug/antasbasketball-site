@@ -256,13 +256,17 @@ export default function App() {
   };
 
   const handleEditFromCard = (id: string) => {
+    if (id === "") {
+      setEditingArticleDetails({});
+      return;
+    }
     const found = articles.find(a => a.id === id);
     if (!found) return;
 
     setEditingArticleDetails({
       id: found.id,
       title: found.title,
-      category: found.category,
+      category: String(found.category),
       content: found.content,
       cover_url: found.imageUrl,
       excerpt: found.description,
@@ -326,6 +330,13 @@ export default function App() {
                 isDarkMode={isDarkMode}
               />
 
+              {isEditing && (
+                <div className="px-6 mb-4 flex justify-between items-center group/admin">
+                  <div className="text-[10px] font-black uppercase tracking-widest text-gray-500">Ferramentas de Post ({activeTab})</div>
+                  <EditTrigger type="add" onClick={() => setEditingArticleDetails({ category: String(activeTab) })} />
+                </div>
+              )}
+
               {loadingArticles ? (
                 <div className="px-6 text-sm text-gray-400">Carregando posts…</div>
               ) : filteredArticles.length === 0 ? (
@@ -334,12 +345,6 @@ export default function App() {
                 </div>
               ) : (
                 <div className="px-6 space-y-4">
-                  {isEditing && (
-                    <div className="flex justify-between items-center mb-2">
-                      <div className="text-[10px] font-black uppercase tracking-widest text-gray-500">Ferramentas de Post</div>
-                      <EditTrigger type="add" onClick={() => setEditingArticleDetails({})} />
-                    </div>
-                  )}
                   {filteredArticles.map((a) => (
                     <ArticleCard
                       key={a.id}
@@ -384,6 +389,6 @@ export default function App() {
           />
         )}
       </div>
-    </div>
+    </div >
   );
 }
