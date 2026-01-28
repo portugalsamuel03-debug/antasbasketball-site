@@ -3,7 +3,8 @@ import { upsertChampion } from '../../cms';
 import { Champion } from '../../types';
 import { EditTrigger } from './EditTrigger';
 import { useAdmin } from '../../context/AdminContext';
-import { Trophy } from 'lucide-react';
+import { Trophy, Image as ImageIcon, Loader2 } from 'lucide-react';
+import { supabase } from '../../lib/supabase';
 
 interface ChampionDetailsModalProps {
     champion: Partial<Champion>;
@@ -12,11 +13,14 @@ interface ChampionDetailsModalProps {
     onUpdate: () => void;
 }
 
+const BUCKET = "article-covers"; // Reusing existing bucket or creating new if needed
+
 export const ChampionDetailsModal: React.FC<ChampionDetailsModalProps> = ({ champion, onClose, isDarkMode, onUpdate }) => {
     const { isEditing } = useAdmin();
     const [isEditMode, setIsEditMode] = useState(false);
     const [formData, setFormData] = useState<Partial<Champion>>({ ...champion });
     const [msg, setMsg] = useState<string | null>(null);
+    const [uploading, setUploading] = useState(false);
 
     // Auto-enter edit mode if it's a new empty champion
     React.useEffect(() => {
@@ -24,6 +28,38 @@ export const ChampionDetailsModal: React.FC<ChampionDetailsModalProps> = ({ cham
             setIsEditMode(true);
         }
     }, [champion, isEditing]);
+
+    const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        setUploading(true);
+        setMsg(null);
+
+        try {
+            const fileExt = file.name.split('.').pop();
+            const fileName = `champion-logo-${Date.now()}.${fileExt}`;
+            const filePath = `logos/${fileName}`;
+
+            const { error: uploadError } = await supabase.storage
+                .from(BUCKET)
+                .upload(filePath, file);
+
+            if (uploadError) throw uploadError;
+
+            const { data: { publicUrl } } = supabase.storage
+                .from(BUCKET)
+                .getPublicUrl(filePath);
+
+            setFormData(prev => ({ ...prev, logo_url: publicUrl }));
+            setMsg("Logo carregado!");
+        } catch (error: any) {
+            console.error("Upload error:", error);
+            setMsg("Erro no upload.");
+        } finally {
+            setUploading(false);
+        }
+    };
 
     const handleSave = async () => {
         setMsg(null);
@@ -65,9 +101,23 @@ export const ChampionDetailsModal: React.FC<ChampionDetailsModalProps> = ({ cham
                     </button>
                 </div>
 
-                {/* Icon */}
-                <div className="w-16 h-16 rounded-2xl bg-yellow-400 flex items-center justify-center text-black shadow-xl mt-2 animate-bounce">
-                    <Trophy size={32} />
+                {/* Icon/Logo */}
+                <div className="relative group w-20 h-20">
+                    <div className={`w-20 h-20 rounded-2xl flex items-center justify-center overflow-hidden shadow-xl mt-2 ${!formData.logo_url ? 'bg-yellow-400 text-black' : 'bg-white/5'}`}>
+                        {formData.logo_url ? (
+                            <img src={formData.logo_url} className="w-full h-full object-contain p-2" alt="Logo" />
+                        ) : (
+                            <Trophy size={40} />
+                        )}
+
+                        {isEditMode && (
+                            <label className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex flex-col items-center justify-center cursor-pointer transition-opacity rounded-2xl">
+                                {uploading ? <Loader2 className="animate-spin text-white" /> : <ImageIcon className="text-white" />}
+                                <span className="text-[8px] font-bold text-white uppercase mt-1">Trocar Logo</span>
+                                <input type="file" className="hidden" accept="image/*" onChange={handleFileUpload} disabled={uploading} />
+                            </label>
+                        )}
+                    </div>
                 </div>
 
                 {/* Content */}
@@ -113,7 +163,6 @@ export const ChampionDetailsModal: React.FC<ChampionDetailsModalProps> = ({ cham
                                 </p>
                             </div>
 
-                            {/* Divider */}
                             <div className={`w-8 h-1 mx-auto rounded-full ${isDarkMode ? 'bg-white/10' : 'bg-black/10'}`} />
 
                             <div className={`p-4 rounded-3xl ${isDarkMode ? 'bg-white/5' : 'bg-black/5'}`}>

@@ -61,13 +61,22 @@ const ChampionsSection: React.FC<{ isDarkMode: boolean }> = ({ isDarkMode }) => 
                                 <EditTrigger type="delete" size={14} onClick={(e) => handleDelete(c.id, e)} />
                             </div>
                         )}
-                        <div>
-                            <div className="flex items-center gap-2 mb-1">
-                                <span className="text-2xl font-black italic text-yellow-500">{c.year}</span>
-                                <Trophy size={16} className="text-yellow-500" />
+                        <div className="flex items-center gap-4">
+                            <div className="w-12 h-12 rounded-xl bg-white/5 flex items-center justify-center overflow-hidden">
+                                {c.logo_url ? (
+                                    <img src={c.logo_url} className="w-full h-full object-contain" alt="Logo" />
+                                ) : (
+                                    <Trophy size={24} className="text-yellow-500/20" />
+                                )}
                             </div>
-                            <div className={`text-lg font-black uppercase ${isDarkMode ? 'text-white' : 'text-[#0B1D33]'}`}>{c.team}</div>
-                            <div className="text-xs font-bold text-gray-500 mt-1">MVP: {c.mvp}</div>
+                            <div>
+                                <div className="flex items-center gap-2 mb-1">
+                                    <span className="text-2xl font-black italic text-yellow-500">{c.year}</span>
+                                    <Trophy size={16} className="text-yellow-500" />
+                                </div>
+                                <div className={`text-lg font-black uppercase ${isDarkMode ? 'text-white' : 'text-[#0B1D33]'}`}>{c.team}</div>
+                                <div className="text-xs font-bold text-gray-500 mt-1">MVP: {c.mvp}</div>
+                            </div>
                         </div>
                         <div className={`text-xl font-black tracking-widest ${isDarkMode ? 'text-white/20' : 'text-[#0B1D33]/20'}`}>{c.score}</div>
                     </div>

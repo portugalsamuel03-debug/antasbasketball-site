@@ -50,6 +50,7 @@ export interface Champion {
   team: string;
   mvp: string;
   score: string;
+  logo_url?: string;
 }
 
 export interface HallOfFame {
