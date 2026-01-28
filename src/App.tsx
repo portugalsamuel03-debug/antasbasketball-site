@@ -87,8 +87,35 @@ export default function App() {
   useEffect(() => {
     mountedRef.current = true;
     setAuthReady(true); // AdminProvider handles role/session now
+
+    // Check for redirection if admin is logged in but no param present
+    const checkAdminRedir = async () => {
+      const { data } = await supabase.auth.getSession();
+      const user = data.session?.user;
+      if (user?.email === "portugalsamuel03@gmail.com") {
+        if (!window.location.search.includes("admin=1")) {
+          const url = new URL(window.location.href);
+          url.searchParams.set("admin", "1");
+          window.location.replace(url.toString()); // Use replace to avoid back-button loop
+        }
+      }
+    };
+    checkAdminRedir();
+
+    const { data } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      const user = session?.user;
+      if (user?.email === "portugalsamuel03@gmail.com") {
+        if (!window.location.search.includes("admin=1")) {
+          const url = new URL(window.location.href);
+          url.searchParams.set("admin", "1");
+          window.location.replace(url.toString());
+        }
+      }
+    });
+
     return () => {
       mountedRef.current = false;
+      data.subscription.unsubscribe();
     };
   }, []);
 

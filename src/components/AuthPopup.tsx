@@ -42,15 +42,24 @@ const AuthPopup: React.FC<AuthPopupProps> = ({ isOpen, onClose }) => {
     setLoading(true);
 
     try {
-      const { error } = await supabase.auth.signInWithPassword({
+      const { data, error } = await supabase.auth.signInWithPassword({
         email: loginEmail.trim(),
         password: loginPassword,
       });
 
       if (error) throw error;
 
-      // garante que a sessão foi persistida antes de fechar o modal
-      await supabase.auth.getSession();
+      // Check if admin to redirect
+      const adminEmail = "portugalsamuel03@gmail.com";
+      if (data.user?.email === adminEmail) {
+        // Force URL param if not present
+        if (!window.location.search.includes("admin=1")) {
+          const url = new URL(window.location.href);
+          url.searchParams.set("admin", "1");
+          window.location.href = url.toString();
+          return; // Redirecting will reload the app
+        }
+      }
 
       onClose();
     } catch (e: any) {
@@ -75,7 +84,6 @@ const AuthPopup: React.FC<AuthPopupProps> = ({ isOpen, onClose }) => {
 
       if (error) throw error;
 
-      // trigger cria o profile como 'reader'
       const userId = data.user?.id;
       if (userId) {
         await supabase
@@ -87,8 +95,14 @@ const AuthPopup: React.FC<AuthPopupProps> = ({ isOpen, onClose }) => {
           .eq("id", userId);
       }
 
-      // garante sessão pronta (às vezes o browser demora a persistir)
-      await supabase.auth.getSession();
+      // Check if admin to redirect
+      const adminEmail = "portugalsamuel03@gmail.com";
+      if (data.user?.email === adminEmail) {
+        const url = new URL(window.location.href);
+        url.searchParams.set("admin", "1");
+        window.location.href = url.toString();
+        return;
+      }
 
       onClose();
     } catch (e: any) {
