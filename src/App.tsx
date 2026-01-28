@@ -43,7 +43,7 @@ export default function App() {
   // ===== Auth / Role =====
   const [authReady, setAuthReady] = useState(false);
 
-  const { isAdmin, isEditing, role, userId: sessionUserId } = useAdmin();
+  const { isAdmin, isEditing, role, userId: sessionUserId, isLoading: isAuthLoading } = useAdmin();
   const [adminError, setAdminError] = useState<string | null>(null);
   const [roleChecking, setRoleChecking] = useState(false);
 
@@ -187,7 +187,7 @@ export default function App() {
   }, [articles, activeTab, searchQuery, sortOption]);
 
   // ===== Loading screen =====
-  if (!authReady) {
+  if (!authReady || isAuthLoading) {
     return (
       <div className={isDarkMode ? "bg-black text-white min-h-screen" : "bg-[#FDFBF4] text-[#0B1D33] min-h-screen"}>
         <div className="max-w-md mx-auto px-6 py-10">

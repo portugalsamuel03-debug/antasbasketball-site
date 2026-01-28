@@ -9,6 +9,7 @@ interface AdminContextType {
     role: Role | 'unknown';
     isAdmin: boolean;
     isEditing: boolean;
+    isLoading: boolean;
     toggleEditing: () => void;
     refreshRole: () => Promise<void>;
 }
@@ -18,6 +19,7 @@ const AdminContext = createContext<AdminContextType>({
     role: 'unknown',
     isAdmin: false,
     isEditing: false,
+    isLoading: true,
     toggleEditing: () => { },
     refreshRole: async () => { },
 });
@@ -28,6 +30,7 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     const [role, setRole] = useState<Role | 'unknown'>('unknown');
     const [isEditing, setIsEditing] = useState(false);
     const [sessionUserId, setSessionUserId] = useState<string | null>(null);
+    const [isLoading, setIsLoading] = useState(true);
 
     // Load persisted edit state
     useEffect(() => {
@@ -47,43 +50,45 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     };
 
     const refreshRole = async () => {
-        const { data } = await supabase.auth.getSession();
-        const user = data.session?.user;
-        const userId = user?.id ?? null;
-        setSessionUserId(userId);
-
-        if (!userId) {
-            setRole('reader');
-            setIsEditing(false);
-            return;
-        }
-
-        // Auto-detect admin by email
-        const adminEmail = "portugalsamuel03@gmail.com";
-        const isUserAdminByEmail = user?.email?.toLowerCase() === adminEmail.toLowerCase();
-
-        // Auto-redirect admin to ?admin if not present
-        if (isUserAdminByEmail && !window.location.search.includes("admin")) {
-            const url = new URL(window.location.href);
-            url.searchParams.set("admin", "1");
-            window.location.replace(url.toString());
-            return;
-        }
-
         try {
-            const r = await getMyRole();
+            const { data } = await supabase.auth.getSession();
+            const user = data.session?.user;
+            const userId = user?.id ?? null;
+
+            setSessionUserId(userId);
+
+            if (!userId) {
+                setRole('reader');
+                setIsEditing(false);
+                setIsLoading(false);
+                return;
+            }
+
+            const adminEmail = "portugalsamuel03@gmail.com";
+            const isUserAdminByEmail = user?.email?.toLowerCase() === adminEmail.toLowerCase();
+
+            // Perform redirection if admin is on the wrong URL
+            if (isUserAdminByEmail && !window.location.search.toLowerCase().includes("admin")) {
+                const url = new URL(window.location.href);
+                url.searchParams.set("admin", "1");
+                window.location.replace(url.toString());
+                return;
+            }
+
+            const r = await getMyRole().catch(() => null);
             const finalRole = isUserAdminByEmail ? 'admin' : (r || 'reader');
             setRole(finalRole);
 
-            // Auto-enable editing if admin and no preference saved yet
+            const isAdminUrl = window.location.search.toLowerCase().includes('admin');
             const saved = localStorage.getItem('antas_admin_edit_mode');
-            if (finalRole === 'admin' && saved === null) {
+            if (finalRole === 'admin' && (isAdminUrl || saved === 'true' || saved === null)) {
                 setIsEditing(true);
-                localStorage.setItem('antas_admin_edit_mode', 'true');
+                if (saved === null) localStorage.setItem('antas_admin_edit_mode', 'true');
             }
         } catch (e) {
-            console.error('Failed to get role', e);
-            setRole(isUserAdminByEmail ? 'admin' : 'reader');
+            console.error('refreshRole error:', e);
+        } finally {
+            setIsLoading(false);
         }
     };
 
@@ -114,9 +119,10 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         role,
         isAdmin: role === 'admin',
         isEditing: role === 'admin' && isEditing,
+        isLoading,
         toggleEditing,
         refreshRole
-    }), [sessionUserId, role, isEditing]);
+    }), [sessionUserId, role, isEditing, isLoading]);
 
     return (
         <AdminContext.Provider value={value}>
