@@ -128,9 +128,17 @@ export default function App() {
         setAuthReady(true);
         console.log("App: Articles loaded.");
       } catch (e: any) {
-        console.error("App: Load error:", e);
         if (!alive) return;
-        setArticlesError(e?.message ?? "Erro ao carregar artigos.");
+
+        // Ignore AbortError - it typically means navigation happened
+        if (e?.name === 'AbortError' || e?.message?.includes('aborted')) {
+          console.warn("App: Load aborted (likely navigation).");
+          return;
+        }
+
+        console.error("App: Load error details:", e);
+        const errMsg = typeof e === 'string' ? e : (e?.message || JSON.stringify(e));
+        setArticlesError(errMsg);
         setAuthReady(true);
       } finally {
         if (alive) setLoadingArticles(false);

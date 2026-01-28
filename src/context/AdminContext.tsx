@@ -40,13 +40,6 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
             setIsEditing(true);
         } else if (saved === 'false') {
             setIsEditing(false);
-        } else {
-            // Default to true if on admin URL
-            const isAdminUrl = window.location.search.toLowerCase().includes('admin');
-            if (isAdminUrl) {
-                setIsEditing(true);
-                localStorage.setItem('antas_admin_edit_mode', 'true');
-            }
         }
     }, []);
 
@@ -57,7 +50,7 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
                 console.warn("AdminContext: Loading safety timeout triggered.");
                 setIsLoading(false);
             }
-        }, 4000); // 4 seconds safety
+        }, 5000);
         return () => clearTimeout(timer);
     }, [isLoading]);
 
@@ -91,19 +84,10 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
             const adminEmail = "portugalsamuel03@gmail.com";
             const isUserAdminByEmail = user?.email?.toLowerCase() === adminEmail.toLowerCase();
 
-            // Perform redirection if admin is on the wrong URL
-            if (isUserAdminByEmail && !window.location.search.toLowerCase().includes("admin")) {
-                console.log("Admin detected, redirecting to ?admin=1...");
-                // Small delay to ensure storage persistence before reload
-                await new Promise(resolve => setTimeout(resolve, 300));
-
-                const url = new URL(window.location.href);
-                url.searchParams.set("admin", "1");
-                window.location.replace(url.toString());
-                return;
-            }
-
-            const r = await getMyRole().catch(() => null);
+            const r = await getMyRole().catch((e) => {
+                console.warn("AdminContext: getMyRole failed:", e);
+                return null;
+            });
             const finalRole = isUserAdminByEmail ? 'admin' : (r || 'reader');
             setRole(finalRole);
 
@@ -111,13 +95,12 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
             if (finalRole === 'admin') {
                 if (saved === 'true' || saved === null) {
                     setIsEditing(true);
-                    if (saved === null) localStorage.setItem('antas_admin_edit_mode', 'true');
                 } else {
                     setIsEditing(false);
                 }
             }
         } catch (e) {
-            console.error('refreshRole error:', e);
+            console.error('AdminContext: refreshRole error:', e);
         } finally {
             setIsLoading(false);
             isRefreshing.current = false;
@@ -125,14 +108,13 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     };
 
     useEffect(() => {
-        // Initial check
         refreshRole();
 
         const { data } = supabase.auth.onAuthStateChange(async (event, session) => {
             console.log("Auth Event:", event, session?.user?.email);
 
             if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION' || event === 'USER_UPDATED') {
-                await refreshRole();
+                refreshRole();
             } else if (event === 'SIGNED_OUT') {
                 setRole('reader');
                 setSessionUserId(null);
