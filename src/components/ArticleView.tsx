@@ -170,12 +170,12 @@ const CommentItem: React.FC<{ comment: Comment; isDarkMode: boolean }> = ({ comm
                 key={i}
                 onClick={() => handleReact(r.emoji)}
                 className={`border px-2.5 py-1 rounded-full flex items-center gap-1.5 animate-in zoom-in-75 duration-300 active:scale-125 transition-all shadow-sm ${userReactions.includes(r.emoji)
-                    ? isDarkMode
-                      ? "border-yellow-400 text-yellow-400"
-                      : "border-[#0B1D33] text-[#0B1D33] bg-[#0B1D33]/5"
-                    : isDarkMode
-                      ? "bg-gray-900 border-white/10 text-gray-400"
-                      : "bg-white border-gray-100 text-gray-400"
+                  ? isDarkMode
+                    ? "border-yellow-400 text-yellow-400"
+                    : "border-[#0B1D33] text-[#0B1D33] bg-[#0B1D33]/5"
+                  : isDarkMode
+                    ? "bg-gray-900 border-white/10 text-gray-400"
+                    : "bg-white border-gray-100 text-gray-400"
                   }`}
               >
                 <span className="text-[11px] leading-none">{r.emoji}</span>
@@ -470,19 +470,34 @@ const ArticleView: React.FC<ArticleViewProps> = ({ article, onBack, onShare, isD
               >
                 <ArrowLeft size={20} strokeWidth={2.5} />
               </button>
-              {isEditing && <EditTrigger type="edit" onClick={handleOpenEdit} label="Editar Post" />}
+              {isEditing && (
+                <div className="flex gap-2">
+                  <EditTrigger type="edit" onClick={handleOpenEdit} />
+                  <EditTrigger
+                    type="delete"
+                    onClick={async () => {
+                      if (confirm('Tem certeza que deseja excluir permanentemente este post?')) {
+                        const { deleteArticle } = await import('../cms');
+                        await deleteArticle(article.id);
+                        onBack();
+                        window.location.reload();
+                      }
+                    }}
+                  />
+                </div>
+              )}
             </div>
 
             <div className="flex items-center gap-3">
               <button
                 onClick={toggleSaved}
                 className={`px-4 py-2 rounded-full text-[10px] font-black uppercase tracking-[0.2em] border transition ${saved
-                    ? isDarkMode
-                      ? "bg-yellow-400 text-black border-yellow-400"
-                      : "bg-[#0B1D33] text-white border-[#0B1D33]"
-                    : isDarkMode
-                      ? "bg-white/5 text-gray-200 border-white/10"
-                      : "bg-white text-[#0B1D33] border-[#0B1D33]/10"
+                  ? isDarkMode
+                    ? "bg-yellow-400 text-black border-yellow-400"
+                    : "bg-[#0B1D33] text-white border-[#0B1D33]"
+                  : isDarkMode
+                    ? "bg-white/5 text-gray-200 border-white/10"
+                    : "bg-white text-[#0B1D33] border-[#0B1D33]/10"
                   }`}
                 title="Salvar / Ler depois"
               >
@@ -606,12 +621,12 @@ const ArticleView: React.FC<ArticleViewProps> = ({ article, onBack, onShare, isD
                   onClick={sendComment}
                   disabled={!me || !commentText.trim() || sent}
                   className={`p-3 rounded-xl transition-all duration-500 flex items-center justify-center ${sent
-                      ? "bg-green-500 text-white"
-                      : commentText.trim()
-                        ? isDarkMode
-                          ? "bg-yellow-400 text-black shadow-lg shadow-yellow-400/20 active:scale-90"
-                          : "bg-[#0B1D33] text-white shadow-lg shadow-[#0B1D33]/20 active:scale-90"
-                        : "text-gray-400 bg-gray-200/50"
+                    ? "bg-green-500 text-white"
+                    : commentText.trim()
+                      ? isDarkMode
+                        ? "bg-yellow-400 text-black shadow-lg shadow-yellow-400/20 active:scale-90"
+                        : "bg-[#0B1D33] text-white shadow-lg shadow-[#0B1D33]/20 active:scale-90"
+                      : "text-gray-400 bg-gray-200/50"
                     }`}
                 >
                   {sent ? <Check size={20} strokeWidth={3} /> : <Send size={20} strokeWidth={3} />}

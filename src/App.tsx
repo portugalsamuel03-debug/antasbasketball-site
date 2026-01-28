@@ -17,6 +17,7 @@ import ProfilePopup from "./components/ProfilePopup";
 import { EditArticleModal } from "./components/admin/EditArticleModal";
 import { ArticleRow } from "./cms";
 import { useAdmin } from "./context/AdminContext";
+import { EditTrigger } from \"./components/admin/EditTrigger\";
 
 // Home sections (opcionais)
 import FeaturedReaders from "./components/FeaturedReaders";
@@ -311,7 +312,13 @@ export default function App() {
                   Nada por aqui ainda {searchQuery ? `pra “${searchQuery}”.` : "nessa categoria."}
                 </div>
               ) : (
-                <div className="px-6">
+                <div className="px-6 space-y-4">
+                  {isEditing && (
+                    <div className="flex justify-between items-center mb-2">
+                      <div className="text-[10px] font-black uppercase tracking-widest text-gray-500">Ferramentas de Post</div>
+                      <EditTrigger type="add" onClick={() => setEditingArticleDetails({})} />
+                    </div>
+                  )}
                   {filteredArticles.map((a) => (
                     <ArticleCard
                       key={a.id}
