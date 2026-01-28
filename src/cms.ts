@@ -24,6 +24,7 @@ export type ArticleRow = {
   category: string;
   subcategory: string | null;
   reading_minutes: number;
+  video_url: string | null;
   author_id: string | null;
   published: boolean;
   published_at: string;

@@ -105,6 +105,7 @@ export interface Article {
   date: string;
   comments: Comment[];
   tags: string[];
+  video_url?: string;
 }
 
 export type SortOption = 'RECENTES' | 'CURTIDOS' | 'COMENTADOS' | 'ANTIGOS' | 'SALVOS';

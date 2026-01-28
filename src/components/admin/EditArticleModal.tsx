@@ -273,6 +273,16 @@ export const EditArticleModal: React.FC<EditArticleModalProps> = ({ article, onC
                     <input className={inputClass} placeholder="Ou cole a URL da imagem aqui" value={editing.cover_url || ''} onChange={e => setEditing({ ...editing, cover_url: e.target.value })} />
                 </div>
 
+                <div className="space-y-1">
+                    <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-2">Link do Podcast / Vídeo (Spotify, YouTube)</label>
+                    <input
+                        className={inputClass}
+                        placeholder="https://open.spotify.com/episode/... ou https://youtube.com/watch?v=..."
+                        value={editing.video_url || ''}
+                        onChange={e => setEditing({ ...editing, video_url: e.target.value })}
+                    />
+                </div>
+
                 <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-1">
                         <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-2">Autor</label>

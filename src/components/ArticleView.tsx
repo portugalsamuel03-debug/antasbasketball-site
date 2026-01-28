@@ -189,6 +189,42 @@ const CommentItem: React.FC<{ comment: Comment; isDarkMode: boolean }> = ({ comm
   );
 };
 
+const PodcastPreview: React.FC<{ url: string; isDarkMode: boolean }> = ({ url, isDarkMode }) => {
+  const embedUrl = useMemo(() => {
+    if (!url) return null;
+    if (url.includes('spotify.com')) {
+      const match = url.match(/episode\/([a-zA-Z0-9]+)/);
+      if (match) return `https://open.spotify.com/embed/episode/${match[1]}?utm_source=generator`;
+      const showMatch = url.match(/show\/([a-zA-Z0-9]+)/);
+      if (showMatch) return `https://open.spotify.com/embed/show/${showMatch[1]}?utm_source=generator`;
+    }
+    if (url.includes('youtube.com') || url.includes('youtu.be')) {
+      let id = '';
+      if (url.includes('v=')) id = url.split('v=')[1].split('&')[0];
+      else if (url.includes('youtu.be/')) id = url.split('youtu.be/')[1].split('?')[0];
+      else if (url.includes('embed/')) id = url.split('embed/')[1].split('?')[0];
+      if (id) return `https://www.youtube.com/embed/${id}`;
+    }
+    return null;
+  }, [url]);
+
+  if (!embedUrl) return null;
+
+  return (
+    <div className={`w-full rounded-3xl overflow-hidden shadow-2xl border ${isDarkMode ? 'bg-black border-white/10' : 'bg-white border-black/5'}`}>
+      <iframe
+        src={embedUrl}
+        width="100%"
+        height={url.includes('spotify.com') ? "152" : "220"}
+        frameBorder="0"
+        allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
+        loading="lazy"
+        className="block"
+      ></iframe>
+    </div>
+  );
+};
+
 const ArticleView: React.FC<ArticleViewProps> = ({ article, onBack, onShare, isDarkMode }) => {
   const [liked, setLiked] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -438,6 +474,7 @@ const ArticleView: React.FC<ArticleViewProps> = ({ article, onBack, onShare, isD
       excerpt: "", // Might be missing in Article view props
       published: true, // Assuming published if visible here
       reading_minutes: parseInt(article.readTime) || 5, // Parsing "5 MIN"
+      video_url: article.video_url,
     });
   };
 
@@ -573,6 +610,12 @@ const ArticleView: React.FC<ArticleViewProps> = ({ article, onBack, onShare, isD
               <span className="text-[10px] font-black tabular-nums">{viewLikes}</span>
             </button>
           </div>
+
+          {article.video_url && (
+            <div className="px-8 mt-6">
+              <PodcastPreview url={article.video_url} isDarkMode={isDarkMode} />
+            </div>
+          )}
 
           <div className="px-8 py-10">
             <p className={`leading-[1.8] text-[15px] font-medium whitespace-pre-wrap selection:bg-yellow-400/30 ${isDarkMode ? "text-gray-300" : "text-gray-700"}`}>

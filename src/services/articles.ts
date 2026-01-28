@@ -26,6 +26,7 @@ type DbArticleRow = {
   category: string;
   subcategory: string | null;
   reading_minutes: number | null;
+  video_url: string | null;
 
   // colunas do seu "articles"
   likes: number | null;
@@ -122,6 +123,7 @@ function toUiArticle(row: DbArticleRow): Article {
 
     comments: [], // carregamos via fetchArticleComments no ArticleView
     tags,
+    video_url: row.video_url ?? undefined,
   };
 }
 
@@ -131,7 +133,7 @@ export async function fetchPublishedArticlesJoined(): Promise<Article[]> {
     .select(
       `
       id, slug, title, excerpt, content, cover_url, category, subcategory,
-      reading_minutes, likes, comments_count, author_id, published, published_at,
+      reading_minutes, video_url, likes, comments_count, author_id, published, published_at,
       author:authors ( id, slug, name, role_label, avatar_url ),
       article_tags ( tag:tags ( id, slug, label ) )
     `
@@ -240,7 +242,7 @@ export async function toggleArticleLike(articleId: string, userId: string): Prom
     // (opcional) tenta manter coluna articles.likes atualizada (não é fonte de verdade)
     try {
       await supabase.from("articles").update({ likes: likesCount }).eq("id", articleId);
-    } catch {}
+    } catch { }
 
     return { liked: false, likesCount };
   }
@@ -253,7 +255,7 @@ export async function toggleArticleLike(articleId: string, userId: string): Prom
 
   try {
     await supabase.from("articles").update({ likes: likesCount }).eq("id", articleId);
-  } catch {}
+  } catch { }
 
   return { liked: true, likesCount };
 }
@@ -328,7 +330,7 @@ export async function addArticleComment(params: {
   // (opcional) mantém articles.comments_count atualizada
   try {
     await supabase.from("articles").update({ comments_count: commentsCount }).eq("id", params.articleId);
-  } catch {}
+  } catch { }
 
   // pega perfil do autor (pra mostrar certo)
   const { data: p } = await supabase
