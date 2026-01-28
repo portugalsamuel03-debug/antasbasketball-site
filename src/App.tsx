@@ -17,7 +17,7 @@ import ProfilePopup from "./components/ProfilePopup";
 import { EditArticleModal } from "./components/admin/EditArticleModal";
 import { ArticleRow } from "./cms";
 import { useAdmin } from "./context/AdminContext";
-import { EditTrigger } from \"./components/admin/EditTrigger\";
+import { EditTrigger } from "./components/admin/EditTrigger";
 
 // Home sections (opcionais)
 import FeaturedReaders from "./components/FeaturedReaders";

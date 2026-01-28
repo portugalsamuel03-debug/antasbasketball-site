@@ -69,6 +69,10 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
             // Perform redirection if admin is on the wrong URL
             if (isUserAdminByEmail && !window.location.search.toLowerCase().includes("admin")) {
+                console.log("Admin detected, redirecting to ?admin=1...");
+                // Small delay to ensure storage persistence before reload
+                await new Promise(resolve => setTimeout(resolve, 300));
+
                 const url = new URL(window.location.href);
                 url.searchParams.set("admin", "1");
                 window.location.replace(url.toString());
