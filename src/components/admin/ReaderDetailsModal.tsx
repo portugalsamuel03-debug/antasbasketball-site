@@ -29,7 +29,10 @@ export const ReaderDetailsModal: React.FC<ReaderDetailsModalProps> = ({ reader, 
         setMsg(null);
         if (!formData.name) return;
 
-        const { error } = await upsertFeaturedReader(formData);
+        const payload = { ...formData };
+        if (payload.id === "") delete payload.id;
+
+        const { error } = await upsertFeaturedReader(payload);
         if (error) {
             console.error(error);
             setMsg("Erro ao salvar.");

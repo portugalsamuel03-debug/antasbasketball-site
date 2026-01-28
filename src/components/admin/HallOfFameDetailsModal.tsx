@@ -29,7 +29,10 @@ export const HallOfFameDetailsModal: React.FC<HallOfFameDetailsModalProps> = ({ 
         setMsg(null);
         if (!formData.name) return;
 
-        const { error } = await upsertHallOfFame(formData);
+        const payload = { ...formData };
+        if (payload.id === "") delete (payload as any).id;
+
+        const { error } = await upsertHallOfFame(payload);
         if (error) {
             console.error(error);
             setMsg("Erro ao salvar.");

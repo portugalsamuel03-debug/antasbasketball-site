@@ -29,7 +29,10 @@ export const TeamDetailsModal: React.FC<TeamDetailsModalProps> = ({ team, onClos
         setMsg(null);
         if (!formData.name) return;
 
-        const { error } = await upsertTeam(formData);
+        const payload = { ...formData };
+        if (payload.id === "") delete payload.id;
+
+        const { error } = await upsertTeam(payload);
         if (error) {
             console.error(error);
             setMsg("Erro ao salvar.");

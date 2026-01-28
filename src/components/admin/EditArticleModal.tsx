@@ -41,12 +41,17 @@ export const EditArticleModal: React.FC<EditArticleModalProps> = ({ article, onC
     // Initial data fetch
     useEffect(() => {
         listAuthors().then(({ data }) => {
-            if (data) setAuthors(data as AuthorRow[]);
+            if (data) {
+                console.log("EditArticleModal: Authors loaded:", data);
+                setAuthors(data as AuthorRow[]);
+            }
         });
         if (article.id) {
             getArticleTags(article.id).then(tags => setTagsInput(tags.join(", ")));
+        } else {
+            setTagsInput("");
         }
-    }, [article.id]);
+    }, [article]);
 
     const categoryOptions = useMemo(() => {
         return ["NOTICIAS", "HISTORIA", "REGRAS", "PODCAST", "OPINIAO", "CURIOSIDADES", "TUTORIAIS"];
@@ -135,19 +140,20 @@ export const EditArticleModal: React.FC<EditArticleModalProps> = ({ article, onC
             return;
         }
 
-        const payload: Partial<ArticleRow> = {
-            ...editing,
-            slug: editing.slug?.trim() || slugify(editing.title),
-            published: editing.published ?? true,
-            reading_minutes: editing.reading_minutes ?? 5,
-            published_at: editing.published_at ?? new Date().toISOString(),
-            updated_at: new Date().toISOString() as any,
-        };
+        const payload: Partial<ArticleRow> = { ...editing };
+        if (payload.id === "") delete payload.id;
 
+        payload.slug = payload.slug?.trim() || slugify(payload.title);
+        payload.published = payload.published ?? true;
+        payload.reading_minutes = payload.reading_minutes ?? 5;
+        payload.published_at = payload.published_at ?? new Date().toISOString();
+        payload.updated_at = new Date().toISOString() as any;
+
+        console.log("EditArticleModal: Saving article payload...", payload);
         const { data: savedData, error } = await upsertArticle(payload);
         if (error || !savedData) {
-            console.error(error);
-            setMsg("Erro ao salvar artigo.");
+            console.error("EditArticleModal: Upsert error:", error);
+            setMsg(`Erro ao salvar: ${error?.message || 'Verifique sua conexão ou se já existe um post com este título'}`);
             return;
         }
 

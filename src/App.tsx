@@ -114,7 +114,7 @@ export default function App() {
       setArticlesError(null);
 
       const timeoutPromise = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error("Timeout fetching articles")), 10000)
+        setTimeout(() => reject(new Error("Timeout: A conexão com o banco está lenta.")), 20000)
       );
 
       try {

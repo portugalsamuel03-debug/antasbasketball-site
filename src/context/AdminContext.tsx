@@ -35,10 +35,18 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
     // Load persisted edit state
     useEffect(() => {
-        const isAdminUrl = window.location.search.includes('admin');
         const saved = localStorage.getItem('antas_admin_edit_mode');
-        if (isAdminUrl || saved === 'true') {
+        if (saved === 'true') {
             setIsEditing(true);
+        } else if (saved === 'false') {
+            setIsEditing(false);
+        } else {
+            // Default to true if on admin URL
+            const isAdminUrl = window.location.search.toLowerCase().includes('admin');
+            if (isAdminUrl) {
+                setIsEditing(true);
+                localStorage.setItem('antas_admin_edit_mode', 'true');
+            }
         }
     }, []);
 
@@ -99,11 +107,14 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
             const finalRole = isUserAdminByEmail ? 'admin' : (r || 'reader');
             setRole(finalRole);
 
-            const isAdminUrl = window.location.search.toLowerCase().includes('admin');
             const saved = localStorage.getItem('antas_admin_edit_mode');
-            if (finalRole === 'admin' && (isAdminUrl || saved === 'true' || saved === null)) {
-                setIsEditing(true);
-                if (saved === null) localStorage.setItem('antas_admin_edit_mode', 'true');
+            if (finalRole === 'admin') {
+                if (saved === 'true' || saved === null) {
+                    setIsEditing(true);
+                    if (saved === null) localStorage.setItem('antas_admin_edit_mode', 'true');
+                } else {
+                    setIsEditing(false);
+                }
             }
         } catch (e) {
             console.error('refreshRole error:', e);

@@ -21,7 +21,10 @@ export const AuthorDetailsModal: React.FC<AuthorDetailsModalProps> = ({ author, 
         setMsg(null);
         if (!formData.name) return;
 
-        const { error } = await upsertAuthor(formData);
+        const payload = { ...formData };
+        if (payload.id === "") delete (payload as any).id;
+
+        const { error } = await upsertAuthor(payload);
         if (error) {
             console.error(error);
             setMsg("Erro ao salvar.");

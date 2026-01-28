@@ -29,7 +29,10 @@ export const ChampionDetailsModal: React.FC<ChampionDetailsModalProps> = ({ cham
         setMsg(null);
         if (!formData.year || !formData.team) return;
 
-        const { error } = await upsertChampion(formData);
+        const payload = { ...formData };
+        if (payload.id === "") delete payload.id;
+
+        const { error } = await upsertChampion(payload);
         if (error) {
             console.error(error);
             setMsg("Erro ao salvar.");

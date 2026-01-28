@@ -17,7 +17,9 @@ export const EditTrigger: React.FC<EditTriggerProps> = ({
 }) => {
     const { isEditing, isAdmin } = useAdmin();
 
-    if (!isAdmin || !isEditing) return null;
+    // config type should always be visible if in admin mode, regardless of isEditing
+    if (!isAdmin) return null;
+    if (!isEditing && type !== 'config') return null;
 
     const getIcon = () => {
         switch (type) {
@@ -34,8 +36,8 @@ export const EditTrigger: React.FC<EditTriggerProps> = ({
     const typeClasses = {
         edit: "bg-yellow-400 text-black hover:bg-yellow-300",
         delete: "bg-red-500 text-white hover:bg-red-400",
-        add: "bg-green-500 text-white hover:bg-green-400",
-        config: "bg-gray-700 text-white hover:bg-gray-600"
+        add: "bg-yellow-400 text-black hover:bg-yellow-300",
+        config: "bg-gray-800 text-white hover:bg-gray-700"
     };
 
     return (
