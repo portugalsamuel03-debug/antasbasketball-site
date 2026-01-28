@@ -56,6 +56,8 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
             if (!userId) {
                 setRole('reader');
                 setIsEditing(false);
+                setIsLoading(false);
+                isRefreshing.current = false;
                 return;
             }
 
