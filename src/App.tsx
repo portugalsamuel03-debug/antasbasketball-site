@@ -283,7 +283,24 @@ export default function App() {
                 </div>
               </div>
 
-              )}
+              {/* LIST */}
+              <div className="px-6 space-y-8">
+                {filteredArticles.length === 0 ? (
+                  <EmptyState isDarkMode={isDarkMode} message={searchQuery ? "Nenhum resultado encontrado." : "Nada por aqui ainda..."} />
+                ) : (
+                  filteredArticles.map((a) => (
+                    <ArticleCard
+                      key={a.id}
+                      article={a}
+                      onClick={() => setSelectedArticle(a)}
+                      onShare={onShare}
+                      isDarkMode={isDarkMode}
+                      isAdmin={isEditing}
+                      onEdit={handleEditFromCard}
+                    />
+                  ))
+                )}
+              </div>
             </>
           )}
         </main>
