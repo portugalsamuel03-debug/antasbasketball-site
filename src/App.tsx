@@ -221,7 +221,7 @@ export default function App() {
             </div>
           )}
 
-          {activeTab === Category.INICIO && (
+          {activeTab === Category.INICIO ? (
             <>
               <FeaturedPost isDarkMode={isDarkMode} onArticleClick={setSelectedArticle} onShare={onShare} />
               <FeaturedReaders isDarkMode={isDarkMode} />
