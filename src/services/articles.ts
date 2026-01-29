@@ -276,11 +276,15 @@ export async function fetchArticleComments(articleId: string): Promise<Comment[]
     `
     )
     .eq("article_id", articleId)
-    .order("created_at", { ascending: true });
+    .eq("article_id", articleId);
+  // .order("created_at", { ascending: true }); // Removed to avoid 400 error on ambiguous column
 
   if (error) throw error;
 
   const rows = (data ?? []) as unknown as DbArticleCommentRow[];
+
+  // Client-side sort to be safe
+  rows.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
 
   return rows.map((r) => {
     const nick = (r.profiles?.nickname || r.profiles?.display_name || "Usuário").trim();

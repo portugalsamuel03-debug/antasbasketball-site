@@ -161,11 +161,16 @@ export const CategoryManager: React.FC<CategoryManagerProps> = ({ isDarkMode, on
                         <h2 className="font-black text-xl uppercase tracking-tight">
                             {selectedCategory ? `Sub: ${selectedCategory.label}` : 'Selecione uma Categoria'}
                         </h2>
-                        {selectedCategory && (
-                            <button onClick={handleAddSubcategory} className="p-2 bg-yellow-400 text-black rounded-full hover:scale-110 transition-transform">
-                                <Plus size={16} />
+                        <div className="flex gap-2">
+                            {selectedCategory && (
+                                <button onClick={handleAddSubcategory} className="p-2 bg-yellow-400 text-black rounded-full hover:scale-110 transition-transform" title="Nova Subcategoria">
+                                    <Plus size={16} />
+                                </button>
+                            )}
+                            <button onClick={onClose} className="p-2 rounded-full bg-black/10 hover:bg-black/20 transition-colors" title="Fechar">
+                                <X size={16} />
                             </button>
-                        )}
+                        </div>
                     </div>
 
                     <div className="flex-1 overflow-y-auto p-4 space-y-2">
@@ -211,10 +216,6 @@ export const CategoryManager: React.FC<CategoryManagerProps> = ({ isDarkMode, on
                         )}
                     </div>
                 </div>
-
-                <button onClick={onClose} className="absolute top-4 right-4 p-2 rounded-full bg-black/10 hover:bg-black/20 transition-colors">
-                    <X size={20} />
-                </button>
             </div>
         </div>
     );

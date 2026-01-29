@@ -152,50 +152,35 @@ const CommentItem: React.FC<{ comment: Comment; isDarkMode: boolean; meId?: stri
         <div
           className={`border rounded-2xl px-5 py-4 shadow-inner relative group ${isDarkMode ? "bg-[#161616] border-white/5" : "bg-[#F0F2F5] border-[#0B1D33]/5"}`}
         >
-          <div className="flex justify-between items-center mb-1.5">
-            <span className={`text-xs font-black uppercase tracking-wider ${isDarkMode ? "text-white" : "text-[#0B1D33]"}`}>
-              {comment.author}
-            </span>
-            <div className="flex items-center gap-2">
-              {comment.editedAt && (
-                <span className="text-[9px] text-gray-500 font-bold uppercase tracking-widest">(editado)</span>
-              )}
-              <span className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">{comment.date}</span>
+          <div className="flex justify-between items-start mb-2">
+            <div className="flex flex-col gap-1">
+              <span className={`text-xs font-black uppercase tracking-wider ${isDarkMode ? "text-white" : "text-[#0B1D33]"}`}>
+                {comment.author}
+              </span>
+              <div className="flex items-center gap-2">
+                {comment.editedAt && (
+                  <span className="text-[9px] text-gray-500 font-bold uppercase tracking-widest">(editado)</span>
+                )}
+                <span className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">{comment.date}</span>
+              </div>
             </div>
+
+            {/* Actions for Owner or Admin */}
+            {(isOwner || isAdmin) && !isEditing && (
+              <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity self-start">
+                {isOwner && (
+                  <button onClick={() => setIsEditing(true)} className="text-gray-500 hover:text-yellow-500 transition-colors" title="Editar">
+                    <Edit2 size={12} />
+                  </button>
+                )}
+                <button onClick={() => onDelete(comment.id)} className="text-gray-500 hover:text-red-500 transition-colors" title="Excluir">
+                  <Trash2 size={12} />
+                </button>
+              </div>
+            )}
           </div>
 
           {isEditing ? (
-            <div className="flex flex-col gap-2">
-              <textarea
-                value={editBody}
-                onChange={e => setEditBody(e.target.value)}
-                className={`w-full bg-transparent border-b ${isDarkMode ? 'border-white/20 text-white' : 'border-black/20 text-black'} focus:outline-none p-2 text-[13px] font-medium resize-none`}
-                autoFocus
-              />
-              <div className="flex gap-2 justify-end">
-                <button onClick={() => setIsEditing(false)} className="text-[10px] uppercase font-bold text-gray-500">Cancelar</button>
-                <button onClick={handleSaveEdit} className="text-[10px] uppercase font-black text-yellow-500">Salvar</button>
-              </div>
-            </div>
-          ) : (
-            <p className={`text-[13px] leading-relaxed font-medium whitespace-pre-wrap ${isDarkMode ? "text-gray-300" : "text-gray-700"}`}>
-              {comment.content}
-            </p>
-          )}
-
-          {/* Actions for Owner or Admin */}
-          {(isOwner || isAdmin) && !isEditing && (
-            <div className="absolute top-4 right-4 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-              {isOwner && (
-                <button onClick={() => setIsEditing(true)} className="text-gray-500 hover:text-yellow-500 transition-colors" title="Editar">
-                  <Edit2 size={12} />
-                </button>
-              )}
-              <button onClick={() => onDelete(comment.id)} className="text-gray-500 hover:text-red-500 transition-colors" title="Excluir">
-                <Trash2 size={12} />
-              </button>
-            </div>
-          )}
         </div>
 
         <div className="flex items-center gap-5 px-1 relative">
