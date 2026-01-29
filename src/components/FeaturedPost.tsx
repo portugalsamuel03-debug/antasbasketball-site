@@ -29,20 +29,20 @@ export const FeaturedPost: React.FC<FeaturedPostProps> = ({ isDarkMode, onArticl
     return (
         <div className="px-6 mb-8 mt-4">
             <div
-                className={`relative rounded-[32px] overflow-hidden shadow-2xl cursor-pointer group hover:scale-[1.02] transition-all duration-300 ${isDarkMode ? 'bg-[#1a1a1a]' : 'bg-white'}`}
+                className={`relative rounded-[32px] overflow-hidden shadow-2xl cursor-pointer group hover:scale-[1.02] hover:shadow-[0_20px_60px_rgba(250,204,21,0.2)] transition-all duration-500 ease-out ${isDarkMode ? 'bg-[#1a1a1a]' : 'bg-white'}`}
                 onClick={() => onArticleClick(article)}
             >
                 {/* Cover Image with Gradient */}
-                <div className="relative h-64 w-full">
+                <div className="relative h-64 w-full overflow-hidden">
                     <img
                         src={article.imageUrl || article.cover_url || "https://images.unsplash.com/photo-1546519638-68e109498ee2?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80"}
                         alt={article.title}
-                        className="w-full h-full object-cover"
+                        className="w-full h-full object-cover transform group-hover:scale-110 transition-transform duration-700 ease-out"
                     />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent" />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent opacity-90 group-hover:opacity-100 transition-opacity" />
 
                     {/* Badge */}
-                    <div className="absolute top-4 left-4 bg-yellow-400 text-black px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest shadow-lg">
+                    <div className="absolute top-4 left-4 bg-yellow-400 text-black px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest shadow-lg group-hover:scale-110 transition-transform origin-left">
                         Destaque
                     </div>
                 </div>

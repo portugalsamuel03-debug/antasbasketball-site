@@ -18,6 +18,9 @@ import { ArticleRow } from "./cms";
 import { useAdmin } from "./context/AdminContext";
 import { EditTrigger } from "./components/admin/EditTrigger";
 
+import { CardSkeleton } from "./components/CardSkeleton";
+import { EmptyState } from "./components/EmptyState";
+
 // Home sections
 import FeaturedReaders from "./components/FeaturedReaders";
 import FeaturedAuthors from "./components/FeaturedAuthors";
@@ -175,12 +178,16 @@ export default function App() {
   }, [articles, activeTab, searchQuery, sortOption]);
 
   // Loading Screen
-  if (isAuthLoading && articles.length === 0) {
+  if ((isAuthLoading || loadingArticles) && articles.length === 0) {
     return (
       <div className={isDarkMode ? "bg-black text-white min-h-screen" : "bg-[#FDFBF4] text-[#0B1D33] min-h-screen"}>
-        <div className="max-w-md mx-auto px-6 py-20 flex flex-col items-center">
-          <div className="text-xs font-black uppercase tracking-widest text-yellow-400 animate-pulse">Antas Basketball</div>
-          <div className="mt-4 text-sm text-gray-400">Preparando o elenco...</div>
+        <div className={`max-w-md mx-auto min-h-screen ${isDarkMode ? "bg-black" : "bg-[#FDFBF4]"}`}>
+          <Header isDarkMode={isDarkMode} onToggleTheme={() => setIsDarkMode(v => !v)} onOpenNotifications={() => setNotificationsOpen(true)} onOpenAuth={() => setAuthOpen(true)} />
+          <div className="px-6 py-4">
+            <CardSkeleton isDarkMode={isDarkMode} />
+            <CardSkeleton isDarkMode={isDarkMode} />
+            <CardSkeleton isDarkMode={isDarkMode} />
+          </div>
         </div>
       </div>
     );
@@ -190,7 +197,13 @@ export default function App() {
   if (selectedArticle) {
     return (
       <>
-        <ArticleView article={selectedArticle} onBack={() => setSelectedArticle(null)} onShare={onShare} isDarkMode={isDarkMode} />
+        <ArticleView
+          article={selectedArticle}
+          onBack={() => setSelectedArticle(null)}
+          onShare={onShare}
+          onAuthRequest={() => setAuthOpen(true)}
+          isDarkMode={isDarkMode}
+        />
         <ShareModal isOpen={shareOpen} onClose={() => setShareOpen(false)} article={shareArticle} isDarkMode={isDarkMode} />
         <AuthPopup isOpen={authOpen} onClose={() => setAuthOpen(false)} />
         <NotificationPopup isOpen={notificationsOpen} onClose={() => setNotificationsOpen(false)} isDarkMode={isDarkMode} />
@@ -258,9 +271,11 @@ export default function App() {
                 <div className="text-[10px] font-black uppercase tracking-widest text-gray-500">Admin Mode ({activeTab})</div>
                 <div className="flex gap-2">
                   {/* Open Category Manager */}
-                  <button onClick={() => setCategoryManagerOpen(true)} className="p-2 bg-gray-200 dark:bg-gray-800 rounded-full hover:scale-110 transition-transform">
-                    <List size={14} className={isDarkMode ? 'text-white' : 'text-black'} />
-                  </button>
+                  {isEditing && (
+                    <button onClick={() => setCategoryManagerOpen(true)} className="text-gray-500 hover:text-yellow-500" title="Gerenciar Categorias">
+                      <List size={14} />
+                    </button>
+                  )}
                   <EditTrigger type="add" onClick={() => {
                     const dbMap: Record<string, string> = { 'INÍCIO': 'INICIO', 'NOTÍCIAS': 'NOTICIAS', 'HISTÓRIA': 'HISTORIA', 'REGRAS': 'REGRAS', 'PODCAST': 'PODCAST', 'STATUS': 'STATUS' };
                     setEditingArticleDetails({ category: dbMap[String(activeTab)] || String(activeTab) });
@@ -268,14 +283,6 @@ export default function App() {
                 </div>
               </div>
 
-              {loadingArticles && articles.length === 0 ? (
-                <div className="px-6 text-sm text-gray-400 animate-pulse">Aquecendo motores...</div>
-              ) : filteredArticles.length === 0 ? (
-                <div className="px-6 text-sm text-gray-400">Nada por aqui ainda {searchQuery ? `pra “${searchQuery}”.` : "nessa categoria."}</div>
-              ) : (
-                <div className="px-6 space-y-4">
-                  {filteredArticles.map(a => <ArticleCard key={a.id} article={a} onClick={() => setSelectedArticle(a)} onShare={onShare} isDarkMode={isDarkMode} isAdmin={isEditing} onEdit={handleEditFromCard} />)}
-                </div>
               )}
             </>
           )}
