@@ -181,6 +181,23 @@ const CommentItem: React.FC<{ comment: Comment; isDarkMode: boolean; meId?: stri
           </div>
 
           {isEditing ? (
+            <div className="flex flex-col gap-2">
+              <textarea
+                value={editBody}
+                onChange={e => setEditBody(e.target.value)}
+                className={`w-full bg-transparent border-b ${isDarkMode ? 'border-white/20 text-white' : 'border-black/20 text-black'} focus:outline-none p-2 text-[13px] font-medium resize-none`}
+                autoFocus
+              />
+              <div className="flex gap-2 justify-end">
+                <button onClick={() => setIsEditing(false)} className="text-[10px] uppercase font-bold text-gray-500">Cancelar</button>
+                <button onClick={handleSaveEdit} className="text-[10px] uppercase font-black text-yellow-500">Salvar</button>
+              </div>
+            </div>
+          ) : (
+            <p className={`text-[13px] leading-relaxed font-medium whitespace-pre-wrap ${isDarkMode ? "text-gray-300" : "text-gray-700"}`}>
+              {comment.content}
+            </p>
+          )}
         </div>
 
         <div className="flex items-center gap-5 px-1 relative">
