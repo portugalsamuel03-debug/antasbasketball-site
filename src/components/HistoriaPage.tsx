@@ -1,38 +1,32 @@
-
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Article, Champion, HallOfFame, TeamRow } from '../types';
-import { listChampions, upsertChampion, deleteChampion, listHallOfFame, upsertHallOfFame, deleteHallOfFame, listTeams, upsertTeam, deleteTeam } from '../cms';
+import { listChampions, upsertChampion, deleteChampion, listHallOfFame, upsertHallOfFame, deleteHallOfFame } from '../cms';
 import ArticleCard from './ArticleCard';
 import SectionTitle from './SectionTitle';
 import { EditTrigger } from './admin/EditTrigger';
 import { useAdmin } from '../context/AdminContext';
-import { Trophy, Crown } from 'lucide-react';
+import { Trophy, Crown, ChevronLeft, ChevronRight, BookOpen } from 'lucide-react';
 import { HallOfFameDetailsModal } from './admin/HallOfFameDetailsModal';
 import { AwardsSection } from './admin/AwardsSection';
 import { TradesSection } from './admin/TradesSection';
+import { ChampionDetailsModal } from './admin/ChampionDetailsModal';
+import { ManagersSection } from './admin/ManagersSection';
+import { RecordsSection } from './admin/RecordsSection';
+import { SeasonsSection } from './admin/SeasonsSection';
+import { TeamsSection } from './admin/TeamsSection';
+import { HistoryStoryModal } from './HistoryStoryModal';
 
 interface HistoriaPageProps {
     articles: Article[];
     isDarkMode: boolean;
     onArticleClick: (article: Article) => void;
     onShare: (article: Article) => void;
-    onEditArticle: (id: string) => void;
+    onEditArticle: (id: string, section?: string) => void;
 }
 
 type SubTab = 'ARTIGOS' | 'CAMPEOES' | 'HALL_OF_FAME' | 'TIMES' | 'AWARDS' | 'TRADES' | 'GESTORES' | 'RECORDES' | 'TEMPORADAS';
 
 // --- CHAMPIONS SECTION ---
-import { ChampionDetailsModal } from './admin/ChampionDetailsModal';
-import { ManagersSection } from './admin/ManagersSection';
-import { RecordsSection } from './admin/RecordsSection';
-import { ChampionDetailsModal } from './admin/ChampionDetailsModal';
-import { ManagersSection } from './admin/ManagersSection';
-import { RecordsSection } from './admin/RecordsSection';
-import { SeasonsSection } from './admin/SeasonsSection';
-import { TeamsSection } from './admin/TeamsSection'; // Extracted
-import { ChevronLeft, ChevronRight } from 'lucide-react';
-import { useRef } from 'react';
-
 const ChampionsSection: React.FC<{ isDarkMode: boolean }> = ({ isDarkMode }) => {
     const [champions, setChampions] = useState<Champion[]>([]);
     const { isEditing } = useAdmin();
@@ -105,11 +99,6 @@ const ChampionsSection: React.FC<{ isDarkMode: boolean }> = ({ isDarkMode }) => 
         </div>
     );
 };
-
-// --- TEAMS SECTION ---
-import { TeamDetailsModal } from './admin/TeamDetailsModal';
-
-// TeamsSection is now imported
 
 // --- HALL OF FAME SECTION ---
 const HallOfFameSection: React.FC<{ isDarkMode: boolean }> = ({ isDarkMode }) => {
@@ -193,25 +182,33 @@ const HistoriaPage: React.FC<HistoriaPageProps> = ({ articles, isDarkMode, onArt
     const { isEditing } = useAdmin();
     const [subTab, setSubTab] = useState<SubTab>('ARTIGOS');
     const scrollRef = useRef<HTMLDivElement>(null);
+    const [showStory, setShowStory] = useState(false);
 
     const scroll = (direction: 'left' | 'right') => {
         if (scrollRef.current) {
             const amount = direction === 'left' ? -200 : 200;
-            // Use directly scrollLeft for reliability
             scrollRef.current.scrollLeft += amount;
         }
     };
 
     return (
         <>
-            <SectionTitle
-                title="HISTÓRIA"
-                sortOption="RECENTES"
-                onSortChange={() => { }}
-                isDarkMode={isDarkMode}
-            />
+            <div className="relative">
+                <SectionTitle
+                    title="HISTÓRIA"
+                    sortOption="RECENTES"
+                    onSortChange={() => { }}
+                    isDarkMode={isDarkMode}
+                />
+                <button
+                    onClick={() => setShowStory(true)}
+                    className={`absolute right-16 top-6 flex items-center gap-2 px-3 py-1.5 rounded-full transition-all ${isDarkMode ? 'bg-yellow-400/10 text-yellow-400 hover:bg-yellow-400/20' : 'bg-[#0B1D33]/5 text-[#0B1D33] hover:bg-[#0B1D33]/10'}`}
+                >
+                    <BookOpen size={14} strokeWidth={2.5} />
+                    <span className="text-[10px] font-black uppercase tracking-widest">Nossa História</span>
+                </button>
+            </div>
 
-            {/* SubTabs with Arrows */}
             <div className={`sticky top-[52px] z-30 py-2 border-b border-white/10 ${isDarkMode ? 'bg-black/95 backdrop-blur-md' : 'bg-[#FDFBF4]/95 backdrop-blur-md'}`}>
                 <div className="relative flex items-center px-2">
                     <button
@@ -279,6 +276,8 @@ const HistoriaPage: React.FC<HistoriaPageProps> = ({ articles, isDarkMode, onArt
             {subTab === 'TRADES' && <TradesSection isDarkMode={isDarkMode} />}
             {subTab === 'TIMES' && <TeamsSection isDarkMode={isDarkMode} />}
             {subTab === 'GESTORES' && <ManagersSection isDarkMode={isDarkMode} />}
+
+            {showStory && <HistoryStoryModal onClose={() => setShowStory(false)} isDarkMode={isDarkMode} />}
         </>
     );
 };
