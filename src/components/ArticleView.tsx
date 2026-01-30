@@ -657,9 +657,9 @@ const ArticleView: React.FC<ArticleViewProps> = ({ article, onBack, onShare, isD
           </div>
         </div>
       </div >
-    </div >
 
-      { editingArticle && (
+
+      {editingArticle && (
         <EditArticleModal
           article={editingArticle}
           isDarkMode={isDarkMode}
@@ -672,7 +672,7 @@ const ArticleView: React.FC<ArticleViewProps> = ({ article, onBack, onShare, isD
           }}
         />
       )
-}
+      }
     </>
   );
 };
