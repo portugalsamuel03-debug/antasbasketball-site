@@ -28,7 +28,7 @@ import { useRef } from 'react';
 
 const ChampionsSection: React.FC<{ isDarkMode: boolean }> = ({ isDarkMode }) => {
     const [champions, setChampions] = useState<Champion[]>([]);
-    // ...    // ...    const { isEditing } = useAdmin();
+    const { isEditing } = useAdmin();
     const [selectedChampion, setSelectedChampion] = useState<Partial<Champion> | null>(null);
 
     const fetchChampions = async () => {
