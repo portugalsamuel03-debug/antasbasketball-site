@@ -43,6 +43,11 @@ export const AwardPopup: React.FC<AwardPopupProps> = ({ award, isDarkMode, onClo
                             {award.team.name}
                         </div>
                     )}
+                    {award.description && (
+                        <div className={`mt-4 text-xs ${subTextClass} px-4 leading-relaxed`}>
+                            {award.description}
+                        </div>
+                    )}
                 </div>
 
                 <button

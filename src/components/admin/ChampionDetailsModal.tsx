@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { upsertChampion } from '../../cms';
-import { Champion } from '../../types';
+import { upsertChampion, listTeams } from '../../cms';
+import { Champion, TeamRow } from '../../types';
 import { EditTrigger } from './EditTrigger';
 import { useAdmin } from '../../context/AdminContext';
 import { Trophy, Image as ImageIcon, Loader2 } from 'lucide-react';
@@ -28,6 +28,12 @@ export const ChampionDetailsModal: React.FC<ChampionDetailsModalProps> = ({ cham
             setIsEditMode(true);
         }
     }, [champion, isEditing]);
+
+    const [teams, setTeams] = useState<TeamRow[]>([]);
+
+    React.useEffect(() => {
+        listTeams().then(({ data }) => setTeams(data as TeamRow[] || []));
+    }, []);
 
     const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
@@ -139,7 +145,19 @@ export const ChampionDetailsModal: React.FC<ChampionDetailsModalProps> = ({ cham
 
                             <div>
                                 <label className="text-[10px] font-bold uppercase text-gray-500 block text-left">Time Campeão</label>
-                                <input value={formData.team || ''} onChange={e => setFormData({ ...formData, team: e.target.value })} className={`${inputClass} uppercase`} placeholder="NOME DO TIME" />
+                                <select
+                                    value={teams.find(t => t.name === formData.team)?.id || ''}
+                                    onChange={e => {
+                                        const t = teams.find(team => team.id === e.target.value);
+                                        if (t) setFormData({ ...formData, team: t.name, team_id: t.id, logo_url: t.logo_url });
+                                    }}
+                                    className={`${inputClass} uppercase`}
+                                >
+                                    <option value="">Selecione um time...</option>
+                                    {teams.map(t => (
+                                        <option key={t.id} value={t.id}>{t.name}</option>
+                                    ))}
+                                </select>
                             </div>
 
                             <div>

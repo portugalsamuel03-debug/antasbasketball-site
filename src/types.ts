@@ -150,6 +150,7 @@ export interface Award {
   winner_name: string;
   team_id?: string;
   team?: Team;
+  description?: string;
 }
 
 export interface Trade {

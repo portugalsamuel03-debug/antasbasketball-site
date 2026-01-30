@@ -13,6 +13,7 @@ export const AwardDetailsModal: React.FC<AwardDetailsModalProps> = ({ award, isD
     const [editing, setEditing] = useState<Partial<Award>>(award);
     const [teams, setTeams] = useState<Team[]>([]);
     const [msg, setMsg] = useState<string | null>(null);
+    const [categories, setCategories] = useState<string[]>(['MVP', 'GM do Ano', 'Defensor do Ano', 'Sexto Homem', 'Melhor Trade', 'Pior Trade']);
 
     useEffect(() => {
         fetchTeams();
@@ -73,10 +74,14 @@ export const AwardDetailsModal: React.FC<AwardDetailsModalProps> = ({ award, isD
                         <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-2">Categoria</label>
                         <input
                             className={inputClass}
-                            placeholder="MVP, GM do Ano, Melhor Trade, etc."
+                            placeholder="MVP, GM do Ano, etc."
+                            list="categories-list"
                             value={editing.category || ''}
                             onChange={e => setEditing({ ...editing, category: e.target.value })}
                         />
+                        <datalist id="categories-list">
+                            {categories.map(c => <option key={c} value={c} />)}
+                        </datalist>
                     </div>
 
                     <div>
@@ -86,6 +91,17 @@ export const AwardDetailsModal: React.FC<AwardDetailsModalProps> = ({ award, isD
                             placeholder="Nome do vencedor"
                             value={editing.winner_name || ''}
                             onChange={e => setEditing({ ...editing, winner_name: e.target.value })}
+                        />
+                    </div>
+
+                    <div>
+                        <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-2">Descrição (Opcional)</label>
+                        <textarea
+                            className={inputClass}
+                            placeholder="Detalhes sobre o prêmio..."
+                            rows={3}
+                            value={editing.description || ''}
+                            onChange={e => setEditing({ ...editing, description: e.target.value })}
                         />
                     </div>
 
