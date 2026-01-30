@@ -19,7 +19,7 @@ interface HistoriaPageProps {
     onEditArticle: (id: string) => void;
 }
 
-type SubTab = 'ARTIGOS' | 'CAMPEOES' | 'HALL_OF_FAME' | 'TIMES';
+type SubTab = 'ARTIGOS' | 'CAMPEOES' | 'HALL_OF_FAME' | 'TIMES' | 'AWARDS' | 'TRADES' | 'GESTORES';
 
 // --- CHAMPIONS SECTION ---
 import { ChampionDetailsModal } from './admin/ChampionDetailsModal';
@@ -273,7 +273,7 @@ const HistoriaPage: React.FC<HistoriaPageProps> = ({ articles, isDarkMode, onArt
                     </button>
 
                     <div ref={scrollRef} className="flex-1 overflow-x-auto flex items-center px-2 no-scrollbar gap-2 scroll-smooth">
-                        {(['ARTIGOS', 'CAMPEOES', 'HALL_OF_FAME', 'AWARDS', 'TRADES', 'TIMES'] as SubTab[]).map(tab => (
+                        {(['ARTIGOS', 'CAMPEOES', 'HALL_OF_FAME', 'AWARDS', 'TRADES', 'TIMES', 'GESTORES'] as SubTab[]).map(tab => (
                             <button
                                 key={tab}
                                 onClick={() => setSubTab(tab)}
@@ -327,6 +327,7 @@ const HistoriaPage: React.FC<HistoriaPageProps> = ({ articles, isDarkMode, onArt
             {subTab === 'AWARDS' && <AwardsSection isDarkMode={isDarkMode} />}
             {subTab === 'TRADES' && <TradesSection isDarkMode={isDarkMode} />}
             {subTab === 'TIMES' && <TeamsSection isDarkMode={isDarkMode} />}
+            {subTab === 'GESTORES' && <ManagersSection isDarkMode={isDarkMode} />}
         </>
     );
 };
