@@ -24,6 +24,26 @@ export const AuthorDetailsModal: React.FC<AuthorDetailsModalProps> = ({ author, 
         const payload = { ...formData };
         if (payload.id === "") delete (payload as any).id;
 
+        // Auto-generate slug if empty or if creating new
+        if (!payload.slug || payload.slug === '') {
+            payload.slug = payload.name
+                .toLowerCase()
+                .normalize("NFD")
+                .replace(/[\u0300-\u036f]/g, "")
+                .replace(/[^a-z0-9]/g, "-")
+                .replace(/-+/g, "-")
+                .replace(/^-|-$/g, "");
+        } else {
+            // Also sanitize existing slug just in case
+            payload.slug = payload.slug
+                .toLowerCase()
+                .normalize("NFD")
+                .replace(/[\u0300-\u036f]/g, "")
+                .replace(/[^a-z0-9]/g, "-")
+                .replace(/-+/g, "-")
+                .replace(/^-|-$/g, "");
+        }
+
         const { error } = await upsertAuthor(payload);
         if (error) {
             console.error(error);

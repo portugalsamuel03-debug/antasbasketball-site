@@ -32,3 +32,13 @@ BEGIN
     END IF;
 END
 $$;
+
+-- IMPORTANT: Grant admin access to the main user
+-- This requires access to auth.users which is available in Supabase SQL Editor
+DO $$
+BEGIN
+    UPDATE profiles 
+    SET is_admin = true 
+    WHERE id IN (SELECT id FROM auth.users WHERE email = 'portugalsamuel03@gmail.com');
+END
+$$;
