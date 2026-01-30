@@ -262,9 +262,11 @@ export default function App() {
             </>
           ) : null}
 
-          {activeTab === Category.HISTORIA ? (
+          {activeTab === Category.HISTORIA && (
             <HistoriaPage articles={filteredArticles} isDarkMode={isDarkMode} onArticleClick={setSelectedArticle} onShare={onShare} onEditArticle={handleEditFromCard} />
-          ) : activeTab !== Category.INICIO && (
+          )}
+
+          {activeTab !== Category.INICIO && activeTab !== Category.HISTORIA && (
             <>
               <SectionTitle title={String(activeTab)} sortOption={sortOption} onSortChange={setSortOption} isDarkMode={isDarkMode} />
               <div className="px-6 mb-4 flex justify-between items-center group/admin">
