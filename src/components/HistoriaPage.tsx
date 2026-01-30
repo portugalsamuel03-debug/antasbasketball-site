@@ -265,10 +265,10 @@ const HistoriaPage: React.FC<HistoriaPageProps> = ({ articles, isDarkMode, onArt
             <div className={`sticky top-[52px] z-30 py-2 border-b border-white/10 ${isDarkMode ? 'bg-black/95 backdrop-blur-md' : 'bg-[#FDFBF4]/95 backdrop-blur-md'}`}>
                 <div className="relative flex items-center px-2">
                     <button
-                        className="p-2 z-10 shrink-0 hover:bg-white/10 rounded-full transition-colors"
+                        className="p-2 z-10 shrink-0 w-8 h-8 rounded-full bg-yellow-400 text-black shadow-lg flex items-center justify-center transition-transform active:scale-95"
                         onClick={() => scroll('left')}
                     >
-                        <ChevronLeft size={16} className={isDarkMode ? 'text-white' : 'text-black'} />
+                        <ChevronLeft size={16} strokeWidth={3} />
                     </button>
 
                     <div ref={scrollRef} className="flex-1 overflow-x-auto flex items-center px-2 no-scrollbar gap-2 scroll-smooth">
@@ -287,10 +287,10 @@ const HistoriaPage: React.FC<HistoriaPageProps> = ({ articles, isDarkMode, onArt
                     </div>
 
                     <button
-                        className="p-2 z-10 shrink-0 hover:bg-white/10 rounded-full transition-colors"
+                        className="p-2 z-10 shrink-0 w-8 h-8 rounded-full bg-yellow-400 text-black shadow-lg flex items-center justify-center transition-transform active:scale-95"
                         onClick={() => scroll('right')}
                     >
-                        <ChevronRight size={16} className={isDarkMode ? 'text-white' : 'text-black'} />
+                        <ChevronRight size={16} strokeWidth={3} />
                     </button>
                 </div>
             </div>
