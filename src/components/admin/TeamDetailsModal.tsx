@@ -91,6 +91,21 @@ export const TeamDetailsModal: React.FC<TeamDetailsModalProps> = ({ team, onClos
                                 <input value={formData.logo_url || ''} onChange={e => setFormData({ ...formData, logo_url: e.target.value })} className={`${inputClass}`} placeholder="https://..." />
                             </div>
 
+                            <div>
+                                <label className="text-[10px] font-bold uppercase text-gray-500 block text-left">GM / Dono</label>
+                                <input value={formData.gm_name || ''} onChange={e => setFormData({ ...formData, gm_name: e.target.value })} className={`${inputClass} font-bold`} placeholder="Nome do GM" />
+                            </div>
+
+                            <div>
+                                <label className="text-[10px] font-bold uppercase text-gray-500 block text-left">Descrição</label>
+                                <textarea
+                                    value={formData.description || ''}
+                                    onChange={e => setFormData({ ...formData, description: e.target.value })}
+                                    className={`${inputClass} min-h-[80px]`}
+                                    placeholder="História do time..."
+                                />
+                            </div>
+
                             <button onClick={handleSave} className="w-full py-3 mt-4 bg-yellow-400 text-black rounded-xl text-xs font-black uppercase tracking-widest shadow-lg shadow-yellow-400/20 active:scale-95 transition-transform">
                                 Salvar Time
                             </button>
@@ -109,8 +124,8 @@ export const TeamDetailsModal: React.FC<TeamDetailsModalProps> = ({ team, onClos
                             {/* Divider */}
                             <div className={`w-8 h-1 mx-auto rounded-full ${isDarkMode ? 'bg-white/10' : 'bg-black/10'}`} />
 
-                            <p className={`text-xs px-4 ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-                                Participante das ligas oficiais do Antas Basketball.
+                            <p className={`text-xs px-4 ${isDarkMode ? 'text-gray-400' : 'text-gray-600'} whitespace-pre-wrap`}>
+                                {team.description || "Participante das ligas oficiais do Antas Basketball."}
                             </p>
                         </>
                     )}

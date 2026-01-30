@@ -151,11 +151,11 @@ export const ChampionDetailsModal: React.FC<ChampionDetailsModalProps> = ({ cham
                                         const t = teams.find(team => team.id === e.target.value);
                                         if (t) setFormData({ ...formData, team: t.name, team_id: t.id, logo_url: t.logo_url });
                                     }}
-                                    className={`${inputClass} uppercase`}
+                                    className={`${inputClass} uppercase appearance-none ${isDarkMode ? 'bg-[#1a2c42]' : 'bg-white'}`}
                                 >
-                                    <option value="">Selecione um time...</option>
+                                    <option value="" className={isDarkMode ? 'bg-[#0B1D33] text-white' : 'bg-white text-black'}>Selecione um time...</option>
                                     {teams.map(t => (
-                                        <option key={t.id} value={t.id}>{t.name}</option>
+                                        <option key={t.id} value={t.id} className={isDarkMode ? 'bg-[#0B1D33] text-white' : 'bg-white text-black'}>{t.name}</option>
                                     ))}
                                 </select>
                             </div>

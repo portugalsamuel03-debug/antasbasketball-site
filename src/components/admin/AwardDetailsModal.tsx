@@ -108,13 +108,13 @@ export const AwardDetailsModal: React.FC<AwardDetailsModalProps> = ({ award, isD
                     <div>
                         <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-2">Time (Opcional)</label>
                         <select
-                            className={inputClass}
+                            className={`${inputClass} appearance-none ${isDarkMode ? 'bg-[#1a2c42]' : 'bg-white'}`}
                             value={editing.team_id || ''}
                             onChange={e => setEditing({ ...editing, team_id: e.target.value })}
                         >
-                            <option value="">Nenhum</option>
+                            <option value="" className={isDarkMode ? 'bg-[#0B1D33] text-white' : 'bg-white text-black'}>Nenhum</option>
                             {teams.map(team => (
-                                <option key={team.id} value={team.id}>
+                                <option key={team.id} value={team.id} className={isDarkMode ? 'bg-[#0B1D33] text-white' : 'bg-white text-black'}>
                                     {team.name} - {team.gm_name}
                                 </option>
                             ))}

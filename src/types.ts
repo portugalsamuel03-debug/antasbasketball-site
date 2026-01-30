@@ -72,7 +72,9 @@ export type HallOfFameRow = HallOfFame;
 export interface TeamRow {
   id: string;
   name: string;
+  gm_name: string;
   logo_url?: string;
+  description?: string;
 }
 
 export interface TagDefinitionRow {

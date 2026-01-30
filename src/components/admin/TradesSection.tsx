@@ -59,7 +59,7 @@ export const TradesSection: React.FC<TradesSectionProps> = ({ isDarkMode }) => {
         <div className="px-6 pb-20">
             {isEditing && (
                 <div className="flex justify-between items-center mb-4">
-                    <div className="text-[10px] font-black uppercase tracking-widest text-gray-500">Admin: Trades</div>
+                    <div className="text-[10px] font-black uppercase tracking-widest text-gray-500">Admin: Trades Históricas</div>
                     <EditTrigger type="add" onClick={handleCreate} />
                 </div>
             )}

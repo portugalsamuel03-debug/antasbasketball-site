@@ -23,6 +23,7 @@ type SubTab = 'ARTIGOS' | 'CAMPEOES' | 'HALL_OF_FAME' | 'TIMES';
 
 // --- CHAMPIONS SECTION ---
 import { ChampionDetailsModal } from './admin/ChampionDetailsModal';
+import { ManagersSection } from './admin/ManagersSection';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { useRef } from 'react';
 
