@@ -19,11 +19,17 @@ interface HistoriaPageProps {
     onEditArticle: (id: string) => void;
 }
 
-type SubTab = 'ARTIGOS' | 'CAMPEOES' | 'HALL_OF_FAME' | 'TIMES' | 'AWARDS' | 'TRADES' | 'GESTORES';
+type SubTab = 'ARTIGOS' | 'CAMPEOES' | 'HALL_OF_FAME' | 'TIMES' | 'AWARDS' | 'TRADES' | 'GESTORES' | 'RECORDES' | 'TEMPORADAS';
 
 // --- CHAMPIONS SECTION ---
 import { ChampionDetailsModal } from './admin/ChampionDetailsModal';
 import { ManagersSection } from './admin/ManagersSection';
+import { RecordsSection } from './admin/RecordsSection';
+import { ChampionDetailsModal } from './admin/ChampionDetailsModal';
+import { ManagersSection } from './admin/ManagersSection';
+import { RecordsSection } from './admin/RecordsSection';
+import { SeasonsSection } from './admin/SeasonsSection';
+import { TeamsSection } from './admin/TeamsSection'; // Extracted
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { useRef } from 'react';
 
@@ -103,64 +109,7 @@ const ChampionsSection: React.FC<{ isDarkMode: boolean }> = ({ isDarkMode }) => 
 // --- TEAMS SECTION ---
 import { TeamDetailsModal } from './admin/TeamDetailsModal';
 
-const TeamsSection: React.FC<{ isDarkMode: boolean }> = ({ isDarkMode }) => {
-    const [teams, setTeams] = useState<TeamRow[]>([]);
-    const { isEditing } = useAdmin();
-    const [selectedTeam, setSelectedTeam] = useState<Partial<TeamRow> | null>(null);
-
-    const fetchTeams = async () => {
-        const { data } = await listTeams();
-        if (data) setTeams(data as TeamRow[]);
-    };
-
-    useEffect(() => { fetchTeams(); }, []);
-
-    const handleDelete = async (id: string, e: React.MouseEvent) => {
-        e.stopPropagation();
-        if (confirm('Apagar este time?')) {
-            await deleteTeam(id);
-            fetchTeams();
-        }
-    };
-
-    return (
-        <div className="space-y-4 px-6 pb-20">
-            <div className="flex justify-between items-center">
-                <div className="text-xs font-black uppercase tracking-widest text-gray-500">Lista de Times</div>
-                {isEditing && <EditTrigger type="add" onClick={() => setSelectedTeam({})} />}
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-                {teams.map((t) => (
-                    <div
-                        key={t.id}
-                        onClick={() => setSelectedTeam(t)}
-                        className={`relative p-5 rounded-[24px] border flex flex-col items-center text-center gap-3 cursor-pointer transition-all active:scale-95 ${isDarkMode ? 'bg-white/5 border-white/10 hover:bg-white/10' : 'bg-white border-[#0B1D33]/10 hover:bg-[#0B1D33]/5'}`}
-                    >
-                        {isEditing && (
-                            <div className="absolute -top-2 -right-2 z-10">
-                                <EditTrigger type="delete" size={14} onClick={(e) => handleDelete(t.id, e)} />
-                            </div>
-                        )}
-                        <div className="w-16 h-16 rounded-2xl bg-white/5 flex items-center justify-center p-2">
-                            {t.logo_url ? <img src={t.logo_url} className="w-full h-full object-contain" /> : <Trophy className="text-yellow-500/20" />}
-                        </div>
-                        <div className={`text-xs font-black uppercase ${isDarkMode ? 'text-white' : 'text-[#0B1D33]'}`}>{t.name}</div>
-                    </div>
-                ))}
-            </div>
-
-            {selectedTeam && (
-                <TeamDetailsModal
-                    team={selectedTeam}
-                    isDarkMode={isDarkMode}
-                    onClose={() => setSelectedTeam(null)}
-                    onUpdate={fetchTeams}
-                />
-            )}
-        </div>
-    );
-}
+// TeamsSection is now imported
 
 // --- HALL OF FAME SECTION ---
 const HallOfFameSection: React.FC<{ isDarkMode: boolean }> = ({ isDarkMode }) => {
@@ -273,7 +222,7 @@ const HistoriaPage: React.FC<HistoriaPageProps> = ({ articles, isDarkMode, onArt
                     </button>
 
                     <div ref={scrollRef} className="flex-1 overflow-x-auto flex items-center px-2 no-scrollbar gap-2 scroll-smooth">
-                        {(['ARTIGOS', 'CAMPEOES', 'HALL_OF_FAME', 'AWARDS', 'TRADES', 'TIMES', 'GESTORES'] as SubTab[]).map(tab => (
+                        {(['ARTIGOS', 'CAMPEOES', 'RECORDES', 'TEMPORADAS', 'HALL_OF_FAME', 'AWARDS', 'TRADES', 'TIMES', 'GESTORES'] as SubTab[]).map(tab => (
                             <button
                                 key={tab}
                                 onClick={() => setSubTab(tab)}
@@ -323,6 +272,8 @@ const HistoriaPage: React.FC<HistoriaPageProps> = ({ articles, isDarkMode, onArt
             )}
 
             {subTab === 'CAMPEOES' && <ChampionsSection isDarkMode={isDarkMode} />}
+            {subTab === 'RECORDES' && <RecordsSection isDarkMode={isDarkMode} />}
+            {subTab === 'TEMPORADAS' && <SeasonsSection isDarkMode={isDarkMode} />}
             {subTab === 'HALL_OF_FAME' && <HallOfFameSection isDarkMode={isDarkMode} />}
             {subTab === 'AWARDS' && <AwardsSection isDarkMode={isDarkMode} />}
             {subTab === 'TRADES' && <TradesSection isDarkMode={isDarkMode} />}

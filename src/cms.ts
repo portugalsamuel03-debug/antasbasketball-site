@@ -290,7 +290,7 @@ export async function markAllNotificationsRead() {
 
 // Teams
 export async function listTeams() {
-  return supabase.from("teams").select("*").order("name", { ascending: true });
+  return supabase.from("teams").select("*, manager:managers(id, name, avatar_url)").order("name", { ascending: true });
 }
 
 export async function getTeam(id: string) {

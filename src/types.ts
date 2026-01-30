@@ -75,6 +75,9 @@ export interface TeamRow {
   gm_name: string;
   logo_url?: string;
   description?: string;
+  manager_id?: string;
+  manager?: { id: string; name: string; avatar_url: string };
+  is_active?: boolean;
 }
 
 export interface TagDefinitionRow {
@@ -143,6 +146,8 @@ export interface Team {
   name: string;
   gm_name: string;
   logo_url?: string;
+  manager_id?: string;
+  is_active?: boolean;
 }
 
 export interface Award {
@@ -168,3 +173,45 @@ export interface Trade {
 
 export type AwardRow = Award;
 export type TradeRow = Trade;
+
+export interface RecordItem {
+  id: string;
+  title: string;
+  description: string;
+  order: number;
+}
+
+export interface Season {
+  id: string;
+  year: string;
+  summary: string;
+}
+
+export interface SeasonStanding {
+  id: string;
+  season_id: string;
+  team_id: string;
+  wins: number;
+  losses: number;
+  ties: number;
+  trades_count: number;
+  position: number;
+  team?: Team; // Join
+}
+
+// Updated Champion with manager_id and historic_players
+export interface Champion {
+  id: string;
+  year: string;
+  team: string;
+  mvp: string; // Keep for backward compatibility or display text
+  manager_id?: string;
+  manager?: { id: string; name: string; avatar_url: string }; // Join
+  score: string;
+  logo_url?: string;
+  team_id?: string;
+  historic_players?: { name: string; icon?: string }[];
+}
+
+export type ChampionRow = Champion;
+export type HallOfFameRow = HallOfFame;
