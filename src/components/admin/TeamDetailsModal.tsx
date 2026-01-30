@@ -35,6 +35,7 @@ export const TeamDetailsModal: React.FC<TeamDetailsModalProps> = ({ team, onClos
         const { error } = await upsertTeam(payload);
         if (error) {
             console.error(error);
+            alert(`Erro ao salvar time: ${error.message}`);
             setMsg("Erro ao salvar.");
             return;
         }

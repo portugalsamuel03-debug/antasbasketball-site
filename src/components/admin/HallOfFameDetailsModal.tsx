@@ -35,6 +35,7 @@ export const HallOfFameDetailsModal: React.FC<HallOfFameDetailsModalProps> = ({ 
         const { error } = await upsertHallOfFame(payload);
         if (error) {
             console.error(error);
+            alert(`Erro ao salvar: ${error.message}`);
             setMsg("Erro ao salvar.");
             return;
         }

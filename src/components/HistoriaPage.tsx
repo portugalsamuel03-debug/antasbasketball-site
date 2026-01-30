@@ -23,10 +23,11 @@ type SubTab = 'ARTIGOS' | 'CAMPEOES' | 'HALL_OF_FAME' | 'TIMES';
 
 // --- CHAMPIONS SECTION ---
 import { ChampionDetailsModal } from './admin/ChampionDetailsModal';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 
 const ChampionsSection: React.FC<{ isDarkMode: boolean }> = ({ isDarkMode }) => {
     const [champions, setChampions] = useState<Champion[]>([]);
-    const { isEditing } = useAdmin();
+    // ...    const { isEditing } = useAdmin();
     const [selectedChampion, setSelectedChampion] = useState<Partial<Champion> | null>(null);
 
     const fetchChampions = async () => {
@@ -250,20 +251,44 @@ const HistoriaPage: React.FC<HistoriaPageProps> = ({ articles, isDarkMode, onArt
                 isDarkMode={isDarkMode}
             />
 
-            {/* SubTabs */}
-            <div className="px-6 mb-6 flex items-center gap-2 overflow-x-auto no-scrollbar">
-                {(['ARTIGOS', 'CAMPEOES', 'HALL_OF_FAME', 'AWARDS', 'TRADES', 'TIMES'] as SubTab[]).map(tab => (
+            {/* SubTabs with Arrows */}
+            <div className={`sticky top-[52px] z-30 py-2 border-b border-white/10 ${isDarkMode ? 'bg-black/95 backdrop-blur-md' : 'bg-[#FDFBF4]/95 backdrop-blur-md'}`}>
+                <div className="relative flex items-center px-2">
                     <button
-                        key={tab}
-                        onClick={() => setSubTab(tab)}
-                        className={`px-4 py-2 rounded-full text-[10px] font-black uppercase tracking-widest whitespace-nowrap transition-all ${subTab === tab
-                            ? 'bg-yellow-400 text-black'
-                            : isDarkMode ? 'bg-white/5 text-gray-400' : 'bg-[#0B1D33]/5 text-gray-500'
-                            }`}
+                        className="p-2 z-10 shrink-0"
+                        onClick={() => {
+                            const container = document.getElementById('historia-subtabs');
+                            if (container) container.scrollBy({ left: -100, behavior: 'smooth' });
+                        }}
                     >
-                        {tab.replace(/_/g, ' ')}
+                        <ChevronLeft size={16} className={isDarkMode ? 'text-white' : 'text-black'} />
                     </button>
-                ))}
+
+                    <div id="historia-subtabs" className="overflow-x-auto flex items-center px-2 no-scrollbar gap-2 scroll-smooth">
+                        {(['ARTIGOS', 'CAMPEOES', 'HALL_OF_FAME', 'AWARDS', 'TRADES', 'TIMES'] as SubTab[]).map(tab => (
+                            <button
+                                key={tab}
+                                onClick={() => setSubTab(tab)}
+                                className={`px-4 py-2 rounded-full text-[10px] font-black uppercase tracking-widest whitespace-nowrap transition-all ${subTab === tab
+                                    ? 'bg-yellow-400 text-black shadow-lg shadow-yellow-400/20 scale-105'
+                                    : isDarkMode ? 'bg-white/5 text-gray-400' : 'bg-[#0B1D33]/5 text-gray-500'
+                                    }`}
+                            >
+                                {tab.replace(/_/g, ' ')}
+                            </button>
+                        ))}
+                    </div>
+
+                    <button
+                        className="p-2 z-10 shrink-0"
+                        onClick={() => {
+                            const container = document.getElementById('historia-subtabs');
+                            if (container) container.scrollBy({ left: 100, behavior: 'smooth' });
+                        }}
+                    >
+                        <ChevronRight size={16} className={isDarkMode ? 'text-white' : 'text-black'} />
+                    </button>
+                </div>
             </div>
 
             {subTab === 'ARTIGOS' && (

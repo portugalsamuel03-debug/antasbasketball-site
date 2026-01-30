@@ -5,6 +5,7 @@ import { useAdmin } from '../../context/AdminContext';
 import { EditTrigger } from './EditTrigger';
 import { Trophy } from 'lucide-react';
 import { AwardDetailsModal } from './AwardDetailsModal';
+import { AwardPopup } from './AwardPopup';
 
 interface AwardsSectionProps {
     isDarkMode: boolean;
@@ -14,11 +15,19 @@ export const AwardsSection: React.FC<AwardsSectionProps> = ({ isDarkMode }) => {
     const { isEditing } = useAdmin();
     const [awards, setAwards] = useState<Award[]>([]);
     const [editingAward, setEditingAward] = useState<Award | null>(null);
+    const [viewingAward, setViewingAward] = useState<Award | null>(null);
     const [showModal, setShowModal] = useState(false);
 
-    useEffect(() => {
-        fetchAwards();
-    }, []);
+    // ... useEffect ...
+
+    function handleEdit(award: Award) {
+        setEditingAward(award);
+        setShowModal(true);
+    }
+
+    // ... handleDelete, handleCreate ...
+    // Note: I need to preserve functions I don't replace or use exact replacement.
+    // Let's replace the top part where state is defined.
 
     async function fetchAwards() {
         const { data } = await listAwards();
@@ -37,16 +46,21 @@ export const AwardsSection: React.FC<AwardsSectionProps> = ({ isDarkMode }) => {
         setShowModal(true);
     }
 
-    function handleEdit(award: Award) {
-        setEditingAward(award);
-        setShowModal(true);
-    }
-
     function handleClose() {
         setShowModal(false);
         setEditingAward(null);
         fetchAwards();
     }
+
+    // ...
+
+    // RENDER PART
+    // I will use replace_file_content on smaller chunk later if I cannot cover everything.
+    // The chunk above is risky.
+    // I'll assume state update is needed.
+
+    // Let's do a smaller edit for just the State.
+
 
     // Group awards by year
     const awardsByYear = awards.reduce((acc, award) => {
@@ -76,7 +90,7 @@ export const AwardsSection: React.FC<AwardsSectionProps> = ({ isDarkMode }) => {
                                     key={award.id}
                                     className={`flex items-center justify-between p-4 rounded-2xl ${isDarkMode ? 'bg-white/5' : 'bg-white'
                                         } group cursor-pointer hover:scale-[1.02] transition-transform`}
-                                    onClick={() => isEditing && handleEdit(award)}
+                                    onClick={() => isEditing ? handleEdit(award) : setViewingAward(award)}
                                 >
                                     <div className="flex items-center gap-3">
                                         <Trophy className="w-5 h-5 text-yellow-400" />
@@ -114,6 +128,14 @@ export const AwardsSection: React.FC<AwardsSectionProps> = ({ isDarkMode }) => {
                     award={editingAward}
                     isDarkMode={isDarkMode}
                     onClose={handleClose}
+                />
+            )}
+
+            {viewingAward && (
+                <AwardPopup
+                    award={viewingAward}
+                    isDarkMode={isDarkMode}
+                    onClose={() => setViewingAward(null)}
                 />
             )}
         </div>

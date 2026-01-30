@@ -31,11 +31,14 @@ export const AwardDetailsModal: React.FC<AwardDetailsModalProps> = ({ award, isD
 
         setMsg('Salvando...');
         try {
-            await upsertAward(editing);
+            const { error } = await upsertAward(editing);
+            if (error) throw error;
+
             setMsg('Salvo!');
             setTimeout(onClose, 500);
         } catch (e: any) {
             console.error(e);
+            alert(`Erro ao salvar premio: ${e.message || JSON.stringify(e)}`);
             setMsg('Erro ao salvar.');
         }
     }

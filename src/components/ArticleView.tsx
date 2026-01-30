@@ -5,7 +5,6 @@ import {
   Share2,
   MessageCircle,
   Send,
-  MoreHorizontal,
   Smile,
   Check,
   Edit2,
@@ -583,12 +582,6 @@ const ArticleView: React.FC<ArticleViewProps> = ({ article, onBack, onShare, isD
                 <Share2 size={20} strokeWidth={2.5} />
               </button>
 
-              <button
-                className={`p-2.5 rounded-full active:scale-90 transition-transform shadow-lg border ${isDarkMode ? "text-white bg-[#1a1a1a] border-white/5" : "text-[#0B1D33] bg-white border-[#0B1D33]/5"
-                  }`}
-              >
-                <MoreHorizontal size={20} strokeWidth={2.5} />
-              </button>
             </div>
           </div>
 
