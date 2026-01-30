@@ -177,6 +177,22 @@ export default function App() {
     return sorted;
   }, [articles, activeTab, searchQuery, sortOption]);
 
+  // Pagination Logic
+  const ITEMS_PER_PAGE = 3;
+  const [currentPage, setCurrentPage] = useState(1);
+
+  // Reset page when tab or search changes
+  useEffect(() => {
+    setCurrentPage(1);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, [activeTab, searchQuery, sortOption]);
+
+  const totalPages = Math.ceil(filteredArticles.length / ITEMS_PER_PAGE);
+  const paginatedArticles = useMemo(() => {
+    const start = (currentPage - 1) * ITEMS_PER_PAGE;
+    return filteredArticles.slice(start, start + ITEMS_PER_PAGE);
+  }, [filteredArticles, currentPage]);
+
   // Loading Screen
   if ((isAuthLoading || loadingArticles) && articles.length === 0) {
     return (
@@ -286,11 +302,11 @@ export default function App() {
               </div>
 
               {/* LIST */}
-              <div className="px-6 space-y-8">
-                {filteredArticles.length === 0 ? (
+              <div className="px-6 space-y-8 min-h-[400px]">
+                {paginatedArticles.length === 0 ? (
                   <EmptyState isDarkMode={isDarkMode} message={searchQuery ? "Nenhum resultado encontrado." : "Nada por aqui ainda..."} />
                 ) : (
-                  filteredArticles.map((a) => (
+                  paginatedArticles.map((a) => (
                     <ArticleCard
                       key={a.id}
                       article={a}
@@ -303,6 +319,37 @@ export default function App() {
                   ))
                 )}
               </div>
+
+              {/* Pagination Controls */}
+              {totalPages > 1 && (
+                <div className="px-6 pb-8 flex items-center justify-between mt-8">
+                  <button
+                    onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                    disabled={currentPage === 1}
+                    className={`px-4 py-2 rounded-full text-[10px] font-black uppercase tracking-widest transition-all ${currentPage === 1
+                      ? 'opacity-30 cursor-not-allowed'
+                      : 'active:scale-95 hover:bg-yellow-400 hover:text-black'
+                      } ${isDarkMode ? 'bg-white/10 text-white' : 'bg-[#0B1D33]/10 text-[#0B1D33]'}`}
+                  >
+                    Anterior
+                  </button>
+
+                  <span className={`text-[10px] font-black tracking-widest ${isDarkMode ? 'text-gray-500' : 'text-gray-400'}`}>
+                    PÁGINA {currentPage} DE {totalPages}
+                  </span>
+
+                  <button
+                    onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                    disabled={currentPage === totalPages}
+                    className={`px-4 py-2 rounded-full text-[10px] font-black uppercase tracking-widest transition-all ${currentPage === totalPages
+                      ? 'opacity-30 cursor-not-allowed'
+                      : 'active:scale-95 hover:bg-yellow-400 hover:text-black'
+                      } ${isDarkMode ? 'bg-white/10 text-white' : 'bg-[#0B1D33]/10 text-[#0B1D33]'}`}
+                  >
+                    Próxima
+                  </button>
+                </div>
+              )}
             </>
           )}
         </main>
