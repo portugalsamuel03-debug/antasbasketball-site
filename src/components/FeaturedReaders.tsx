@@ -75,7 +75,7 @@ const FeaturedReaders: React.FC<{ isDarkMode: boolean }> = ({ isDarkMode }) => {
     <div className="py-2 relative group/featured">
       <div className="px-6 flex justify-between items-center mb-4">
         <div className="flex items-center gap-2">
-          <h3 className="text-[10px] font-black tracking-[0.2em] text-gray-500 uppercase">Ranking de Atletas</h3>
+          <h3 className="text-[10px] font-black tracking-[0.2em] text-gray-500 uppercase">Ranking de Leitores</h3>
         </div>
         <button onClick={() => setShowStats(true)} className={`text-[10px] font-black uppercase tracking-widest hover:underline ${isDarkMode ? 'text-yellow-400' : 'text-[#0B1D33]'}`}>Ver estatísticas</button>
       </div>

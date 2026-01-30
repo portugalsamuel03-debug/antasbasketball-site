@@ -24,8 +24,8 @@ export const AuthorDetailsModal: React.FC<AuthorDetailsModalProps> = ({ author, 
         const payload = { ...formData };
         if (payload.id === "") delete (payload as any).id;
 
-        // Auto-generate slug if empty or if creating new
-        if (!payload.slug || payload.slug === '') {
+        // Auto-generate slug if empty (and only if empty)
+        if (!payload.slug || payload.slug.trim() === '') {
             payload.slug = payload.name
                 .toLowerCase()
                 .normalize("NFD")
@@ -34,20 +34,23 @@ export const AuthorDetailsModal: React.FC<AuthorDetailsModalProps> = ({ author, 
                 .replace(/-+/g, "-")
                 .replace(/^-|-$/g, "");
         } else {
-            // Also sanitize existing slug just in case
+            // Basic sanitation for manual slugs
             payload.slug = payload.slug
                 .toLowerCase()
                 .normalize("NFD")
                 .replace(/[\u0300-\u036f]/g, "")
                 .replace(/[^a-z0-9]/g, "-")
-                .replace(/-+/g, "-")
-                .replace(/^-|-$/g, "");
+                .replace(/-+/g, "-");
         }
 
         const { error } = await upsertAuthor(payload);
         if (error) {
             console.error(error);
-            setMsg("Erro ao salvar.");
+            if (error.code === '23505') { // Unique violation
+                setMsg("Erro: Slug (ID) já existe. Tente outro.");
+            } else {
+                setMsg("Erro ao salvar.");
+            }
             return;
         }
 
@@ -88,6 +91,7 @@ export const AuthorDetailsModal: React.FC<AuthorDetailsModalProps> = ({ author, 
                     {isEditMode ? (
                         <>
                             <input value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} className={`${inputClass} text-center font-black text-lg`} placeholder="Nome" />
+                            <input value={formData.slug} onChange={e => setFormData({ ...formData, slug: e.target.value })} className={`${inputClass} text-center text-xs font-mono text-gray-500`} placeholder="slug-do-autor" />
                             <input value={formData.role_label || ''} onChange={e => setFormData({ ...formData, role_label: e.target.value })} className={`${inputClass} text-center text-xs uppercase`} placeholder="Cargo / Função" />
                             <input value={formData.avatar_url || ''} onChange={e => setFormData({ ...formData, avatar_url: e.target.value })} className={`${inputClass} text-center text-xs`} placeholder="Avatar URL" />
 
