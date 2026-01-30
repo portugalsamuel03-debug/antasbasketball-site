@@ -24,10 +24,11 @@ type SubTab = 'ARTIGOS' | 'CAMPEOES' | 'HALL_OF_FAME' | 'TIMES';
 // --- CHAMPIONS SECTION ---
 import { ChampionDetailsModal } from './admin/ChampionDetailsModal';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { useRef } from 'react';
 
 const ChampionsSection: React.FC<{ isDarkMode: boolean }> = ({ isDarkMode }) => {
     const [champions, setChampions] = useState<Champion[]>([]);
-    // ...    const { isEditing } = useAdmin();
+    // ...    // ...    const { isEditing } = useAdmin();
     const [selectedChampion, setSelectedChampion] = useState<Partial<Champion> | null>(null);
 
     const fetchChampions = async () => {
@@ -241,6 +242,15 @@ const HallOfFameSection: React.FC<{ isDarkMode: boolean }> = ({ isDarkMode }) =>
 const HistoriaPage: React.FC<HistoriaPageProps> = ({ articles, isDarkMode, onArticleClick, onShare, onEditArticle }) => {
     const { isEditing } = useAdmin();
     const [subTab, setSubTab] = useState<SubTab>('ARTIGOS');
+    const scrollRef = useRef<HTMLDivElement>(null);
+
+    const scroll = (direction: 'left' | 'right') => {
+        if (scrollRef.current) {
+            const amount = direction === 'left' ? -200 : 200;
+            // Use directly scrollLeft for reliability
+            scrollRef.current.scrollLeft += amount;
+        }
+    };
 
     return (
         <>
@@ -255,16 +265,13 @@ const HistoriaPage: React.FC<HistoriaPageProps> = ({ articles, isDarkMode, onArt
             <div className={`sticky top-[52px] z-30 py-2 border-b border-white/10 ${isDarkMode ? 'bg-black/95 backdrop-blur-md' : 'bg-[#FDFBF4]/95 backdrop-blur-md'}`}>
                 <div className="relative flex items-center px-2">
                     <button
-                        className="p-2 z-10 shrink-0"
-                        onClick={() => {
-                            const container = document.getElementById('historia-subtabs');
-                            if (container) container.scrollBy({ left: -100, behavior: 'smooth' });
-                        }}
+                        className="p-2 z-10 shrink-0 hover:bg-white/10 rounded-full transition-colors"
+                        onClick={() => scroll('left')}
                     >
                         <ChevronLeft size={16} className={isDarkMode ? 'text-white' : 'text-black'} />
                     </button>
 
-                    <div id="historia-subtabs" className="overflow-x-auto flex items-center px-2 no-scrollbar gap-2 scroll-smooth">
+                    <div ref={scrollRef} className="flex-1 overflow-x-auto flex items-center px-2 no-scrollbar gap-2 scroll-smooth">
                         {(['ARTIGOS', 'CAMPEOES', 'HALL_OF_FAME', 'AWARDS', 'TRADES', 'TIMES'] as SubTab[]).map(tab => (
                             <button
                                 key={tab}
@@ -280,11 +287,8 @@ const HistoriaPage: React.FC<HistoriaPageProps> = ({ articles, isDarkMode, onArt
                     </div>
 
                     <button
-                        className="p-2 z-10 shrink-0"
-                        onClick={() => {
-                            const container = document.getElementById('historia-subtabs');
-                            if (container) container.scrollBy({ left: 100, behavior: 'smooth' });
-                        }}
+                        className="p-2 z-10 shrink-0 hover:bg-white/10 rounded-full transition-colors"
+                        onClick={() => scroll('right')}
                     >
                         <ChevronRight size={16} className={isDarkMode ? 'text-white' : 'text-black'} />
                     </button>
