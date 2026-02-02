@@ -333,6 +333,27 @@ const ArticleView: React.FC<ArticleViewProps> = ({ article, onBack, onShare, isD
           >
             <X size={20} strokeWidth={3} />
           </button>
+
+          {isEditing && (
+            <button
+              onClick={() => setEditingArticle({
+                id: article.id,
+                title: article.title,
+                category: String(article.category),
+                content: article.content,
+                cover_url: article.imageUrl,
+                excerpt: article.description,
+                published: true,
+                reading_minutes: parseInt(article.readTime) || 5,
+                author_id: article.authorId,
+                is_featured: article.isFeatured
+              })}
+              className="p-2.5 rounded-full bg-yellow-400 text-black hover:bg-yellow-300 shadow-xl active:scale-95 transition-all ml-2"
+              title="Editar Artigo"
+            >
+              <Edit2 size={20} strokeWidth={2.5} />
+            </button>
+          )}
         </div>
 
         {/* HERO SECTION */}
@@ -386,8 +407,8 @@ const ArticleView: React.FC<ArticleViewProps> = ({ article, onBack, onShare, isD
 
         {/* CONTENT */}
         <div className={`relative z-10 -mt-6 rounded-t-[40px] px-6 py-12 transition-colors min-h-screen ${isDarkMode
-            ? "bg-[#080808] shadow-[0_-20px_60px_rgba(0,0,0,1)] border-t border-white/5"
-            : "bg-[#FAFAFA] shadow-[0_-20px_60px_rgba(0,0,0,0.05)] border-t border-black/5"
+          ? "bg-[#080808] shadow-[0_-20px_60px_rgba(0,0,0,1)] border-t border-white/5"
+          : "bg-[#FAFAFA] shadow-[0_-20px_60px_rgba(0,0,0,0.05)] border-t border-black/5"
           }`}>
           {/* Reading Line */}
           <div className="sticky top-0 left-0 w-full h-1 bg-gray-200/10 z-20 overflow-hidden max-w-md mx-auto">

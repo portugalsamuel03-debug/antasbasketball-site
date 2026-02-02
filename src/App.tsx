@@ -147,6 +147,7 @@ export default function App() {
       excerpt: found.description,
       published: true,
       reading_minutes: parseInt(found.readTime) || 5,
+      author_id: found.authorId,
     });
   };
 
