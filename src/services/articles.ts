@@ -16,7 +16,7 @@ type DbTag = {
   label: string;
 };
 
-type DbArticleRow = {
+export type DbArticleRow = {
   id: string;
   slug: string;
   title: string;
@@ -98,7 +98,7 @@ function uniqueStrings(arr: string[]): string[] {
   return Array.from(new Set(arr.map((x) => x.trim()).filter(Boolean)));
 }
 
-function toUiArticle(row: DbArticleRow): Article {
+export function toUiArticle(row: DbArticleRow): Article {
   const tags = uniqueStrings(
     (row.article_tags ?? []).map((x) => x?.tag?.label ?? "").filter(Boolean)
   );

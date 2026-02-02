@@ -411,8 +411,14 @@ export async function deleteSubcategory(id: string) {
 export async function getFeaturedArticle() {
   return supabase
     .from("articles")
-    .select("*")
+    .select(`
+      id, slug, title, excerpt, content, cover_url, category, subcategory,
+      reading_minutes, video_url, is_featured, likes, comments_count, author_id, published, published_at,
+      author:authors ( id, slug, name, role_label, avatar_url ),
+      article_tags ( tag:tags ( id, slug, label ) )
+    `)
     .eq("is_featured", true)
+    .eq("published", true)
     .order("published_at", { ascending: false })
     .limit(1)
     .single();

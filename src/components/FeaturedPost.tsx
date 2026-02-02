@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Article, Reaction } from '../types';
 import { getFeaturedArticle } from '../cms';
+import { toUiArticle, DbArticleRow } from '../services/articles';
 import { Share2, MessageCircle, Heart } from 'lucide-react';
 
 interface FeaturedPostProps {
@@ -19,8 +20,13 @@ export const FeaturedPost: React.FC<FeaturedPostProps> = ({ isDarkMode, onArticl
     async function loadFeatured() {
         const { data } = await getFeaturedArticle();
         if (data) {
-            // Map CMS data to Article type if needed, or assume it matches closely
-            setArticle(data as any);
+            // Map CMS data to Article type ensuring all fields (like imageUrl) are correct
+            // explicit handling for missing imageUrl vs cover_url
+            // We need to fetch it joined or use the helper if possible, 
+            // but getFeaturedArticle likely returns a joined row similar to what we want.
+            // Let's verify if we need to cast it to DbArticleRow first.
+            const uiArticle = toUiArticle(data as any as DbArticleRow);
+            setArticle(uiArticle);
         }
     }
 
