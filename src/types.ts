@@ -76,7 +76,7 @@ export interface TeamRow {
   logo_url?: string;
   description?: string;
   manager_id?: string;
-  manager?: { id: string; name: string; avatar_url: string };
+  manager?: { id: string; name: string; image_url: string };
   is_active?: boolean;
 }
 
@@ -206,12 +206,11 @@ export interface Champion {
   team: string;
   mvp: string; // Keep for backward compatibility or display text
   manager_id?: string;
-  manager?: { id: string; name: string; avatar_url: string }; // Join
+  manager?: { id: string; name: string; image_url: string }; // Join
   score: string;
   logo_url?: string;
   team_id?: string;
   historic_players?: { name: string; icon?: string }[];
 }
 
-export type ChampionRow = Champion;
-export type HallOfFameRow = HallOfFame;
+
