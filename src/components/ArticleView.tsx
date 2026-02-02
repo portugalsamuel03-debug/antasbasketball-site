@@ -220,10 +220,19 @@ const ArticleView: React.FC<ArticleViewProps> = ({ article, onBack, onShare, isD
   const { isEditing } = useAdmin();
   const [editingArticle, setEditingArticle] = useState<Partial<ArticleRow> | null>(null);
   const [articleAuthorAvatar, setArticleAuthorAvatar] = useState(FALLBACK_AVATAR);
+  const [authorName, setAuthorName] = useState(article.author);
   const [isScrolled, setIsScrolled] = useState(false);
+
+  // Scroll to top on mount or article change
+  useEffect(() => {
+    if (containerRef.current) {
+      containerRef.current.scrollTo(0, 0);
+    }
+  }, [article.id]);
 
   useEffect(() => {
     const el = containerRef.current;
+    // ... (rest of scroll listener)
     if (!el) return;
     const onScroll = () => {
       const { scrollTop, scrollHeight, clientHeight } = el;
@@ -288,12 +297,15 @@ const ArticleView: React.FC<ArticleViewProps> = ({ article, onBack, onShare, isD
   useEffect(() => { loadMeAndState(); loadComments(); }, [article.id]);
 
   useEffect(() => {
-    async function loadAuthorAvatar() {
+    async function loadAuthorDetails() {
       if (!article.authorId) return;
-      const { data } = await supabase.from('authors').select('avatar_url').eq('id', article.authorId).single();
-      if (data?.avatar_url) setArticleAuthorAvatar(data.avatar_url);
+      const { data } = await supabase.from('authors').select('name, avatar_url').eq('id', article.authorId).single();
+      if (data) {
+        if (data.avatar_url) setArticleAuthorAvatar(data.avatar_url);
+        if (data.name) setAuthorName(data.name);
+      }
     }
-    loadAuthorAvatar();
+    loadAuthorDetails();
   }, [article.authorId]);
 
   const hasHero = !!article.imageUrl;
@@ -382,7 +394,7 @@ const ArticleView: React.FC<ArticleViewProps> = ({ article, onBack, onShare, isD
                   <img src={articleAuthorAvatar} alt={article.author} className="w-full h-full object-cover" />
                 </div>
                 <div className="bg-black/40 backdrop-blur-md px-3 py-1.5 rounded-xl border border-white/10">
-                  <p className="text-white text-xs font-black uppercase tracking-widest drop-shadow-md">{article.author}</p>
+                  <p className="text-white text-xs font-black uppercase tracking-widest drop-shadow-md">{authorName}</p>
                   <p className="text-gray-300 text-[10px] font-bold uppercase tracking-widest mt-0.5">{article.date}</p>
                 </div>
               </div>
@@ -398,7 +410,7 @@ const ArticleView: React.FC<ArticleViewProps> = ({ article, onBack, onShare, isD
                 <img src={articleAuthorAvatar} className="w-full h-full object-cover" />
               </div>
               <div>
-                <p className={`text-xs font-black uppercase ${isDarkMode ? "text-white" : "text-black"}`}>{article.author}</p>
+                <p className={`text-xs font-black uppercase ${isDarkMode ? "text-white" : "text-black"}`}>{authorName}</p>
                 <p className="text-gray-500 text-[10px] font-bold uppercase">{article.date}</p>
               </div>
             </div>
