@@ -164,6 +164,9 @@ export const EditArticleModal: React.FC<EditArticleModalProps> = ({ article, onC
             if (payload.id === "") delete payload.id;
             payload.slug = payload.slug?.trim() || slugify(payload.title);
 
+            // Ensure author_id is preserved or explicitly nulled if empty string
+            if (payload.author_id === "") payload.author_id = null;
+
             console.log("EditArticleModal: Saving article payload...", payload);
 
             // Add a timeout to the upsert call to prevent infinite hang

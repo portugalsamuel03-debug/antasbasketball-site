@@ -318,11 +318,15 @@ const ArticleView: React.FC<ArticleViewProps> = ({ article, onBack, onShare, isD
 
   return (
     <>
-      <div ref={containerRef} className={`h-full overflow-y-auto custom-scrollbar relative ${isDarkMode ? 'bg-[#080808]' : 'bg-[#FAFAFA]'}`}>
+      {/* FULL SCREEN OVERLAY - FIXED POSITION TO CONTROL SCROLL */}
+      <div
+        ref={containerRef}
+        className={`fixed inset-0 z-[100] h-full w-full overflow-y-auto custom-scrollbar ${isDarkMode ? 'bg-[#080808]' : 'bg-[#FAFAFA]'}`}
+      >
 
         {/* Floating Header Actions */}
         <div
-          className={`fixed top-4 right-6 z-50 flex items-center gap-2 transition-all duration-300 ${isScrolled || !hasHero ? "bg-black/50 backdrop-blur-md p-1.5 rounded-full border border-white/10" : ""
+          className={`fixed top-4 right-6 z-[110] flex items-center gap-2 transition-all duration-300 ${isScrolled || !hasHero ? "bg-black/50 backdrop-blur-md p-1.5 rounded-full border border-white/10" : ""
             }`}
         >
           <button
