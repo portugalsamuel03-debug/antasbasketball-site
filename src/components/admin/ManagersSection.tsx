@@ -133,18 +133,15 @@ export const ManagersSection: React.FC<ManagersSectionProps> = ({ isDarkMode }) 
                     </div>
                 </div>
             )}
-        </div>
 
-            {
-        selectedManager && (
-            <ManagerDetailsModal
-                manager={selectedManager}
-                isDarkMode={isDarkMode}
-                onClose={() => setSelectedManager(null)}
-                onUpdate={fetchManagers}
-            />
-        )
-    }
-        </div >
+            {selectedManager && (
+                <ManagerDetailsModal
+                    manager={selectedManager}
+                    isDarkMode={isDarkMode}
+                    onClose={() => setSelectedManager(null)}
+                    onUpdate={fetchManagers}
+                />
+            )}
+        </div>
     );
 };
