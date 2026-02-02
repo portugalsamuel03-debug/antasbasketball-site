@@ -261,7 +261,7 @@ export default function App() {
                 <div className="px-6 space-y-4">
                   {articles
                     .filter(a => !a.isFeatured)
-                    .slice(0, 5)
+                    .slice(0, 3)
                     .map(a => (
                       <ArticleCard
                         key={a.id}

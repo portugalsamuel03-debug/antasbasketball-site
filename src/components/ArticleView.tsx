@@ -341,7 +341,7 @@ const ArticleView: React.FC<ArticleViewProps> = ({ article, onBack, onShare, isD
             <img src={article.imageUrl} alt="Cover" className="w-full h-full object-cover" />
             <div className="absolute inset-0 bg-gradient-to-t from-[#080808] via-[#080808]/40 to-transparent"></div>
 
-            <div className="absolute bottom-0 left-0 w-full p-6 sm:p-12 pb-12 max-w-4xl mx-auto">
+            <div className="absolute bottom-0 left-0 w-full p-6 sm:p-12 pb-12 max-w-md mx-auto left-0 right-0">
               <div className="flex items-center gap-3 mb-4 animate-in slide-in-from-bottom-4 duration-700 delay-100 opacity-0 fill-mode-forwards">
                 <span className="px-3 py-1 rounded-full bg-yellow-500 text-black text-[10px] font-black tracking-widest uppercase shadow-lg shadow-yellow-500/20">
                   {article.category || 'ARTIGO'}
@@ -352,24 +352,24 @@ const ArticleView: React.FC<ArticleViewProps> = ({ article, onBack, onShare, isD
                 </span>
               </div>
 
-              <h1 className="text-3xl sm:text-5xl md:text-6xl font-black text-white leading-[1.1] uppercase tracking-tight mb-6 animate-in slide-in-from-bottom-4 duration-700 delay-200 opacity-0 fill-mode-forwards drop-shadow-xl max-w-4xl">
+              <h1 className="text-3xl sm:text-4xl font-black text-white leading-[1.1] uppercase tracking-tight mb-6 animate-in slide-in-from-bottom-4 duration-700 delay-200 opacity-0 fill-mode-forwards drop-shadow-xl">
                 {article.title}
               </h1>
 
               <div className="flex items-center gap-4 animate-in slide-in-from-bottom-4 duration-700 delay-300 opacity-0 fill-mode-forwards">
-                <div className="w-12 h-12 rounded-full border-2 border-white/20 overflow-hidden shadow-lg">
+                <div className="w-12 h-12 rounded-full border-2 border-white/20 overflow-hidden shadow-lg bg-black">
                   <img src={articleAuthorAvatar} alt={article.author} className="w-full h-full object-cover" />
                 </div>
-                <div>
+                <div className="bg-black/40 backdrop-blur-md px-3 py-1.5 rounded-xl border border-white/10">
                   <p className="text-white text-xs font-black uppercase tracking-widest drop-shadow-md">{article.author}</p>
-                  <p className="text-gray-400 text-[10px] font-bold uppercase tracking-widest mt-0.5">{article.date}</p>
+                  <p className="text-gray-300 text-[10px] font-bold uppercase tracking-widest mt-0.5">{article.date}</p>
                 </div>
               </div>
             </div>
           </div>
         ) : (
-          <div className={`pt-32 pb-12 px-6 sm:px-12 ${isDarkMode ? 'bg-[#080808]' : 'bg-white'}`}>
-            <h1 className={`text-4xl sm:text-6xl font-black uppercase tracking-tight mb-8 ${isDarkMode ? "text-white" : "text-[#0B1D33]"}`}>
+          <div className={`pt-32 pb-12 px-6 sm:px-12 ${isDarkMode ? 'bg-[#080808]' : 'bg-white'} max-w-md mx-auto`}>
+            <h1 className={`text-3xl sm:text-4xl font-black uppercase tracking-tight mb-8 ${isDarkMode ? "text-white" : "text-[#0B1D33]"}`}>
               {article.title}
             </h1>
             <div className="flex items-center gap-4">
@@ -385,16 +385,16 @@ const ArticleView: React.FC<ArticleViewProps> = ({ article, onBack, onShare, isD
         )}
 
         {/* CONTENT */}
-        <div className={`relative z-10 -mt-6 rounded-t-[40px] px-6 sm:px-0 py-12 transition-colors min-h-screen ${isDarkMode
+        <div className={`relative z-10 -mt-6 rounded-t-[40px] px-6 py-12 transition-colors min-h-screen ${isDarkMode
             ? "bg-[#080808] shadow-[0_-20px_60px_rgba(0,0,0,1)] border-t border-white/5"
             : "bg-[#FAFAFA] shadow-[0_-20px_60px_rgba(0,0,0,0.05)] border-t border-black/5"
           }`}>
           {/* Reading Line */}
-          <div className="sticky top-0 left-0 w-full h-1 bg-gray-200/10 z-20 overflow-hidden">
+          <div className="sticky top-0 left-0 w-full h-1 bg-gray-200/10 z-20 overflow-hidden max-w-md mx-auto">
             <div className="h-full bg-yellow-500 transition-all duration-100 ease-out shadow-[0_0_10px_#EAB308]" style={{ width: `${readingProgress}%` }}></div>
           </div>
 
-          <div className="max-w-3xl mx-auto">
+          <div className="max-w-md mx-auto">
 
             {article.video_url && (
               <div className="mb-12">
