@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { upsertChampion, listTeams } from '../../cms';
+import { upsertChampion, listTeams, listManagers } from '../../cms';
 import { Champion, TeamRow } from '../../types';
 import { EditTrigger } from './EditTrigger';
 import { useAdmin } from '../../context/AdminContext';
@@ -13,12 +13,22 @@ interface ChampionDetailsModalProps {
     onUpdate: () => void;
 }
 
-const BUCKET = "article-covers"; // Reusing existing bucket or creating new if needed
+const BUCKET = "article-covers";
 
 export const ChampionDetailsModal: React.FC<ChampionDetailsModalProps> = ({ champion, onClose, isDarkMode, onUpdate }) => {
     const { isEditing } = useAdmin();
     const [isEditMode, setIsEditMode] = useState(false);
+
+    // Parse historic_players if string/json
+    const initialPlayers = Array.isArray(champion.historic_players)
+        ? champion.historic_players.map(p => typeof p === 'string' ? p : p.name)
+        : ["", "", ""];
+
     const [formData, setFormData] = useState<Partial<Champion>>({ ...champion });
+    const [highlightPlayers, setHighlightPlayers] = useState<string[]>(
+        initialPlayers.length === 3 ? initialPlayers : [...initialPlayers, "", "", ""].slice(0, 3)
+    );
+
     const [msg, setMsg] = useState<string | null>(null);
     const [uploading, setUploading] = useState(false);
 
@@ -30,9 +40,11 @@ export const ChampionDetailsModal: React.FC<ChampionDetailsModalProps> = ({ cham
     }, [champion, isEditing]);
 
     const [teams, setTeams] = useState<TeamRow[]>([]);
+    const [managers, setManagers] = useState<any[]>([]);
 
     React.useEffect(() => {
         listTeams().then(({ data }) => setTeams(data as TeamRow[] || []));
+        listManagers().then(({ data }) => setManagers(data || []));
     }, []);
 
     const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -73,6 +85,19 @@ export const ChampionDetailsModal: React.FC<ChampionDetailsModalProps> = ({ cham
 
         const payload = { ...formData };
         if (payload.id === "") delete payload.id;
+
+        // Save highlights as JSON array of objects
+        payload.historic_players = highlightPlayers
+            .filter(n => n.trim() !== "")
+            .map(n => ({ name: n.trim() }));
+
+        // Remove old MVP field update if we want to rely on manager
+        // But for safety, we can sync MVP field to Manager Name if needed, 
+        // or just let it be. User asked to replace use of MVP.
+        const selectedManager = managers.find(m => m.id === formData.manager_id);
+        if (selectedManager) {
+            payload.mvp = selectedManager.name; // Sync for backward capability if needed
+        }
 
         const { error } = await upsertChampion(payload);
         if (error) {
@@ -161,8 +186,36 @@ export const ChampionDetailsModal: React.FC<ChampionDetailsModalProps> = ({ cham
                             </div>
 
                             <div>
-                                <label className="text-[10px] font-bold uppercase text-gray-500 block text-left">MVP das Finais</label>
-                                <input value={formData.mvp || ''} onChange={e => setFormData({ ...formData, mvp: e.target.value })} className={`${inputClass}`} placeholder="Nome do Jogador" />
+                                <label className="text-[10px] font-bold uppercase text-gray-500 block text-left mb-1">Gestor do Time</label>
+                                <select
+                                    value={formData.manager_id || ''}
+                                    onChange={e => setFormData({ ...formData, manager_id: e.target.value })}
+                                    className={`${inputClass} uppercase appearance-none ${isDarkMode ? 'bg-[#1a2c42]' : 'bg-white'}`}
+                                >
+                                    <option value="">Selecione o Gestor...</option>
+                                    {managers.map(m => (
+                                        <option key={m.id} value={m.id}>{m.name}</option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            <div className="pt-2 border-t border-dashed border-gray-700 mt-2">
+                                <label className="text-[10px] font-bold uppercase text-yellow-500 block text-left mb-2">Jogadores Destaque (Max 3)</label>
+                                <div className="space-y-2">
+                                    {[0, 1, 2].map(idx => (
+                                        <input
+                                            key={idx}
+                                            value={highlightPlayers[idx] || ''}
+                                            onChange={e => {
+                                                const newArr = [...highlightPlayers];
+                                                newArr[idx] = e.target.value;
+                                                setHighlightPlayers(newArr);
+                                            }}
+                                            className={`${inputClass}`}
+                                            placeholder={`Jogador ${idx + 1}`}
+                                        />
+                                    ))}
+                                </div>
                             </div>
 
                             <button onClick={handleSave} className="w-full py-3 mt-4 bg-yellow-400 text-black rounded-xl text-xs font-black uppercase tracking-widest shadow-lg shadow-yellow-400/20 active:scale-95 transition-transform">
@@ -183,10 +236,40 @@ export const ChampionDetailsModal: React.FC<ChampionDetailsModalProps> = ({ cham
 
                             <div className={`w-8 h-1 mx-auto rounded-full ${isDarkMode ? 'bg-white/10' : 'bg-black/10'}`} />
 
-                            <div className={`p-4 rounded-3xl ${isDarkMode ? 'bg-white/5' : 'bg-black/5'}`}>
-                                <p className="text-[10px] font-bold text-yellow-500 uppercase mb-1">MVP DA TEMPORADA</p>
-                                <p className={`text-sm font-black uppercase ${isDarkMode ? 'text-white' : 'text-[#0B1D33]'}`}>{champion.mvp}</p>
-                            </div>
+                            {/* Manager Display */}
+                            {champion.manager ? (
+                                <div className={`p-4 rounded-3xl ${isDarkMode ? 'bg-white/5' : 'bg-black/5'}`}>
+                                    <p className="text-[10px] font-bold text-yellow-500 uppercase mb-2">GESTOR DO TIME</p>
+                                    <div className="flex flex-col items-center gap-2">
+                                        <div className="w-12 h-12 rounded-full overflow-hidden border-2 border-yellow-500">
+                                            <img src={champion.manager.image_url} alt={champion.manager.name} className="w-full h-full object-cover" />
+                                        </div>
+                                        <p className={`text-sm font-black uppercase ${isDarkMode ? 'text-white' : 'text-[#0B1D33]'}`}>
+                                            {champion.manager.name}
+                                        </p>
+                                    </div>
+                                </div>
+                            ) : (champion.mvp && (
+                                <div className={`p-4 rounded-3xl ${isDarkMode ? 'bg-white/5' : 'bg-black/5'}`}>
+                                    <p className="text-[10px] font-bold text-yellow-500 uppercase mb-1">MVP DA TEMPORADA</p>
+                                    <p className={`text-sm font-black uppercase ${isDarkMode ? 'text-white' : 'text-[#0B1D33]'}`}>{champion.mvp}</p>
+                                </div>
+                            ))}
+
+                            {/* Highlight Players */}
+                            {champion.historic_players && champion.historic_players.length > 0 && (
+                                <div className="mt-2">
+                                    <p className="text-[9px] font-bold text-gray-500 uppercase mb-2 tracking-widest">DESTAQUES - BIG THREE</p>
+                                    <div className="flex flex-wrap justify-center gap-2">
+                                        {champion.historic_players.map((p: any, i: number) => (
+                                            <span key={i} className={`text-[10px] font-bold px-2 py-1 rounded-md ${isDarkMode ? 'bg-white/10 text-white' : 'bg-black/5 text-black'}`}>
+                                                {typeof p === 'string' ? p : p.name}
+                                            </span>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+
                         </>
                     )}
                 </div>

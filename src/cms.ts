@@ -131,14 +131,20 @@ export async function upsertTag(payload: Partial<TagRow>) {
 }
 
 // Champions
+// Champions
 export async function listChampions() {
-  return supabase.from("champions").select("*").order("year", { ascending: false });
+  return supabase.from("champions").select("*, manager:managers(id, name, image_url)").order("year", { ascending: false });
 }
 export async function upsertChampion(payload: Partial<any>) {
-  return supabase.from("champions").upsert(payload).select("*").single();
+  return supabase.from("champions").upsert(payload).select("*, manager:managers(id, name, image_url)").single();
 }
 export async function deleteChampion(id: string) {
   return supabase.from("champions").delete().eq("id", id);
+}
+
+// Managers Helper
+export async function listManagers() {
+  return supabase.from("managers").select("*").order("name");
 }
 
 // Hall of Fame

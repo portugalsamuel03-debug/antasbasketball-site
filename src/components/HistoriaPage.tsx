@@ -59,31 +59,66 @@ const ChampionsSection: React.FC<{ isDarkMode: boolean }> = ({ isDarkMode }) => 
                     <div
                         key={c.id}
                         onClick={() => setSelectedChampion(c)}
-                        className={`relative p-5 rounded-[24px] border cursor-pointer transition-all active:scale-95 ${isDarkMode ? 'bg-white/5 border-white/10 hover:bg-white/10' : 'bg-white border-[#0B1D33]/10 hover:bg-[#0B1D33]/5'} flex items-center justify-between group`}
+                        className={`relative p-5 rounded-[32px] border cursor-pointer transition-all active:scale-95 ${isDarkMode ? 'bg-white/5 border-white/10 hover:bg-white/10' : 'bg-white border-[#0B1D33]/10 hover:bg-[#0B1D33]/5'} flex flex-col gap-4 group overflow-hidden`}
                     >
                         {isEditing && (
-                            <div className="absolute -top-2 -right-2 z-10 flex gap-1">
+                            <div className="absolute top-4 right-4 z-10 flex gap-1">
                                 <EditTrigger type="delete" size={14} onClick={(e) => handleDelete(c.id, e)} />
                             </div>
                         )}
+
                         <div className="flex items-center gap-4">
-                            <div className="w-12 h-12 rounded-xl bg-white/5 flex items-center justify-center overflow-hidden">
+                            <div className="w-16 h-16 rounded-2xl bg-white/5 flex items-center justify-center overflow-hidden shrink-0">
                                 {c.logo_url ? (
                                     <img src={c.logo_url} className="w-full h-full object-contain" alt="Logo" />
                                 ) : (
-                                    <Trophy size={24} className="text-yellow-500/20" />
+                                    <Trophy size={32} className="text-yellow-500/20" />
                                 )}
                             </div>
                             <div>
                                 <div className="flex items-center gap-2 mb-1">
-                                    <span className="text-2xl font-black italic text-yellow-500">{c.year}</span>
+                                    <span className="text-3xl font-black italic text-yellow-500 leading-none">{c.year}</span>
                                     <Trophy size={16} className="text-yellow-500" />
                                 </div>
-                                <div className={`text-lg font-black uppercase ${isDarkMode ? 'text-white' : 'text-[#0B1D33]'}`}>{c.team}</div>
-                                <div className="text-xs font-bold text-gray-500 mt-1">MVP: {c.mvp}</div>
+                                <div className={`text-xl font-black uppercase leading-none ${isDarkMode ? 'text-white' : 'text-[#0B1D33]'}`}>{c.team}</div>
+                                <div className={`text-sm font-bold tracking-widest mt-1 opacity-50 ${isDarkMode ? 'text-white' : 'text-[#0B1D33]'}`}>SCORE: {c.score}</div>
                             </div>
                         </div>
-                        <div className={`text-xl font-black tracking-widest ${isDarkMode ? 'text-white/20' : 'text-[#0B1D33]/20'}`}>{c.score}</div>
+
+                        {/* Manager / MVP Section */}
+                        <div className={`p-3 rounded-2xl flex items-center gap-3 ${isDarkMode ? 'bg-black/20' : 'bg-gray-50'}`}>
+                            {c.manager ? (
+                                <>
+                                    <div className="w-8 h-8 rounded-full overflow-hidden border border-yellow-500/50">
+                                        <img src={c.manager.image_url} alt={c.manager.name} className="w-full h-full object-cover" />
+                                    </div>
+                                    <div>
+                                        <div className="text-[8px] font-bold text-yellow-500 uppercase tracking-wider">Gestor</div>
+                                        <div className={`text-xs font-black uppercase ${isDarkMode ? 'text-white' : 'text-[#0B1D33]'}`}>{c.manager.name}</div>
+                                    </div>
+                                </>
+                            ) : (
+                                <div>
+                                    <div className="text-[8px] font-bold text-gray-500 uppercase tracking-wider">MVP</div>
+                                    <div className={`text-xs font-black uppercase ${isDarkMode ? 'text-white' : 'text-[#0B1D33]'}`}>{c.mvp}</div>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Historic Players (Big Three) */}
+                        {c.historic_players && c.historic_players.length > 0 && (
+                            <div className="flex flex-wrap gap-2">
+                                {c.historic_players.map((p: any, i: number) => {
+                                    const name = typeof p === 'string' ? p : p.name;
+                                    if (!name) return null;
+                                    return (
+                                        <span key={i} className={`text-[9px] font-bold px-2 py-1 rounded-md uppercase tracking-wide ${isDarkMode ? 'bg-white/10 text-gray-300' : 'bg-black/5 text-gray-600'}`}>
+                                            {name}
+                                        </span>
+                                    );
+                                })}
+                            </div>
+                        )}
                     </div>
                 ))}
             </div>
