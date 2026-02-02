@@ -428,7 +428,21 @@ export async function updateComment(id: string, body: string) {
     .single();
 }
 
+
 export async function deleteComment(id: string) {
   return supabase.from("article_comments").delete().eq("id", id);
 }
+
+
+// Static Content
+export async function getStaticContent(key: string) {
+  const { data, error } = await supabase.from('static_content').select('content').eq('key', key).single();
+  if (error) return null;
+  return data.content;
+}
+
+export async function updateStaticContent(key: string, content: any) {
+  return supabase.from('static_content').upsert({ key, content, updated_at: new Date().toISOString() }).select();
+}
+
 

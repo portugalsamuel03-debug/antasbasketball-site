@@ -199,14 +199,15 @@ const HistoriaPage: React.FC<HistoriaPageProps> = ({ articles, isDarkMode, onArt
                     sortOption="RECENTES"
                     onSortChange={() => { }}
                     isDarkMode={isDarkMode}
-                />
-                <button
-                    onClick={() => setShowStory(true)}
-                    className={`absolute right-16 top-6 flex items-center gap-2 px-3 py-1.5 rounded-full transition-all ${isDarkMode ? 'bg-yellow-400/10 text-yellow-400 hover:bg-yellow-400/20' : 'bg-[#0B1D33]/5 text-[#0B1D33] hover:bg-[#0B1D33]/10'}`}
                 >
-                    <BookOpen size={14} strokeWidth={2.5} />
-                    <span className="text-[10px] font-black uppercase tracking-widest">Nossa História</span>
-                </button>
+                    <button
+                        onClick={() => setShowStory(true)}
+                        className={`flex items-center gap-2 px-3 py-1.5 rounded-full transition-all ${isDarkMode ? 'bg-yellow-400/10 text-yellow-400 hover:bg-yellow-400/20' : 'bg-[#0B1D33]/5 text-[#0B1D33] hover:bg-[#0B1D33]/10'}`}
+                    >
+                        <BookOpen size={14} strokeWidth={2.5} />
+                        <span className="hidden sm:inline text-[10px] font-black uppercase tracking-widest">Nossa História</span>
+                    </button>
+                </SectionTitle>
             </div>
 
             <div className={`sticky top-[52px] z-30 py-2 border-b border-white/10 ${isDarkMode ? 'bg-black/95 backdrop-blur-md' : 'bg-[#FDFBF4]/95 backdrop-blur-md'}`}>
