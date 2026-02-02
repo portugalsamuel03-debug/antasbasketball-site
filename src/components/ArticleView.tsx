@@ -385,7 +385,7 @@ const ArticleView: React.FC<ArticleViewProps> = ({ article, onBack, onShare, isD
             <div className="absolute inset-0 bg-gradient-to-t from-[#080808] via-[#080808]/40 to-transparent"></div>
 
             <div className="absolute bottom-0 left-0 w-full p-6 sm:p-12 pb-12 max-w-md mx-auto left-0 right-0">
-              <div className="flex items-center gap-3 mb-4 animate-in slide-in-from-bottom-4 duration-700 delay-100 opacity-0 fill-mode-forwards">
+              <div className="flex items-center gap-3 mb-4">
                 <span className="px-3 py-1 rounded-full bg-yellow-500 text-black text-[10px] font-black tracking-widest uppercase shadow-lg shadow-yellow-500/20">
                   {article.category || 'ARTIGO'}
                 </span>
@@ -395,11 +395,11 @@ const ArticleView: React.FC<ArticleViewProps> = ({ article, onBack, onShare, isD
                 </span>
               </div>
 
-              <h1 className="text-3xl sm:text-4xl font-black text-white leading-[1.1] uppercase tracking-tight mb-6 animate-in slide-in-from-bottom-4 duration-700 delay-200 opacity-0 fill-mode-forwards drop-shadow-xl">
+              <h1 className="text-3xl sm:text-4xl font-black text-white leading-[1.1] uppercase tracking-tight mb-6 drop-shadow-xl">
                 {article.title}
               </h1>
 
-              <div className="flex items-center gap-4 animate-in slide-in-from-bottom-4 duration-700 delay-300 opacity-0 fill-mode-forwards">
+              <div className="flex items-center gap-4">
                 <div className="w-12 h-12 rounded-full border-2 border-white/20 overflow-hidden shadow-lg bg-black">
                   <img src={articleAuthorAvatar} alt={article.author} className="w-full h-full object-cover" />
                 </div>
