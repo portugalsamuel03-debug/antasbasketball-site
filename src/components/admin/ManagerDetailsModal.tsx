@@ -14,41 +14,11 @@ interface ManagerDetailsModalProps {
 const BUCKET = "article-covers";
 
 export const ManagerDetailsModal: React.FC<ManagerDetailsModalProps> = ({ manager, onClose, isDarkMode, onUpdate }) => {
-    const [formData, setFormData] = useState<Partial<Manager>>({ ...manager });
+    const [formData, setFormData] = useState<Partial<Manager>>({
+        is_active: true, // Default to true
+        ...manager
+    });
     const [msg, setMsg] = useState<string | null>(null);
-    const [uploading, setUploading] = useState(false);
-
-    const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (!file) return;
-
-        setUploading(true);
-        setMsg(null);
-
-        try {
-            const fileExt = file.name.split('.').pop();
-            const fileName = `manager-${Date.now()}.${fileExt}`;
-            const filePath = `managers/${fileName}`;
-
-            const { error: uploadError } = await supabase.storage
-                .from(BUCKET)
-                .upload(filePath, file);
-
-            if (uploadError) throw uploadError;
-
-            const { data: { publicUrl } } = supabase.storage
-                .from(BUCKET)
-                .getPublicUrl(filePath);
-
-            setFormData(prev => ({ ...prev, image_url: publicUrl }));
-            setMsg("Foto carregada!");
-        } catch (error: any) {
-            console.error("Upload error:", error);
-            setMsg("Erro no upload.");
-        } finally {
-            setUploading(false);
-        }
-    };
 
     const handleSave = async () => {
         setMsg(null);
@@ -90,7 +60,7 @@ export const ManagerDetailsModal: React.FC<ManagerDetailsModalProps> = ({ manage
                     {manager.id ? 'Editar Gestor' : 'Novo Gestor'}
                 </h2>
 
-                {/* Image Upload */}
+                {/* Image Preview */}
                 <div className="relative group w-24 h-24">
                     <div className={`w-24 h-24 rounded-full flex items-center justify-center overflow-hidden shadow-xl ${!formData.image_url ? 'bg-gray-200' : 'bg-black'}`}>
                         {formData.image_url ? (
@@ -98,16 +68,29 @@ export const ManagerDetailsModal: React.FC<ManagerDetailsModalProps> = ({ manage
                         ) : (
                             <Users size={40} className="text-gray-400" />
                         )}
-
-                        <label className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex flex-col items-center justify-center cursor-pointer transition-opacity rounded-full">
-                            {uploading ? <Loader2 className="animate-spin text-white" /> : <ImageIcon className="text-white" />}
-                            <span className="text-[8px] font-bold text-white uppercase mt-1">Alterar</span>
-                            <input type="file" className="hidden" accept="image/*" onChange={handleFileUpload} disabled={uploading} />
-                        </label>
                     </div>
                 </div>
 
                 <div className="w-full space-y-4 mt-2">
+                    {/* Active Toggle */}
+                    <div className="flex items-center justify-between p-3 rounded-xl bg-white/5 border border-white/10">
+                        <span className="text-xs font-bold uppercase text-gray-500">Gestor em Atividade?</span>
+                        <label className="relative inline-flex items-center cursor-pointer">
+                            <input
+                                type="checkbox"
+                                className="sr-only peer"
+                                checked={formData.is_active !== false} // Default true
+                                onChange={e => setFormData({ ...formData, is_active: e.target.checked })}
+                            />
+                            <div className="w-9 h-5 bg-gray-600 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-yellow-400"></div>
+                        </label>
+                    </div>
+
+                    <div>
+                        <label className="text-[10px] font-bold uppercase text-gray-500 block text-left">URL da Foto</label>
+                        <input value={formData.image_url || ''} onChange={e => setFormData({ ...formData, image_url: e.target.value })} className={`${inputClass} text-xs`} placeholder="https://..." />
+                    </div>
+
                     <div>
                         <label className="text-[10px] font-bold uppercase text-gray-500 block text-left">Nome</label>
                         <input value={formData.name || ''} onChange={e => setFormData({ ...formData, name: e.target.value })} className={`${inputClass} font-bold text-lg`} placeholder="Ex: Pat Riley" />
