@@ -215,6 +215,7 @@ export default function App() {
     return (
       <>
         <ArticleView
+          key={selectedArticle.id}
           article={selectedArticle}
           onBack={() => setSelectedArticle(null)}
           onShare={onShare}

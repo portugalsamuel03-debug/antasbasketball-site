@@ -220,13 +220,16 @@ const ArticleView: React.FC<ArticleViewProps> = ({ article, onBack, onShare, isD
   const { isEditing } = useAdmin();
   const [editingArticle, setEditingArticle] = useState<Partial<ArticleRow> | null>(null);
   const [articleAuthorAvatar, setArticleAuthorAvatar] = useState(FALLBACK_AVATAR);
-  const [authorName, setAuthorName] = useState(article.author);
+  const [authorName, setAuthorName] = useState(() => (article.author && article.author.trim()) ? article.author : "Antas Basketball");
   const [isScrolled, setIsScrolled] = useState(false);
 
-  // Scroll to top on mount or article change
-  useEffect(() => {
+  // Scroll to top immediately on mount
+  React.useLayoutEffect(() => {
+    console.log("ArticleView: Mount/Change", article.id);
     if (containerRef.current) {
-      containerRef.current.scrollTo(0, 0);
+      console.log("ArticleView: Scrolling to top");
+      containerRef.current.scrollTo({ top: 0, behavior: "instant" as any });
+      containerRef.current.scrollTop = 0;
     }
   }, [article.id]);
 
@@ -302,7 +305,10 @@ const ArticleView: React.FC<ArticleViewProps> = ({ article, onBack, onShare, isD
       const { data } = await supabase.from('authors').select('name, avatar_url').eq('id', article.authorId).single();
       if (data) {
         if (data.avatar_url) setArticleAuthorAvatar(data.avatar_url);
-        if (data.name) setAuthorName(data.name);
+        // Ensure we don't set empty string if name is missing/empty/whitespace
+        const validName = (data.name || "").trim();
+        setAuthorName(validName || "Antas Basketball");
+        console.log("ArticleView: Author details fetched", data);
       }
     }
     loadAuthorDetails();
