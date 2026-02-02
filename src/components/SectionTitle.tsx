@@ -37,11 +37,11 @@ const SectionTitle: React.FC<React.PropsWithChildren<SectionTitleProps>> = ({ ti
         <div className="relative">
           <button
             onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-            className={`flex items-center gap-2 text-[10px] font-black tracking-widest transition-colors uppercase ${isDarkMode ? 'text-gray-500 hover:text-yellow-400' : 'text-gray-400 hover:text-[#0B1D33]'
+            className={`flex items-center gap-2 p-2 rounded-full transition-colors ${isDarkMode ? 'text-gray-500 hover:text-yellow-400 hover:bg-white/5' : 'text-gray-400 hover:text-[#0B1D33] hover:bg-black/5'
               }`}
+            title={activeOption.label}
           >
-            <activeOption.icon size={12} className={sortOption !== 'RECENTES' ? isDarkMode ? 'text-yellow-400' : 'text-[#0B1D33]' : ''} />
-            {activeOption.label}
+            <activeOption.icon size={16} className={sortOption !== 'RECENTES' ? (isDarkMode ? 'text-yellow-400' : 'text-[#0B1D33]') : ''} />
             <ChevronDown size={12} className={`transition-transform ${isDropdownOpen ? 'rotate-180' : ''}`} />
           </button>
 
