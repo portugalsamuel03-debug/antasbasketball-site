@@ -30,7 +30,6 @@ export const ChampionDetailsModal: React.FC<ChampionDetailsModalProps> = ({ cham
     );
 
     const [msg, setMsg] = useState<string | null>(null);
-    const [uploading, setUploading] = useState(false);
 
     // Auto-enter edit mode if it's a new empty champion
     React.useEffect(() => {
@@ -46,38 +45,6 @@ export const ChampionDetailsModal: React.FC<ChampionDetailsModalProps> = ({ cham
         listTeams().then(({ data }) => setTeams(data as TeamRow[] || []));
         listManagers().then(({ data }) => setManagers(data || []));
     }, []);
-
-    const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (!file) return;
-
-        setUploading(true);
-        setMsg(null);
-
-        try {
-            const fileExt = file.name.split('.').pop();
-            const fileName = `champion-logo-${Date.now()}.${fileExt}`;
-            const filePath = `logos/${fileName}`;
-
-            const { error: uploadError } = await supabase.storage
-                .from(BUCKET)
-                .upload(filePath, file);
-
-            if (uploadError) throw uploadError;
-
-            const { data: { publicUrl } } = supabase.storage
-                .from(BUCKET)
-                .getPublicUrl(filePath);
-
-            setFormData(prev => ({ ...prev, logo_url: publicUrl }));
-            setMsg("Logo carregado!");
-        } catch (error: any) {
-            console.error("Upload error:", error);
-            setMsg("Erro no upload.");
-        } finally {
-            setUploading(false);
-        }
-    };
 
     const handleSave = async () => {
         setMsg(null);
@@ -143,14 +110,6 @@ export const ChampionDetailsModal: React.FC<ChampionDetailsModalProps> = ({ cham
                         ) : (
                             <Trophy size={40} />
                         )}
-
-                        {isEditMode && (
-                            <label className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex flex-col items-center justify-center cursor-pointer transition-opacity rounded-2xl">
-                                {uploading ? <Loader2 className="animate-spin text-white" /> : <ImageIcon className="text-white" />}
-                                <span className="text-[8px] font-bold text-white uppercase mt-1">Trocar Logo</span>
-                                <input type="file" className="hidden" accept="image/*" onChange={handleFileUpload} disabled={uploading} />
-                            </label>
-                        )}
                     </div>
                 </div>
 
@@ -160,6 +119,16 @@ export const ChampionDetailsModal: React.FC<ChampionDetailsModalProps> = ({ cham
 
                     {isEditMode ? (
                         <>
+                            <div>
+                                <label className="text-[10px] font-bold uppercase text-gray-500 block text-left">URL da Logo (Icon)</label>
+                                <input
+                                    value={formData.logo_url || ''}
+                                    onChange={e => setFormData({ ...formData, logo_url: e.target.value })}
+                                    className={`${inputClass} text-xs`}
+                                    placeholder="https://..."
+                                />
+                            </div>
+
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
                                     <label className="text-[10px] font-bold uppercase text-gray-500 block text-left">Ano</label>
