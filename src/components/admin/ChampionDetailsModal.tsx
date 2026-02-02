@@ -86,6 +86,9 @@ export const ChampionDetailsModal: React.FC<ChampionDetailsModalProps> = ({ cham
         const payload = { ...formData };
         if (payload.id === "") delete payload.id;
 
+        // Remove joined data that shouldn't be valid columns
+        delete (payload as any).manager;
+
         // Save highlights as JSON array of objects
         payload.historic_players = highlightPlayers
             .filter(n => n.trim() !== "")
