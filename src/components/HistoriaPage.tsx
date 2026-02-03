@@ -81,7 +81,17 @@ const ChampionsSection: React.FC<{ isDarkMode: boolean }> = ({ isDarkMode }) => 
                                     <Trophy size={16} className="text-yellow-500" />
                                 </div>
                                 <div className={`text-xl font-black uppercase leading-none ${isDarkMode ? 'text-white' : 'text-[#0B1D33]'}`}>{c.team}</div>
-                                <div className={`text-sm font-bold tracking-widest mt-1 opacity-50 ${isDarkMode ? 'text-white' : 'text-[#0B1D33]'}`}>SCORE: {c.score}</div>
+                                <div className={`flex flex-wrap items-center gap-3 text-sm font-bold tracking-widest mt-1 opacity-50 ${isDarkMode ? 'text-white' : 'text-[#0B1D33]'}`}>
+                                    <span>SCORE: {c.score}</span>
+                                    {c.runner_up_team && (
+                                        <div className="flex items-center gap-1.5 pl-3 border-l-2 border-current">
+                                            {c.runner_up_team.logo_url && (
+                                                <img src={c.runner_up_team.logo_url} className="w-5 h-5 object-contain opacity-80" alt={c.runner_up_team.name} />
+                                            )}
+                                            <span className="text-[10px] sm:text-xs text-red-400">VICE: {c.runner_up_team.name}</span>
+                                        </div>
+                                    )}
+                                </div>
                             </div>
                         </div>
 
