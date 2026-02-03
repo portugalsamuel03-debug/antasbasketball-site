@@ -123,17 +123,28 @@ export const ManagerDetailsModal: React.FC<ManagerDetailsModalProps> = ({ manage
     return (
         <div className="fixed inset-0 z-[160] flex items-center justify-center p-4">
             <div className="absolute inset-0 bg-black/80 backdrop-blur-md" onClick={onClose}></div>
-            <div className={`relative w-full max-w-lg border rounded-[32px] overflow-hidden shadow-xl flex flex-col animate-in zoom-in-95 duration-200 ${isDarkMode ? 'bg-[#121212] border-white/10' : 'bg-white'} max-h-[90vh]`}>
+            <div className={`relative w-full max-w-sm border rounded-[32px] overflow-hidden shadow-xl flex flex-col animate-in zoom-in-95 duration-200 ${isDarkMode ? 'bg-[#121212] border-white/10' : 'bg-white'} max-h-[90vh]`}>
 
                 {/* Header / Cover */}
                 <div className={`relative h-24 flex-shrink-0 ${isDarkMode ? 'bg-white/5' : 'bg-gray-100'}`}>
                     <button onClick={onClose} className={`absolute top-4 right-4 p-2 rounded-full z-10 ${isDarkMode ? 'bg-black/50 text-white' : 'bg-white/50 text-black'}`}>
                         ✕
                     </button>
+                    {isEditing && (
+                        <div className="absolute bottom-2 right-4 flex items-center gap-2">
+                            <span className="text-[10px] font-bold uppercase text-gray-400">Ativo?</span>
+                            <button
+                                onClick={() => setFormData({ ...formData, is_active: !formData.is_active })}
+                                className={`w-8 h-4 rounded-full transition-colors relative ${formData.is_active !== false ? 'bg-green-500' : 'bg-gray-400'}`}
+                            >
+                                <div className={`absolute top-0.5 left-0.5 w-3 h-3 bg-white rounded-full transition-transform ${formData.is_active !== false ? 'translate-x-4' : ''}`} />
+                            </button>
+                        </div>
+                    )}
                 </div>
 
                 {/* Profile Content */}
-                <div className="px-8 pb-8 flex-1 overflow-y-auto custom-scrollbar -mt-12">
+                <div className="px-6 pb-6 flex-1 overflow-y-auto custom-scrollbar -mt-12">
                     <div className="flex flex-col items-center">
                         {/* Avatar */}
                         <div className={`w-24 h-24 rounded-full border-4 overflow-hidden shadow-2xl ${isDarkMode ? 'border-[#121212] bg-[#121212]' : 'border-white bg-white'}`}>
@@ -148,20 +159,18 @@ export const ManagerDetailsModal: React.FC<ManagerDetailsModalProps> = ({ manage
 
                         {/* Name & Title */}
                         {isEditing ? (
-                            <div className="w-full mt-4 space-y-3">
-                                <label className="text-[10px] font-bold uppercase text-gray-500">Nome</label>
+                            <div className="w-full mt-4 space-y-3 text-center">
                                 <input
                                     value={formData.name || ''}
                                     onChange={e => setFormData({ ...formData, name: e.target.value })}
-                                    className={`${inputClass} text-center font-black text-2xl uppercase`}
+                                    className={`w-full bg-transparent text-center font-black text-xl uppercase outline-none placeholder-gray-500 ${isDarkMode ? 'text-white' : 'text-[#0B1D33]'}`}
                                     placeholder="NOME DO GESTOR"
                                 />
-                                <label className="text-[10px] font-bold uppercase text-gray-500">Foto URL</label>
                                 <input
                                     value={formData.image_url || ''}
                                     onChange={e => setFormData({ ...formData, image_url: e.target.value })}
-                                    className={`${inputClass} text-center text-xs`}
-                                    placeholder="https://..."
+                                    className={`w-full text-center text-[10px] bg-transparent outline-none border-b border-transparent focus:border-yellow-400 text-gray-500 transition-colors`}
+                                    placeholder="URL da Foto..."
                                 />
                             </div>
                         ) : (
@@ -178,18 +187,19 @@ export const ManagerDetailsModal: React.FC<ManagerDetailsModalProps> = ({ manage
 
                         {/* Bio / Observation */}
                         <div className="w-full mt-6">
-                            <h3 className="text-xs font-black uppercase tracking-widest text-gray-400 mb-2 flex items-center gap-2">
+                            <h3 className="text-xs font-black uppercase tracking-widest text-gray-400 mb-2 flex items-center justify-center gap-2">
                                 <Briefcase size={14} /> Observação / Bio
                             </h3>
                             {isEditing ? (
                                 <textarea
                                     value={formData.bio || ''}
                                     onChange={e => setFormData({ ...formData, bio: e.target.value })}
-                                    className={`${inputClass} min-h-[80px]`}
+                                    className={`w-full bg-transparent border rounded-xl p-3 text-sm focus:outline-none focus:border-yellow-400 transition-colors ${isDarkMode ? 'border-white/20 text-white' : 'border-gray-200 text-black'}`}
                                     placeholder="Escreva um resumo sobre a carreira do gestor..."
+                                    rows={3}
                                 />
                             ) : (
-                                <p className={`text-sm leading-relaxed ${isDarkMode ? 'text-gray-300' : 'text-gray-600'}`}>
+                                <p className={`text-sm leading-relaxed text-center ${isDarkMode ? 'text-gray-300' : 'text-gray-600'}`}>
                                     {formData.bio || 'Sem observações registradas.'}
                                 </p>
                             )}
@@ -198,11 +208,11 @@ export const ManagerDetailsModal: React.FC<ManagerDetailsModalProps> = ({ manage
                         {/* Stats Summary - View Only */}
                         {!isEditing && (
                             <div className="grid grid-cols-2 w-full gap-4 mt-6">
-                                <div className={`p-4 rounded-2xl ${isDarkMode ? 'bg-white/5' : 'bg-gray-50'}`}>
+                                <div className={`p-4 rounded-2xl text-center ${isDarkMode ? 'bg-white/5' : 'bg-gray-50'}`}>
                                     <div className="text-2xl font-black text-yellow-500">{history.length}</div>
                                     <div className="text-[10px] font-bold uppercase text-gray-500">Temporadas</div>
                                 </div>
-                                <div className={`p-4 rounded-2xl ${isDarkMode ? 'bg-white/5' : 'bg-gray-50'}`}>
+                                <div className={`p-4 rounded-2xl text-center ${isDarkMode ? 'bg-white/5' : 'bg-gray-50'}`}>
                                     <div className="text-2xl font-black text-yellow-500">{calculatedTitles.filter(t => t.includes('🏆')).length}</div>
                                     <div className="text-[10px] font-bold uppercase text-gray-500">Títulos</div>
                                 </div>
@@ -211,7 +221,7 @@ export const ManagerDetailsModal: React.FC<ManagerDetailsModalProps> = ({ manage
 
                         {/* History Section */}
                         <div className="w-full mt-8">
-                            <h3 className="text-xs font-black uppercase tracking-widest text-gray-400 mb-3 flex items-center gap-2">
+                            <h3 className="text-xs font-black uppercase tracking-widest text-gray-400 mb-3 flex items-center justify-center gap-2">
                                 <Calendar size={14} /> Histórico de Temporadas
                             </h3>
 
@@ -238,17 +248,24 @@ export const ManagerDetailsModal: React.FC<ManagerDetailsModalProps> = ({ manage
                                 ))}
 
                                 {isEditing && manager.id && (
-                                    <div className={`mt-2 p-3 rounded-xl border border-dashed ${isDarkMode ? 'border-white/20' : 'border-gray-300'} flex items-center gap-2`}>
-                                        <input
+                                    <div className={`mt-2 p-2 rounded-xl border border-dashed ${isDarkMode ? 'border-white/20' : 'border-gray-300'} flex items-center gap-2`}>
+                                        <select
                                             value={newHistoryYear}
                                             onChange={e => setNewHistoryYear(e.target.value)}
-                                            placeholder="Ano (Ex: 17/18)"
-                                            className="bg-transparent text-sm w-24 outline-none border-b border-transparent focus:border-yellow-400 px-1 py-1"
-                                        />
+                                            className="bg-transparent text-xs w-24 outline-none border-b border-transparent focus:border-yellow-400 px-1 py-1 appearance-none"
+                                        >
+                                            <option value="" className="text-gray-500">Temp...</option>
+                                            {Array.from({ length: 15 }, (_, i) => {
+                                                const start = 2017 + i;
+                                                const label = `${start}/${start + 1}`;
+                                                return <option key={label} value={label} className="text-black">{label}</option>;
+                                            })}
+                                        </select>
+
                                         <select
                                             value={newHistoryTeam}
                                             onChange={e => setNewHistoryTeam(e.target.value)}
-                                            className={`bg-transparent text-sm flex-1 outline-none appearance-none ${!newHistoryTeam && 'text-gray-500'}`}
+                                            className={`bg-transparent text-xs flex-1 outline-none appearance-none ${!newHistoryTeam && 'text-gray-500'}`}
                                         >
                                             <option value="">Selecione o Time...</option>
                                             {allTeams.map(t => (
@@ -268,38 +285,36 @@ export const ManagerDetailsModal: React.FC<ManagerDetailsModalProps> = ({ manage
                         </div>
 
                         {/* Achievements */}
-                        <div className="w-full mt-8">
-                            <h3 className="text-xs font-black uppercase tracking-widest text-gray-400 mb-3 flex items-center gap-2">
-                                <Trophy size={14} /> Conquistas
-                            </h3>
-                            <div className="space-y-2">
-                                {calculatedTitles.length === 0 && calculatedAwards.length === 0 && !formData.individual_titles && (
-                                    <div className="text-sm text-gray-500 italic">Nenhuma conquista registrada no sistema.</div>
-                                )}
+                        {(calculatedTitles.length > 0 || calculatedAwards.length > 0 || formData.individual_titles) && (
+                            <div className="w-full mt-8">
+                                <h3 className="text-xs font-black uppercase tracking-widest text-gray-400 mb-3 flex items-center justify-center gap-2">
+                                    <Trophy size={14} /> Conquistas
+                                </h3>
+                                <div className="space-y-2">
+                                    {calculatedTitles.map((t, i) => (
+                                        <div key={`t-${i}`} className={`p-3 rounded-xl flex items-center gap-3 ${isDarkMode ? 'bg-yellow-500/10 text-yellow-500' : 'bg-yellow-50 text-yellow-600'}`}>
+                                            <Trophy size={14} />
+                                            <span className="text-sm font-bold uppercase">{t}</span>
+                                        </div>
+                                    ))}
 
-                                {calculatedTitles.map((t, i) => (
-                                    <div key={`t-${i}`} className={`p-3 rounded-xl flex items-center gap-3 ${isDarkMode ? 'bg-yellow-500/10 text-yellow-500' : 'bg-yellow-50 text-yellow-600'}`}>
-                                        <Trophy size={14} />
-                                        <span className="text-sm font-bold uppercase">{t}</span>
-                                    </div>
-                                ))}
+                                    {calculatedAwards.map((t, i) => (
+                                        <div key={`a-${i}`} className={`p-3 rounded-xl flex items-center gap-3 ${isDarkMode ? 'bg-white/5 text-gray-300' : 'bg-gray-100 text-gray-600'}`}>
+                                            <AwardIcon size={14} />
+                                            <span className="text-sm font-medium uppercase">{t}</span>
+                                        </div>
+                                    ))}
 
-                                {calculatedAwards.map((t, i) => (
-                                    <div key={`a-${i}`} className={`p-3 rounded-xl flex items-center gap-3 ${isDarkMode ? 'bg-white/5 text-gray-300' : 'bg-gray-100 text-gray-600'}`}>
-                                        <AwardIcon size={14} />
-                                        <span className="text-sm font-medium uppercase">{t}</span>
-                                    </div>
-                                ))}
-
-                                {/* Manual Bio/Titles is handled in Bio now, but if we have legacy manual titles we can show them */}
-                                {formData.individual_titles && (
-                                    <div className={`p-3 rounded-xl flex flex-col gap-1 ${isDarkMode ? 'bg-white/5 text-gray-300' : 'bg-gray-100 text-gray-600'}`}>
-                                        <span className="text-[10px] font-bold uppercase text-gray-400">Outros (Manual)</span>
-                                        <span className="text-sm">{formData.individual_titles}</span>
-                                    </div>
-                                )}
+                                    {/* Manual Bio/Titles is handled in Bio now, but if we have legacy manual titles we can show them */}
+                                    {formData.individual_titles && (
+                                        <div className={`p-3 rounded-xl flex flex-col gap-1 ${isDarkMode ? 'bg-white/5 text-gray-300' : 'bg-gray-100 text-gray-600'}`}>
+                                            <span className="text-[10px] font-bold uppercase text-gray-400">Outros (Manual)</span>
+                                            <span className="text-sm">{formData.individual_titles}</span>
+                                        </div>
+                                    )}
+                                </div>
                             </div>
-                        </div>
+                        )}
 
                     </div>
                 </div>
@@ -308,21 +323,7 @@ export const ManagerDetailsModal: React.FC<ManagerDetailsModalProps> = ({ manage
                 {isEditing && (
                     <div className={`p-6 border-t ${isDarkMode ? 'border-white/10' : 'border-gray-100'}`}>
                         {msg && <div className="text-xs text-center text-yellow-500 font-bold mb-2">{msg}</div>}
-
-                        <div className="flex items-center justify-between mb-4">
-                            <span className="text-xs font-bold uppercase text-gray-500">Gestor em Atividade?</span>
-                            <label className="relative inline-flex items-center cursor-pointer">
-                                <input
-                                    type="checkbox"
-                                    className="sr-only peer"
-                                    checked={formData.is_active !== false}
-                                    onChange={e => setFormData({ ...formData, is_active: e.target.checked })}
-                                />
-                                <div className="w-9 h-5 bg-gray-600 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-yellow-400"></div>
-                            </label>
-                        </div>
-
-                        <button onClick={handleSave} className="w-full py-4 bg-yellow-400 text-black rounded-xl text-xs font-black uppercase tracking-widest hover:bg-yellow-300 transition-colors">
+                        <button onClick={handleSave} className="w-full py-3 bg-yellow-400 text-black rounded-xl text-xs font-black uppercase tracking-widest hover:bg-yellow-300 transition-colors shadow-lg shadow-yellow-400/20 active:scale-95 transition-transform">
                             Salvar Alterações
                         </button>
                     </div>
