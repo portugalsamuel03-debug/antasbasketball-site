@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
-import { listTeams, listChampions, listAwards, listManagerHistory, upsertManagerHistory, deleteManagerHistory } from '../../cms';
-import { TeamRow, Champion, Award, ManagerHistory } from '../../types';
-import { Plus, Trash2, Calendar, Briefcase, Trophy, ChevronRight } from 'lucide-react';
+import { listTeams, listChampions, listAwards, listManagerHistory, upsertManagerHistory, deleteManagerHistory, listHallOfFame } from '../../cms';
+import { TeamRow, Champion, Award, ManagerHistory, HallOfFame } from '../../types';
+import { Plus, Trash2, Calendar, Briefcase, Trophy, ChevronRight, Crown } from 'lucide-react';
 import { Manager } from './ManagersSection';
 import { useAdmin } from '../../context/AdminContext';
 
@@ -26,6 +26,7 @@ export const ManagerDetailsModal: React.FC<ManagerDetailsModalProps> = ({ manage
     const [allTeams, setAllTeams] = useState<TeamRow[]>([]);
     const [calculatedTitles, setCalculatedTitles] = useState<string[]>([]);
     const [calculatedAwards, setCalculatedAwards] = useState<string[]>([]);
+    const [isHoF, setIsHoF] = useState(false);
 
     // History State
     const [history, setHistory] = useState<ManagerHistory[]>([]);
@@ -61,6 +62,12 @@ export const ManagerDetailsModal: React.FC<ManagerDetailsModalProps> = ({ manage
                 const myAwards = awards.filter(a => a.manager_id === manager.id);
                 const awardStrings = myAwards.map(a => `${a.year}: ${a.category}`);
                 setCalculatedAwards(awardStrings);
+            });
+
+            // Check Hall of Fame
+            listHallOfFame().then(({ data }) => {
+                const isMember = (data as HallOfFame[])?.some(h => h.manager_id === manager.id);
+                setIsHoF(isMember || false);
             });
         }
     }, [manager.id]);
@@ -147,12 +154,19 @@ export const ManagerDetailsModal: React.FC<ManagerDetailsModalProps> = ({ manage
                 <div className="px-6 pb-6 flex-1 overflow-y-auto custom-scrollbar -mt-10 relative z-10">
                     <div className="flex flex-col items-center">
                         {/* Avatar */}
-                        <div className={`w-24 h-24 rounded-full border-4 overflow-hidden shadow-2xl ${isDarkMode ? 'border-[#121212] bg-[#121212]' : 'border-white bg-white'}`}>
+                        <div className={`relative w-24 h-24 rounded-full border-4 overflow-hidden shadow-2xl ${isDarkMode ? 'border-[#121212] bg-[#121212]' : 'border-white bg-white'}`}>
                             {formData.image_url ? (
                                 <img src={formData.image_url} className="w-full h-full object-cover" alt="Manager" />
                             ) : (
                                 <div className="w-full h-full flex items-center justify-center bg-gray-200 text-gray-400">
                                     <Briefcase size={32} />
+                                </div>
+                            )}
+
+                            {/* Crown Icon if HoF */}
+                            {isHoF && (
+                                <div className="absolute bottom-0 right-0 p-1 bg-black rounded-full border-2 border-yellow-400 shadow-lg z-20" title="Hall of Fame">
+                                    <Crown size={12} className="text-yellow-400" fill="currentColor" />
                                 </div>
                             )}
                         </div>
@@ -174,13 +188,24 @@ export const ManagerDetailsModal: React.FC<ManagerDetailsModalProps> = ({ manage
                                 />
                             </div>
                         ) : (
-                            <div className="text-center mt-2">
+                            <div className="text-center mt-2 flex flex-col items-center">
                                 <h2 className={`text-2xl font-black uppercase ${isDarkMode ? 'text-white' : 'text-[#0B1D33]'}`}>
                                     {formData.name}
                                 </h2>
-                                {/* Active Badge */}
-                                <div className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-[10px] uppercase font-black tracking-widest mt-2 ${formData.is_active !== false ? 'bg-yellow-400 text-black' : 'bg-gray-500 text-white'}`}>
-                                    {formData.is_active !== false ? 'Em Atividade' : 'Lenda / Inativo'}
+
+                                <div className="flex items-center gap-2 mt-2">
+                                    {/* Active Badge */}
+                                    <div className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-[10px] uppercase font-black tracking-widest ${formData.is_active !== false ? 'bg-yellow-400 text-black' : 'bg-gray-500 text-white'}`}>
+                                        {formData.is_active !== false ? 'Em Atividade' : 'Inativo'}
+                                    </div>
+
+                                    {/* Hall of Fame Badge */}
+                                    {isHoF && (
+                                        <div className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-[10px] uppercase font-black tracking-widest bg-black text-yellow-400 border border-yellow-400/30">
+                                            <Crown size={10} fill="currentColor" />
+                                            Hall of Fame
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                         )}
