@@ -42,6 +42,9 @@ export const TeamDetailsModal: React.FC<TeamDetailsModalProps> = ({ team, onClos
         const payload = { ...formData };
         if (payload.id === "") delete payload.id;
 
+        // Sanitize mapped objects (joined fields that are not columns)
+        delete payload.manager;
+
         // Ensure is_active is boolean or default
         if (payload.is_active === undefined) payload.is_active = true;
 
