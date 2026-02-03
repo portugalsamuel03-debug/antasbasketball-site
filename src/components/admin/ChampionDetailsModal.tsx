@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { upsertChampion, listTeams, listManagers } from '../../cms';
+import { SEASON_OPTIONS } from '../../utils/seasons';
 import { Champion, TeamRow } from '../../types';
 import { EditTrigger } from './EditTrigger';
 import { useAdmin } from '../../context/AdminContext';
@@ -134,7 +135,16 @@ export const ChampionDetailsModal: React.FC<ChampionDetailsModalProps> = ({ cham
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
                                     <label className="text-[10px] font-bold uppercase text-gray-500 block text-left">Ano</label>
-                                    <input value={formData.year || ''} onChange={e => setFormData({ ...formData, year: e.target.value })} className={`${inputClass} font-black text-lg`} placeholder="2024" />
+                                    <select
+                                        value={formData.year || ''}
+                                        onChange={e => setFormData({ ...formData, year: e.target.value })}
+                                        className={`${inputClass} font-black text-xs appearance-none py-2`}
+                                    >
+                                        <option value="">Selecione...</option>
+                                        {SEASON_OPTIONS.map(s => (
+                                            <option key={s} value={s}>{s}</option>
+                                        ))}
+                                    </select>
                                 </div>
                                 <div>
                                     <label className="text-[10px] font-bold uppercase text-gray-500 block text-left">Placar</label>

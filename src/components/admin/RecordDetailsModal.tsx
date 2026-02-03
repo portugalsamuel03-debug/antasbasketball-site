@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { X, Save } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { RecordItem } from '../../types';
+import { SEASON_OPTIONS } from '../../utils/seasons';
 
 interface RecordDetailsModalProps {
     record: Partial<RecordItem> | null;
@@ -13,7 +14,8 @@ interface RecordDetailsModalProps {
 export const RecordDetailsModal: React.FC<RecordDetailsModalProps> = ({ record, isDarkMode, onClose, onSave }) => {
     const [formData, setFormData] = useState<Partial<RecordItem>>({
         title: '',
-        description: ''
+        description: '',
+        year: ''
     });
 
     useEffect(() => {
@@ -38,8 +40,8 @@ export const RecordDetailsModal: React.FC<RecordDetailsModalProps> = ({ record, 
     };
 
     const inputClass = `w-full bg-transparent border-b p-3 text-sm font-bold focus:outline-none transition-colors ${isDarkMode
-            ? 'border-white/10 text-white focus:border-yellow-400 placeholder:text-gray-700'
-            : 'border-[#0B1D33]/10 text-[#0B1D33] focus:border-[#0B1D33] placeholder:text-gray-300'
+        ? 'border-white/10 text-white focus:border-yellow-400 placeholder:text-gray-700'
+        : 'border-[#0B1D33]/10 text-[#0B1D33] focus:border-[#0B1D33] placeholder:text-gray-300'
         }`;
 
     return (
@@ -65,6 +67,20 @@ export const RecordDetailsModal: React.FC<RecordDetailsModalProps> = ({ record, 
                                 className={inputClass}
                                 placeholder="EX: MAIS PONTOS EM UM JOGO"
                             />
+                        </div>
+
+                        <div>
+                            <label className="text-[10px] font-bold uppercase text-gray-500 mb-1 block">Temporada (Opcional)</label>
+                            <select
+                                value={formData.year || ''}
+                                onChange={e => setFormData({ ...formData, year: e.target.value })}
+                                className={`${inputClass} appearance-none py-2`}
+                            >
+                                <option value="">Selecione...</option>
+                                {SEASON_OPTIONS.map(s => (
+                                    <option key={s} value={s}>{s}</option>
+                                ))}
+                            </select>
                         </div>
 
                         <div>

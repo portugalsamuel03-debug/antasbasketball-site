@@ -3,6 +3,7 @@ import { X, Save, Plus, Trash2, Edit2, Trophy, Award as AwardIcon } from 'lucide
 import { supabase } from '../../lib/supabase';
 import { Season, Team, SeasonStanding, Champion, Award, TeamRow } from '../../types';
 import { listChampions, listAwards, listTeams } from '../../cms';
+import { SEASON_OPTIONS } from '../../utils/seasons';
 
 interface SeasonDetailsModalProps {
     season: Season | null;
@@ -197,12 +198,16 @@ export const SeasonDetailsModal: React.FC<SeasonDetailsModalProps> = ({ season, 
                             {canEdit ? (
                                 <div>
                                     <label className="text-[10px] font-bold uppercase text-gray-500 mb-1 block">Ano (Ex: 2017/18)</label>
-                                    <input
+                                    <select
                                         value={formData.year}
                                         onChange={e => setFormData({ ...formData, year: e.target.value })}
-                                        className={inputClass}
-                                        placeholder="20XX/20XX"
-                                    />
+                                        className={`${inputClass} appearance-none`}
+                                    >
+                                        <option value="">Selecione...</option>
+                                        {SEASON_OPTIONS.map(s => (
+                                            <option key={s} value={s}>{s}</option>
+                                        ))}
+                                    </select>
                                 </div>
                             ) : null}
 

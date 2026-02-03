@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Award, Team } from '../../types';
 import { upsertAward, listTeams, listManagers } from '../../cms';
+import { SEASON_OPTIONS } from '../../utils/seasons';
 import { X } from 'lucide-react';
 
 interface AwardDetailsModalProps {
@@ -76,12 +77,16 @@ export const AwardDetailsModal: React.FC<AwardDetailsModalProps> = ({ award, isD
                 <div className="space-y-4">
                     <div>
                         <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-2">Ano</label>
-                        <input
-                            className={inputClass}
-                            placeholder="2024/25"
+                        <select
+                            className={`${inputClass} appearance-none`}
                             value={editing.year || ''}
                             onChange={e => setEditing({ ...editing, year: e.target.value })}
-                        />
+                        >
+                            <option value="">Selecione...</option>
+                            {SEASON_OPTIONS.map(s => (
+                                <option key={s} value={s}>{s}</option>
+                            ))}
+                        </select>
                     </div>
 
                     <div>
