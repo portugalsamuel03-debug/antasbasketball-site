@@ -167,6 +167,14 @@ export async function deleteManagerHistory(id: string) {
   return supabase.from("manager_history").delete().eq("id", id);
 }
 
+export async function listTeamHistory(teamId: string) {
+  return supabase
+    .from("manager_history")
+    .select("*, manager:managers(*)")
+    .eq("team_id", teamId)
+    .order("year", { ascending: false });
+}
+
 // Hall of Fame
 export async function listHallOfFame() {
   return supabase.from("hall_of_fame").select("*").order("year_inducted", { ascending: false });

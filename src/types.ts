@@ -148,6 +148,7 @@ export interface ManagerHistory {
   team_id?: string;
   year: string;
   team?: Team;
+  manager?: Manager;
 }
 
 export interface Manager {
