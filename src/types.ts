@@ -47,15 +47,7 @@ export interface Author {
   bio?: string;
 }
 
-export interface Champion {
-  id: string;
-  year: string;
-  team: string;
-  mvp: string;
-  score: string;
-  logo_url?: string;
-  team_id?: string;
-}
+
 
 export interface HallOfFame {
   id: string;
