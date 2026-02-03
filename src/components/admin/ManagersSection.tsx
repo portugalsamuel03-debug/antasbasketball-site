@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useAdmin } from '../../context/AdminContext';
 import { supabase } from '../../lib/supabase';
-import { listTeams, listChampions, listAwards } from '../../cms';
-import { TeamRow, Champion, Award } from '../../types';
+import { listTeams, listChampions, listAwards, listHallOfFame } from '../../cms';
+import { TeamRow, Champion, Award, HallOfFame } from '../../types';
 import { EditTrigger } from './EditTrigger';
-import { Users, Trash2, Award as AwardIcon, Briefcase, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Users, Trash2, Award as AwardIcon, Briefcase, ChevronLeft, ChevronRight, Crown } from 'lucide-react';
 import { ManagerDetailsModal } from './ManagerDetailsModal';
 
 export interface Manager {
@@ -38,6 +38,7 @@ export const ManagersSection: React.FC<ManagersSectionProps> = ({ isDarkMode }) 
     const [championCounts, setChampionCounts] = useState<Record<string, number>>({});
     const [runnerUpCounts, setRunnerUpCounts] = useState<Record<string, number>>({});
     const [managerAwards, setManagerAwards] = useState<Record<string, string[]>>({});
+    const [hofIds, setHofIds] = useState<Set<string>>(new Set());
 
     const fetchData = async () => {
         // Fetch Managers
@@ -76,6 +77,14 @@ export const ManagersSection: React.FC<ManagersSectionProps> = ({ isDarkMode }) 
             }
         });
         setManagerAwards(mAwards);
+
+        // Fetch Hall of Fame
+        const { data: hofData } = await listHallOfFame();
+        const hIds = new Set<string>();
+        (hofData as HallOfFame[])?.forEach(h => {
+            if (h.manager_id) hIds.add(h.manager_id);
+        });
+        setHofIds(hIds);
     };
 
     useEffect(() => {
@@ -110,6 +119,8 @@ export const ManagersSection: React.FC<ManagersSectionProps> = ({ isDarkMode }) 
         const titleCount = championCounts[manager.id] || 0;
         const runnerUpCount = runnerUpCounts[manager.id] || 0;
 
+        const isHoF = hofIds.has(manager.id);
+
         const parts = [];
         if (titleCount > 0) parts.push(`${titleCount}x Campeão`);
         // if (runnerUpCount > 0) parts.push(`${runnerUpCount}x Vice`); // Simplify summary
@@ -126,12 +137,19 @@ export const ManagersSection: React.FC<ManagersSectionProps> = ({ isDarkMode }) 
 
                 <div className="relative p-6 flex flex-col sm:flex-row gap-6 items-center sm:items-start text-center sm:text-left">
                     {/* Manager Image */}
-                    <div className={`w-24 h-24 rounded-full border-4 overflow-hidden shadow-xl flex-shrink-0 bg-gray-300 ${manager.is_active !== false ? 'border-yellow-400' : 'border-gray-500 grayscale'} `}>
-                        {manager.image_url ? (
-                            <img src={manager.image_url} alt={manager.name} className="w-full h-full object-cover" />
-                        ) : (
-                            <div className="w-full h-full flex items-center justify-center text-gray-500">
-                                <Users size={32} />
+                    <div className="relative">
+                        <div className={`w-24 h-24 rounded-full border-4 overflow-hidden shadow-xl flex-shrink-0 bg-gray-300 ${manager.is_active !== false ? 'border-yellow-400' : 'border-gray-500 grayscale'} `}>
+                            {manager.image_url ? (
+                                <img src={manager.image_url} alt={manager.name} className="w-full h-full object-cover" />
+                            ) : (
+                                <div className="w-full h-full flex items-center justify-center text-gray-500">
+                                    <Users size={32} />
+                                </div>
+                            )}
+                        </div>
+                        {isHoF && (
+                            <div className="absolute -bottom-1 -right-1 w-8 h-8 bg-black rounded-full flex items-center justify-center text-yellow-400 border-2 border-yellow-400 shadow-lg z-10" title="Hall of Fame">
+                                <Crown size={14} fill="currentColor" />
                             </div>
                         )}
                     </div>
@@ -139,15 +157,21 @@ export const ManagersSection: React.FC<ManagersSectionProps> = ({ isDarkMode }) 
                     {/* Info */}
                     <div className="flex-1 space-y-2">
                         <div>
-                            <h3 className={`text-2xl font-black uppercase leading-none mb-1 ${isDarkMode ? 'text-white' : 'text-[#0B1D33]'} `}>
-                                {manager.name}
-                            </h3>
+                            <div className="flex items-center justify-center sm:justify-start gap-2">
+                                <h3 className={`text-2xl font-black uppercase leading-none mb-1 ${isDarkMode ? 'text-white' : 'text-[#0B1D33]'} `}>
+                                    {manager.name}
+                                </h3>
+                            </div>
                             {/* Summary Bio (Truncated) */}
-                            {manager.bio && (
+                            {manager.bio ? (
                                 <p className="text-xs text-gray-500 font-bold uppercase tracking-widest line-clamp-1">
                                     {manager.bio}
                                 </p>
-                            )}
+                            ) : isHoF ? (
+                                <p className="text-xs text-yellow-500 font-bold uppercase tracking-widest">
+                                    Hall of Fame Member
+                                </p>
+                            ) : null}
                         </div>
 
                         <div className="flex flex-col gap-1 text-xs">
