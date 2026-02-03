@@ -64,12 +64,15 @@ export const AwardDetailsModal: React.FC<AwardDetailsModalProps> = ({ award, isD
             return;
         }
 
-        // Clean payload relations and sanitize UUIDs
-        const payload = { ...editing };
-        delete (payload as any).team;
-        delete (payload as any).manager;
+        // Clean payload relations
+        const payload: any = { ...editing };
+        delete payload.team;
+        delete payload.manager;
 
-        // Convert empty strings to null for UUID fields
+        // SANITIZATION: Remove id if empty string to avoid UUID error on insert
+        if (!payload.id) delete payload.id;
+
+        // SANITIZATION: Convert empty strings to null for nullable UUID fields
         if (!payload.team_id) payload.team_id = null;
         if (!payload.manager_id) payload.manager_id = null;
 

@@ -44,19 +44,21 @@ export const RecordDetailsModal: React.FC<RecordDetailsModalProps> = ({ record, 
 
         try {
             // Clean up fields based on type
-            const payload = { ...formData };
+            const payload: any = { ...formData };
+
+            // Clean ID if empty
+            if (!payload.id) delete payload.id;
+
             if (payload.type === 'TEAM') {
-                payload.manager_id = undefined;
+                payload.manager_id = null; // Explicitly clear if switching types
             } else {
-                // If individual, can have manager_id. team_id is optional context? Or enforcing?
-                // User said "allow linking to a team or GM".
+                // If individual, we might want to allow team_id as context, or not?
+                // For now, keep as is, but ensure empty strings are null
             }
 
-            // To ensure compatibility if column doesn't exist yet, we rely on supabase ignoring undefined unless it's strict.
-            // But we should set empty strings to null for UUIDs
             if (!payload.team_id) payload.team_id = null;
             if (!payload.manager_id) payload.manager_id = null;
-            if (payload.year === '') payload.year = null; // Optional year
+            if (!payload.year) payload.year = null;
 
             if (record?.id) {
                 await supabase.from('records').update(payload).eq('id', record.id);
