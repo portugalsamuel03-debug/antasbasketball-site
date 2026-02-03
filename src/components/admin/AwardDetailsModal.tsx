@@ -20,6 +20,7 @@ export const AwardDetailsModal: React.FC<AwardDetailsModalProps> = ({ award, isD
     const [categories, setCategories] = useState<any[]>([]);
     const [isManagingCategories, setIsManagingCategories] = useState(false);
     const [newCategoryName, setNewCategoryName] = useState('');
+    const [newCategoryType, setNewCategoryType] = useState<'INDIVIDUAL' | 'TEAM'>('INDIVIDUAL');
 
     useEffect(() => {
         fetchData();
@@ -40,7 +41,7 @@ export const AwardDetailsModal: React.FC<AwardDetailsModalProps> = ({ award, isD
 
     async function handleAddCategory() {
         if (!newCategoryName.trim()) return;
-        await insertAwardCategory(newCategoryName.trim());
+        await insertAwardCategory(newCategoryName.trim(), newCategoryType);
         setNewCategoryName('');
         fetchCategories();
     }

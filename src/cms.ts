@@ -357,8 +357,8 @@ export async function listAwardCategories() {
   return supabase.from("award_categories").select("*").order("name");
 }
 
-export async function insertAwardCategory(name: string) {
-  return supabase.from("award_categories").insert([{ name }]).select("*").single();
+export async function insertAwardCategory(name: string, type: 'INDIVIDUAL' | 'TEAM') {
+  return supabase.from("award_categories").insert([{ name, type }]).select("*").single();
 }
 
 export async function deleteAwardCategory(id: string) {
