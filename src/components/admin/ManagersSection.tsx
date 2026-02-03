@@ -1,6 +1,9 @@
+```
 import React, { useState, useEffect } from 'react';
 import { useAdmin } from '../../context/AdminContext';
 import { supabase } from '../../lib/supabase';
+import { listTeams, listChampions } from '../../cms';
+import { TeamRow, Champion } from '../../types';
 import { EditTrigger } from './EditTrigger';
 import { Users, Trash2, Award, Briefcase } from 'lucide-react';
 import { ManagerDetailsModal } from './ManagerDetailsModal';
@@ -9,8 +12,10 @@ export interface Manager {
     id: string;
     name: string;
     image_url?: string;
-    teams_managed?: string;
-    titles_won?: string;
+    teams_managed?: string; // Legacy
+    teams_managed_ids?: string[]; // New
+    titles_won?: string; // Legacy
+    individual_titles?: string; // New
     bio?: string;
     is_active?: boolean;
 }
@@ -23,85 +28,145 @@ export const ManagersSection: React.FC<ManagersSectionProps> = ({ isDarkMode }) 
     const { isEditing } = useAdmin();
     const [managers, setManagers] = useState<Manager[]>([]);
     const [selectedManager, setSelectedManager] = useState<Partial<Manager> | null>(null);
+    
+    // Aux data
+    const [teamsMap, setTeamsMap] = useState<Record<string, TeamRow>>({});
+    const [championCounts, setChampionCounts] = useState<Record<string, number>>({});
 
-    const fetchManagers = async () => {
-        const { data, error } = await supabase.from('managers').select('*').order('created_at', { ascending: true });
-        if (data) setManagers(data);
+    const fetchData = async () => {
+        // Fetch Managers
+        const { data: managersData } = await supabase.from('managers').select('*').order('created_at', { ascending: true });
+        if (managersData) setManagers(managersData);
+
+        // Fetch Teams to map IDs to Names
+        const { data: teamsData } = await listTeams();
+        const tMap: Record<string, TeamRow> = {};
+        teamsData?.forEach((t: any) => tMap[t.id] = t);
+        setTeamsMap(tMap);
+
+        // Fetch Champions to count titles
+        const { data: champsData } = await listChampions();
+        const cCounts: Record<string, number> = {};
+        (champsData as Champion[])?.forEach(c => {
+            if (c.manager_id) {
+                cCounts[c.manager_id] = (cCounts[c.manager_id] || 0) + 1;
+            }
+        });
+        setChampionCounts(cCounts);
     };
 
     useEffect(() => {
-        fetchManagers();
+        fetchData();
     }, []);
 
     const handleDelete = async (id: string, e: React.MouseEvent) => {
         e.stopPropagation();
         if (confirm('Deletar este gestor?')) {
             await supabase.from('managers').delete().eq('id', id);
-            fetchManagers();
+            fetchData();
         }
     };
 
     const activeManagers = managers.filter(m => m.is_active !== false);
     const historicManagers = managers.filter(m => m.is_active === false);
 
-    const ManagerCard = ({ manager }: { manager: Manager }) => (
-        <div
-            className={`relative rounded-3xl overflow-hidden shadow-lg group cursor-pointer transition-transform hover:scale-[1.01] ${isDarkMode ? 'bg-[#1a2c42]' : 'bg-white'}`}
-            onClick={() => isEditing && setSelectedManager(manager)}
-        >
-            {/* Background Gradient */}
-            <div className={`absolute inset-0 opacity-10 ${isDarkMode ? 'bg-white' : 'bg-black'}`} />
+    const ManagerCard = ({ manager }: { manager: Manager }) => {
+        // Resolve Teams
+        const linkedTeams = (manager.teams_managed_ids || [])
+            .map(id => teamsMap[id])
+            .filter(Boolean);
+        
+        // Resolve Titles
+        const titleCount = championCounts[manager.id] || 0;
+        const titleText = titleCount > 0 ? `${ titleCount }x Campeão` : '';
 
-            <div className="relative p-6 flex flex-col sm:flex-row gap-6 items-center sm:items-start text-center sm:text-left">
-                {/* Manager Image */}
-                <div className={`w-24 h-24 rounded-full border-4 overflow-hidden shadow-xl flex-shrink-0 bg-gray-300 ${manager.is_active !== false ? 'border-yellow-400' : 'border-gray-500 grayscale'}`}>
-                    {manager.image_url ? (
-                        <img src={manager.image_url} alt={manager.name} className="w-full h-full object-cover" />
-                    ) : (
-                        <div className="w-full h-full flex items-center justify-center text-gray-500">
-                            <Users size={32} />
+        return (
+            <div
+                className={`relative rounded - 3xl overflow - hidden shadow - lg group cursor - pointer transition - transform hover: scale - [1.01] ${ isDarkMode ? 'bg-[#1a2c42]' : 'bg-white' } `}
+                onClick={() => isEditing && setSelectedManager(manager)}
+            >
+                {/* Background Gradient */}
+                <div className={`absolute inset - 0 opacity - 10 ${ isDarkMode ? 'bg-white' : 'bg-black' } `} />
+
+                <div className="relative p-6 flex flex-col sm:flex-row gap-6 items-center sm:items-start text-center sm:text-left">
+                    {/* Manager Image */}
+                    <div className={`w - 24 h - 24 rounded - full border - 4 overflow - hidden shadow - xl flex - shrink - 0 bg - gray - 300 ${ manager.is_active !== false ? 'border-yellow-400' : 'border-gray-500 grayscale' } `}>
+                        {manager.image_url ? (
+                            <img src={manager.image_url} alt={manager.name} className="w-full h-full object-cover" />
+                        ) : (
+                            <div className="w-full h-full flex items-center justify-center text-gray-500">
+                                <Users size={32} />
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Info */}
+                    <div className="flex-1 space-y-3">
+                        <div>
+                            <h3 className={`text - 2xl font - black uppercase leading - none mb - 1 ${ isDarkMode ? 'text-white' : 'text-[#0B1D33]' } `}>
+                                {manager.name}
+                            </h3>
+                            {manager.bio && <p className="text-xs text-yellow-500 font-bold uppercase tracking-widest">{manager.bio}</p>}
                         </div>
-                    )}
+
+                        <div className="flex flex-col gap-2 text-xs">
+                            {/* Teams Logic: Prefer Linked Teams, fallback to legacy text */}
+                            {(linkedTeams.length > 0) ? (
+                                <div className="flex flex-wrap items-center gap-2 justify-center sm:justify-start text-gray-400">
+                                    <Briefcase size={12} className="text-yellow-400" />
+                                    {linkedTeams.map((t, idx) => (
+                                        <span key={t.id} className="uppercase">{t.name}{idx < linkedTeams.length - 1 ? ', ' : ''}</span>
+                                    ))}
+                                </div>
+                            ) : (manager.teams_managed && (
+                                <div className="flex items-center gap-2 justify-center sm:justify-start text-gray-400">
+                                    <Briefcase size={12} className="text-yellow-400" />
+                                    <span>{manager.teams_managed}</span>
+                                </div>
+                            ))}
+
+                            {/* Titles Logic: Show Auto-Titles + Individual Titles */}
+                            {(titleText || manager.individual_titles) && (
+                                <div className="flex flex-col gap-1 justify-center sm:justify-start text-gray-400">
+                                    {titleText && (
+                                        <div className="flex items-center gap-2">
+                                            <Award size={12} className="text-yellow-400" />
+                                            <span className="font-bold text-yellow-500 uppercase">{titleText}</span>
+                                        </div>
+                                    )}
+                                    {manager.individual_titles && (
+                                        <div className="flex items-center gap-2">
+                                            <Award size={12} className="text-yellow-400 opacity-50" />
+                                            <span>{manager.individual_titles}</span>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+
+                            {/* Legacy Title Fallback if no new schema data */}
+                            {!titleText && !manager.individual_titles && manager.titles_won && (
+                                <div className="flex items-center gap-2 justify-center sm:justify-start text-gray-400">
+                                    <Award size={12} className="text-yellow-400" />
+                                    <span>{manager.titles_won}</span>
+                                </div>
+                            )}
+                        </div>
+                    </div>
                 </div>
 
-                {/* Info */}
-                <div className="flex-1 space-y-3">
-                    <div>
-                        <h3 className={`text-2xl font-black uppercase leading-none mb-1 ${isDarkMode ? 'text-white' : 'text-[#0B1D33]'}`}>
-                            {manager.name}
-                        </h3>
-                        {manager.bio && <p className="text-xs text-yellow-500 font-bold uppercase tracking-widest">{manager.bio}</p>}
+                {isEditing && (
+                    <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button
+                            onClick={(e) => handleDelete(manager.id, e)}
+                            className="p-2 bg-red-500 text-white rounded-full shadow-lg hover:bg-red-600 transition"
+                        >
+                            <Trash2 size={14} />
+                        </button>
                     </div>
-
-                    <div className="flex flex-col gap-2 text-xs">
-                        {manager.teams_managed && (
-                            <div className="flex items-center gap-2 justify-center sm:justify-start text-gray-400">
-                                <Briefcase size={12} className="text-yellow-400" />
-                                <span>{manager.teams_managed}</span>
-                            </div>
-                        )}
-                        {manager.titles_won && (
-                            <div className="flex items-center gap-2 justify-center sm:justify-start text-gray-400">
-                                <Award size={12} className="text-yellow-400" />
-                                <span>{manager.titles_won}</span>
-                            </div>
-                        )}
-                    </div>
-                </div>
+                )}
             </div>
-
-            {isEditing && (
-                <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button
-                        onClick={(e) => handleDelete(manager.id, e)}
-                        className="p-2 bg-red-500 text-white rounded-full shadow-lg hover:bg-red-600 transition"
-                    >
-                        <Trash2 size={14} />
-                    </button>
-                </div>
-            )}
-        </div>
-    );
+        );
+    };
 
     return (
         <div className="px-6 pb-20 space-y-12">
@@ -139,9 +204,10 @@ export const ManagersSection: React.FC<ManagersSectionProps> = ({ isDarkMode }) 
                     manager={selectedManager}
                     isDarkMode={isDarkMode}
                     onClose={() => setSelectedManager(null)}
-                    onUpdate={fetchManagers}
+                    onUpdate={fetchData}
                 />
             )}
         </div>
     );
 };
+```

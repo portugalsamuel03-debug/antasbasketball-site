@@ -1,7 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
+import { listTeams, listChampions } from '../../cms';
+import { TeamRow, Champion } from '../../types';
 import { EditTrigger } from './EditTrigger';
-import { Users, Loader2, Image as ImageIcon } from 'lucide-react';
+import { Users, Loader2, Image as ImageIcon, Check } from 'lucide-react';
 import { Manager } from './ManagersSection';
 
 interface ManagerDetailsModalProps {
@@ -16,9 +18,29 @@ const BUCKET = "article-covers";
 export const ManagerDetailsModal: React.FC<ManagerDetailsModalProps> = ({ manager, onClose, isDarkMode, onUpdate }) => {
     const [formData, setFormData] = useState<Partial<Manager>>({
         is_active: true, // Default to true
+        teams_managed_ids: [],
         ...manager
     });
     const [msg, setMsg] = useState<string | null>(null);
+
+    // Data filtering state
+    const [allTeams, setAllTeams] = useState<TeamRow[]>([]);
+    const [calculatedTitles, setCalculatedTitles] = useState<string[]>([]);
+
+    useEffect(() => {
+        // Fetch Teams for dropdown
+        listTeams().then(({ data }) => setAllTeams(data as TeamRow[] || []));
+
+        // Calculate Titles if manager has an ID
+        if (manager.id) {
+            listChampions().then(({ data }) => {
+                const champions = data as Champion[] || [];
+                const wins = champions.filter(c => c.manager_id === manager.id);
+                const titles = wins.map(w => `${w.year} (${w.team})`);
+                setCalculatedTitles(titles);
+            });
+        }
+    }, [manager.id]);
 
     const handleSave = async () => {
         setMsg(null);
@@ -28,8 +50,14 @@ export const ManagerDetailsModal: React.FC<ManagerDetailsModalProps> = ({ manage
 
         try {
             const payload = { ...formData };
-            // If new (no ID), delete ID to let DB generate UUID if it was empty string
+            // If new (no ID), delete ID 
             if (!payload.id) delete (payload as any).id;
+
+            // Clean up legacy text fields if we are transitioning? 
+            // For now, let's keep them if they exist or just rely on new cols.
+            // But user asked to remove "Times que comandou" text field usage.
+            // We can optionally construct the string representation for backward compatibility if we wanted to
+            // but let's assume we are moving fully to IDs.
 
             const { error } = await supabase.from('managers').upsert(payload);
 
@@ -42,6 +70,15 @@ export const ManagerDetailsModal: React.FC<ManagerDetailsModalProps> = ({ manage
             console.error(e);
             alert(`Erro ao salvar: ${e.message}`);
             setMsg("Erro ao salvar.");
+        }
+    };
+
+    const toggleTeam = (teamId: string) => {
+        const currentIds = formData.teams_managed_ids || [];
+        if (currentIds.includes(teamId)) {
+            setFormData({ ...formData, teams_managed_ids: currentIds.filter(id => id !== teamId) });
+        } else {
+            setFormData({ ...formData, teams_managed_ids: [...currentIds, teamId] });
         }
     };
 
@@ -71,7 +108,7 @@ export const ManagerDetailsModal: React.FC<ManagerDetailsModalProps> = ({ manage
                     </div>
                 </div>
 
-                <div className="w-full space-y-4 mt-2">
+                <div className="w-full space-y-4 mt-2 max-h-[60vh] overflow-y-auto pr-2 custom-scrollbar">
                     {/* Active Toggle */}
                     <div className="flex items-center justify-between p-3 rounded-xl bg-white/5 border border-white/10">
                         <span className="text-xs font-bold uppercase text-gray-500">Gestor em Atividade?</span>
@@ -101,24 +138,58 @@ export const ManagerDetailsModal: React.FC<ManagerDetailsModalProps> = ({ manage
                         <input value={formData.bio || ''} onChange={e => setFormData({ ...formData, bio: e.target.value })} className={`${inputClass}`} placeholder="Ex: O Poderoso Chefão" />
                     </div>
 
+                    {/* Teams Selection */}
                     <div>
-                        <label className="text-[10px] font-bold uppercase text-gray-500 block text-left">Times que comandou</label>
-                        <textarea
-                            value={formData.teams_managed || ''}
-                            onChange={e => setFormData({ ...formData, teams_managed: e.target.value })}
-                            className={`${inputClass} min-h-[60px] resize-none`}
-                            placeholder="Ex: Lakers (80s), Heat (90s-Presente)"
-                        />
+                        <label className="text-[10px] font-bold uppercase text-gray-500 block text-left mb-2">Times Comandados</label>
+                        <div className={`p-2 rounded-xl border max-h-32 overflow-y-auto ${isDarkMode ? 'border-white/10 bg-black/20' : 'border-gray-200 bg-gray-50'}`}>
+                            {allTeams.map(team => {
+                                const isSelected = (formData.teams_managed_ids || []).includes(team.id);
+                                return (
+                                    <div
+                                        key={team.id}
+                                        onClick={() => toggleTeam(team.id)}
+                                        className={`flex items-center gap-2 p-2 rounded-lg cursor-pointer mb-1 transition-colors ${isSelected ? 'bg-yellow-400 text-black font-bold' : 'hover:bg-white/10 text-gray-500'}`}
+                                    >
+                                        <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${isSelected ? 'border-black' : 'border-gray-500'}`}>
+                                            {isSelected && <Check size={10} />}
+                                        </div>
+                                        <span className="text-xs uppercase">{team.name}</span>
+                                    </div>
+                                );
+                            })}
+                        </div>
                     </div>
 
-                    <div>
-                        <label className="text-[10px] font-bold uppercase text-gray-500 block text-left">Títulos Conquistados</label>
-                        <textarea
-                            value={formData.titles_won || ''}
-                            onChange={e => setFormData({ ...formData, titles_won: e.target.value })}
-                            className={`${inputClass} min-h-[60px] resize-none`}
-                            placeholder="Ex: 5x NBA Champion, 3x Coach of the Year"
-                        />
+                    {/* Titles Section */}
+                    <div className="space-y-3 pt-2 border-t border-dashed border-gray-700">
+                        {/* Auto-calculated Team Titles */}
+                        <div>
+                            <label className="text-[10px] font-bold uppercase text-gray-500 block text-left mb-1">
+                                Títulos de Times (Automático)
+                            </label>
+                            {calculatedTitles.length > 0 ? (
+                                <div className="text-xs text-yellow-500 font-bold bg-yellow-400/10 p-2 rounded-lg border border-yellow-400/20">
+                                    {calculatedTitles.map((t, i) => (
+                                        <div key={i}>🏆 {t}</div>
+                                    ))}
+                                </div>
+                            ) : (
+                                <div className="text-[10px] text-gray-600 italic">Nenhum título registrado na aba Campeões.</div>
+                            )}
+                        </div>
+
+                        {/* Individual Titles Input */}
+                        <div>
+                            <label className="text-[10px] font-bold uppercase text-gray-500 block text-left">
+                                Títulos Individuais (MVP, COY, etc)
+                            </label>
+                            <textarea
+                                value={formData.individual_titles || ''}
+                                onChange={e => setFormData({ ...formData, individual_titles: e.target.value })}
+                                className={`${inputClass} min-h-[50px] resize-none`}
+                                placeholder="Ex: 3x Coach of the Year, Hall of Fame 2024..."
+                            />
+                        </div>
                     </div>
 
                     {msg && <div className="text-xs text-center text-yellow-500 font-bold">{msg}</div>}
