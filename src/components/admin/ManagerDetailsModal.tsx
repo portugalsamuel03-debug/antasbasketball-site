@@ -144,7 +144,7 @@ export const ManagerDetailsModal: React.FC<ManagerDetailsModalProps> = ({ manage
                 </div>
 
                 {/* Profile Content */}
-                <div className="px-6 pb-6 flex-1 overflow-y-auto custom-scrollbar -mt-12">
+                <div className="px-6 pb-6 flex-1 overflow-y-auto custom-scrollbar -mt-10 relative z-10">
                     <div className="flex flex-col items-center">
                         {/* Avatar */}
                         <div className={`w-24 h-24 rounded-full border-4 overflow-hidden shadow-2xl ${isDarkMode ? 'border-[#121212] bg-[#121212]' : 'border-white bg-white'}`}>

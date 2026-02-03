@@ -1,11 +1,11 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Article, Champion, HallOfFame, TeamRow } from '../types';
 import { listChampions, upsertChampion, deleteChampion, listHallOfFame, upsertHallOfFame, deleteHallOfFame } from '../cms';
 import ArticleCard from './ArticleCard';
 import SectionTitle from './SectionTitle';
 import { EditTrigger } from './admin/EditTrigger';
 import { useAdmin } from '../context/AdminContext';
-import { Trophy, Crown, ChevronLeft, ChevronRight, BookOpen } from 'lucide-react';
+import { Trophy, Crown, BookOpen } from 'lucide-react';
 import { HallOfFameDetailsModal } from './admin/HallOfFameDetailsModal';
 import { AwardsSection } from './admin/AwardsSection';
 import { TradesSection } from './admin/TradesSection';
@@ -226,15 +226,7 @@ const HallOfFameSection: React.FC<{ isDarkMode: boolean }> = ({ isDarkMode }) =>
 const HistoriaPage: React.FC<HistoriaPageProps> = ({ articles, isDarkMode, onArticleClick, onShare, onEditArticle }) => {
     const { isEditing } = useAdmin();
     const [subTab, setSubTab] = useState<SubTab>('ARTIGOS');
-    const scrollRef = useRef<HTMLDivElement>(null);
     const [showStory, setShowStory] = useState(false);
-
-    const scroll = (direction: 'left' | 'right') => {
-        if (scrollRef.current) {
-            const amount = direction === 'left' ? -200 : 200;
-            scrollRef.current.scrollLeft += amount;
-        }
-    };
 
     return (
         <>
@@ -255,36 +247,24 @@ const HistoriaPage: React.FC<HistoriaPageProps> = ({ articles, isDarkMode, onArt
                 </SectionTitle>
             </div>
 
-            <div className={`sticky top-[52px] z-30 py-2 border-b border-white/10 ${isDarkMode ? 'bg-black/95 backdrop-blur-md' : 'bg-[#FDFBF4]/95 backdrop-blur-md'}`}>
-                <div className="relative flex items-center px-2">
-                    <button
-                        className="p-2 z-10 shrink-0 w-8 h-8 rounded-full bg-yellow-400 text-black shadow-lg flex items-center justify-center transition-transform active:scale-95"
-                        onClick={() => scroll('left')}
-                    >
-                        <ChevronLeft size={16} strokeWidth={3} />
-                    </button>
-
-                    <div ref={scrollRef} className="flex-1 overflow-x-auto flex items-center px-2 no-scrollbar gap-2 scroll-smooth">
+            <div className={`sticky top-[52px] z-30 py-3 border-b border-white/5 ${isDarkMode ? 'bg-black/95 backdrop-blur-md' : 'bg-[#FDFBF4]/95 backdrop-blur-md'}`}>
+                <div className="w-full max-w-7xl mx-auto px-4">
+                    <div className="flex items-center gap-2 overflow-x-auto pb-1 md:pb-0 no-scrollbar md:flex-wrap md:justify-center">
                         {(['ARTIGOS', 'CAMPEOES', 'RECORDES', 'TEMPORADAS', 'HALL_OF_FAME', 'AWARDS', 'TRADES', 'TIMES', 'GESTORES'] as SubTab[]).map(tab => (
                             <button
                                 key={tab}
                                 onClick={() => setSubTab(tab)}
-                                className={`px-4 py-2 rounded-full text-[10px] font-black uppercase tracking-widest whitespace-nowrap transition-all ${subTab === tab
+                                className={`shrink-0 px-4 py-2 rounded-full text-[10px] font-black uppercase tracking-widest transition-all ${subTab === tab
                                     ? 'bg-yellow-400 text-black shadow-lg shadow-yellow-400/20 scale-105'
-                                    : isDarkMode ? 'bg-white/5 text-gray-400' : 'bg-[#0B1D33]/5 text-gray-500'
+                                    : isDarkMode
+                                        ? 'bg-white/5 text-gray-400 hover:bg-white/10'
+                                        : 'bg-[#0B1D33]/5 text-gray-500 hover:bg-[#0B1D33]/10'
                                     }`}
                             >
                                 {tab.replace(/_/g, ' ')}
                             </button>
                         ))}
                     </div>
-
-                    <button
-                        className="p-2 z-10 shrink-0 w-8 h-8 rounded-full bg-yellow-400 text-black shadow-lg flex items-center justify-center transition-transform active:scale-95"
-                        onClick={() => scroll('right')}
-                    >
-                        <ChevronRight size={16} strokeWidth={3} />
-                    </button>
                 </div>
             </div>
 
