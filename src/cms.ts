@@ -151,6 +151,22 @@ export async function listManagers() {
   return supabase.from("managers").select("*").order("name");
 }
 
+export async function listManagerHistory(managerId: string) {
+  return supabase
+    .from("manager_history")
+    .select("*, team:teams(*)")
+    .eq("manager_id", managerId)
+    .order("year", { ascending: false });
+}
+
+export async function upsertManagerHistory(payload: any) {
+  return supabase.from("manager_history").upsert(payload).select().single();
+}
+
+export async function deleteManagerHistory(id: string) {
+  return supabase.from("manager_history").delete().eq("id", id);
+}
+
 // Hall of Fame
 export async function listHallOfFame() {
   return supabase.from("hall_of_fame").select("*").order("year_inducted", { ascending: false });

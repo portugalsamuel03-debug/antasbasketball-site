@@ -142,6 +142,25 @@ export interface Team {
   is_active?: boolean;
 }
 
+export interface ManagerHistory {
+  id: string;
+  manager_id: string;
+  team_id?: string;
+  year: string;
+  team?: Team;
+}
+
+export interface Manager {
+  id: string;
+  name: string;
+  image_url: string;
+  teams_managed?: string; // Legacy
+  teams_managed_ids?: string[]; // Legacy array
+  bio?: string;
+  is_active?: boolean;
+  individual_titles?: string; // Manual extras
+}
+
 export interface Award {
   id: string;
   year: string;
