@@ -54,7 +54,7 @@ export interface HallOfFame {
   name: string;
   year_inducted: string;
   role: string;
-  achievement: string;
+  achievement?: string;
   image_url: string;
   manager_id?: string;
   manager?: { id: string; name: string; image_url: string };

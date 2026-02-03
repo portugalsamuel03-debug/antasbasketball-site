@@ -118,12 +118,23 @@ export const HallOfFameDetailsModal: React.FC<HallOfFameDetailsModalProps> = ({ 
                             </div>
 
                             <input value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} className={`${inputClass} text-center font-black text-lg mt-2`} placeholder="Nome" />
-                            <input value={formData.year_inducted || ''} onChange={e => setFormData({ ...formData, year_inducted: e.target.value })} className={`${inputClass} text-center text-xs text-yellow-500 font-bold`} placeholder="Ano de Indução (Ex: 2026)" />
+
+                            <select
+                                value={formData.year_inducted || ''}
+                                onChange={e => setFormData({ ...formData, year_inducted: e.target.value })}
+                                className={`${inputClass} text-center text-xs text-yellow-500 font-bold bg-transparent outline-none`}
+                            >
+                                <option value="" className="text-gray-500">Temporada...</option>
+                                {Array.from({ length: 15 }, (_, i) => {
+                                    const start = 2017 + i;
+                                    const label = `${start}/${start + 1}`;
+                                    return <option key={label} value={label} className="text-black">{label}</option>;
+                                })}
+                            </select>
 
                             <div className="space-y-2 mt-2">
                                 <label className={`text-[10px] font-bold uppercase tracking-widest block text-left ${isDarkMode ? 'text-gray-500' : 'text-gray-400'}`}>Detalhes</label>
                                 <input value={formData.role || ''} onChange={e => setFormData({ ...formData, role: e.target.value })} className={`${inputClass} text-left text-xs`} placeholder="Função / Role" />
-                                <input value={formData.achievement || ''} onChange={e => setFormData({ ...formData, achievement: e.target.value })} className={`${inputClass} text-left text-xs`} placeholder="Conquista Principal" />
                                 <input value={formData.image_url || ''} onChange={e => setFormData({ ...formData, image_url: e.target.value })} className={`${inputClass} text-left text-xs`} placeholder="Image URL" />
                             </div>
 
@@ -147,7 +158,6 @@ export const HallOfFameDetailsModal: React.FC<HallOfFameDetailsModalProps> = ({ 
 
                             <div className={`text-xs space-y-1 ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
                                 <p><span className="font-bold opacity-50">ROLE:</span> {member.role}</p>
-                                <p><span className="font-bold opacity-50">FEAT:</span> {member.achievement}</p>
                                 {member.manager && (
                                     <p className="mt-2 text-[10px] italic opacity-60">Vinculado a: {member.manager.name}</p>
                                 )}
