@@ -352,6 +352,19 @@ export async function deleteAward(id: string) {
   return supabase.from("awards").delete().eq("id", id);
 }
 
+// Award Categories
+export async function listAwardCategories() {
+  return supabase.from("award_categories").select("*").order("name");
+}
+
+export async function insertAwardCategory(name: string) {
+  return supabase.from("award_categories").insert([{ name }]).select("*").single();
+}
+
+export async function deleteAwardCategory(id: string) {
+  return supabase.from("award_categories").delete().eq("id", id);
+}
+
 // Trades
 export async function listTrades() {
   return supabase
@@ -463,3 +476,6 @@ export async function updateStaticContent(key: string, content: any) {
 }
 
 
+export async function listRecords() {
+  return supabase.from("records").select("*").order("title");
+}

@@ -1,8 +1,7 @@
-import React, { useState, useEffect } from 'react';
-import { X, Save, Plus, Trash2, Edit2, Trophy, Award as AwardIcon } from 'lucide-react';
+import { X, Save, Plus, Trash2, Edit2, Trophy, Award as AwardIcon, Star } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
-import { Season, Team, SeasonStanding, Champion, Award, TeamRow } from '../../types';
-import { listChampions, listAwards, listTeams } from '../../cms';
+import { Season, Team, SeasonStanding, Champion, Award, TeamRow, RecordItem } from '../../types';
+import { listChampions, listAwards, listTeams, listRecords } from '../../cms';
 import { SEASON_OPTIONS } from '../../utils/seasons';
 
 interface SeasonDetailsModalProps {
@@ -23,6 +22,7 @@ export const SeasonDetailsModal: React.FC<SeasonDetailsModalProps> = ({ season, 
     // Auto-fetched data
     const [yearChampion, setYearChampion] = useState<Champion | null>(null);
     const [yearAwards, setYearAwards] = useState<Award[]>([]);
+    const [yearRecords, setYearRecords] = useState<RecordItem[]>([]);
 
     // For adding/editing standing row
     const [editingStanding, setEditingStanding] = useState<Partial<SeasonStanding> | null>(null);
@@ -62,6 +62,12 @@ export const SeasonDetailsModal: React.FC<SeasonDetailsModalProps> = ({ season, 
         if (awards) {
             const a = (awards as Award[]).filter(aw => aw.year.includes(year) || aw.year === year);
             setYearAwards(a);
+        }
+        // Fetch Records
+        const { data: records } = await listRecords();
+        if (records) {
+            const r = (records as RecordItem[]).filter(rec => rec.year === year || (rec.year && rec.year.includes(year)));
+            setYearRecords(r);
         }
     }
 
@@ -191,6 +197,25 @@ export const SeasonDetailsModal: React.FC<SeasonDetailsModalProps> = ({ season, 
                                             </div>
                                         </div>
                                     )}
+                                </div>
+                            )}
+
+
+                            {/* Records Section */}
+                            {yearRecords.length > 0 && (
+                                <div className="mt-4">
+                                    <h3 className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-3">Recordes da Temporada</h3>
+                                    <div className="grid grid-cols-1 gap-2">
+                                        {yearRecords.map(rec => (
+                                            <div key={rec.id} className={`p-4 rounded-2xl flex items-center gap-3 ${isDarkMode ? 'bg-white/5' : 'bg-orange-50'}`}>
+                                                <Star className="text-orange-400" size={16} />
+                                                <div>
+                                                    <div className={`text-xs font-black uppercase ${isDarkMode ? 'text-white' : 'text-black'}`}>{rec.title}</div>
+                                                    <div className="text-[10px] text-gray-500 font-bold">{rec.description}</div>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
                                 </div>
                             )}
 
@@ -361,6 +386,6 @@ export const SeasonDetailsModal: React.FC<SeasonDetailsModalProps> = ({ season, 
                     )}
                 </div>
             </div>
-        </div>
+        </div >
     );
 };
