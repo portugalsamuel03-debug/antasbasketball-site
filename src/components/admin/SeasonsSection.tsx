@@ -85,6 +85,7 @@ export const SeasonsSection: React.FC<{ isDarkMode: boolean }> = ({ isDarkMode }
                     season={selectedSeason}
                     isCreating={isCreating}
                     isDarkMode={isDarkMode}
+                    canEdit={isEditing}
                     onClose={() => setIsModalOpen(false)}
                     onSave={fetchSeasons}
                 />

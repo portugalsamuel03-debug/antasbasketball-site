@@ -8,11 +8,12 @@ interface SeasonDetailsModalProps {
     season: Season | null;
     isCreating: boolean;
     isDarkMode: boolean;
+    canEdit: boolean;
     onClose: () => void;
     onSave: () => void;
 }
 
-export const SeasonDetailsModal: React.FC<SeasonDetailsModalProps> = ({ season, isCreating, isDarkMode, onClose, onSave }) => {
+export const SeasonDetailsModal: React.FC<SeasonDetailsModalProps> = ({ season, isCreating, isDarkMode, canEdit, onClose, onSave }) => {
     const [formData, setFormData] = useState<Partial<Season>>({ year: '', summary: '' });
     const [standings, setStandings] = useState<SeasonStanding[]>([]);
     const [teams, setTeams] = useState<TeamRow[]>([]);
@@ -192,31 +193,45 @@ export const SeasonDetailsModal: React.FC<SeasonDetailsModalProps> = ({ season, 
                                 </div>
                             )}
 
+                            {/* Year Input (Only editable when creating or editing) */}
+                            {canEdit ? (
+                                <div>
+                                    <label className="text-[10px] font-bold uppercase text-gray-500 mb-1 block">Ano (Ex: 2017/18)</label>
+                                    <input
+                                        value={formData.year}
+                                        onChange={e => setFormData({ ...formData, year: e.target.value })}
+                                        className={inputClass}
+                                        placeholder="20XX/20XX"
+                                    />
+                                </div>
+                            ) : null}
+
+                            {/* Manual Summary */}
                             <div>
-                                <label className="text-[10px] font-bold uppercase text-gray-500 mb-1 block">Ano (Ex: 2017/18)</label>
-                                <input
-                                    value={formData.year}
-                                    onChange={e => setFormData({ ...formData, year: e.target.value })}
-                                    className={inputClass}
-                                    placeholder="20XX/20XX"
-                                />
+                                <label className="text-[10px] font-bold uppercase text-gray-500 mb-1 block">Resumo Manual</label>
+                                {canEdit ? (
+                                    <textarea
+                                        value={formData.summary || ''}
+                                        onChange={e => setFormData({ ...formData, summary: e.target.value })}
+                                        className={`${inputClass} min-h-[100px] resize-none`}
+                                        placeholder="Escreva um resumo adicional..."
+                                    />
+                                ) : (
+                                    <p className={`text-sm leading-relaxed ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                                        {formData.summary || 'Nenhum resumo disponível.'}
+                                    </p>
+                                )}
                             </div>
-                            <div>
-                                <label className="text-[10px] font-bold uppercase text-gray-500 mb-1 block">Resumo Manual (Opcional)</label>
-                                <textarea
-                                    value={formData.summary || ''}
-                                    onChange={e => setFormData({ ...formData, summary: e.target.value })}
-                                    className={`${inputClass} min-h-[100px] resize-none`}
-                                    placeholder="Escreva um resumo adicional..."
-                                />
-                            </div>
-                            <button
-                                onClick={handleSaveSeason}
-                                className="w-full py-4 rounded-2xl bg-yellow-400 text-black font-black uppercase tracking-widest hover:bg-yellow-300 active:scale-95 transition-all flex items-center justify-center gap-2"
-                            >
-                                <Save size={18} />
-                                {isCreating ? 'Criar Temporada' : 'Salvar Resumo'}
-                            </button>
+
+                            {canEdit && (
+                                <button
+                                    onClick={handleSaveSeason}
+                                    className="w-full py-4 rounded-2xl bg-yellow-400 text-black font-black uppercase tracking-widest hover:bg-yellow-300 active:scale-95 transition-all flex items-center justify-center gap-2"
+                                >
+                                    <Save size={18} />
+                                    {isCreating ? 'Criar Temporada' : 'Salvar Resumo'}
+                                </button>
+                            )}
                         </div>
                     )}
 
@@ -308,10 +323,12 @@ export const SeasonDetailsModal: React.FC<SeasonDetailsModalProps> = ({ season, 
                                                         </div>
                                                     </div>
                                                 </div>
-                                                <div className="flex items-center gap-2">
-                                                    <button onClick={() => setEditingStanding(st)} className="p-2 text-blue-400 hover:bg-blue-400/10 rounded-full"><Edit2 size={14} /></button>
-                                                    <button onClick={() => handleDeleteStanding(st.id)} className="p-2 text-red-400 hover:bg-red-400/10 rounded-full"><Trash2 size={14} /></button>
-                                                </div>
+                                                {canEdit && (
+                                                    <div className="flex items-center gap-2">
+                                                        <button onClick={() => setEditingStanding(st)} className="p-2 text-blue-400 hover:bg-blue-400/10 rounded-full"><Edit2 size={14} /></button>
+                                                        <button onClick={() => handleDeleteStanding(st.id)} className="p-2 text-red-400 hover:bg-red-400/10 rounded-full"><Trash2 size={14} /></button>
+                                                    </div>
+                                                )}
                                             </div>
 
                                             {/* RICH DATA DISPLAY */}
