@@ -64,10 +64,14 @@ export const AwardDetailsModal: React.FC<AwardDetailsModalProps> = ({ award, isD
             return;
         }
 
-        // Clean payload relations
+        // Clean payload relations and sanitize UUIDs
         const payload = { ...editing };
         delete (payload as any).team;
         delete (payload as any).manager;
+
+        // Convert empty strings to null for UUID fields
+        if (!payload.team_id) payload.team_id = null;
+        if (!payload.manager_id) payload.manager_id = null;
 
         setMsg('Salvando...');
         try {

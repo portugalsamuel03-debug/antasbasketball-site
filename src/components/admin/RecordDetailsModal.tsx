@@ -56,6 +56,7 @@ export const RecordDetailsModal: React.FC<RecordDetailsModalProps> = ({ record, 
             // But we should set empty strings to null for UUIDs
             if (!payload.team_id) payload.team_id = null;
             if (!payload.manager_id) payload.manager_id = null;
+            if (payload.year === '') payload.year = null; // Optional year
 
             if (record?.id) {
                 await supabase.from('records').update(payload).eq('id', record.id);
