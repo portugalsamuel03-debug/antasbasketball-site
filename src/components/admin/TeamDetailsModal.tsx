@@ -298,12 +298,18 @@ export const TeamDetailsModal: React.FC<TeamDetailsModalProps> = ({ team, onClos
 
                                         {isEditMode && team.id && (
                                             <div className={`mt-2 p-2 rounded-lg border border-dashed ${isDarkMode ? 'border-white/20' : 'border-gray-300'} flex items-center gap-2`}>
-                                                <input
+                                                <select
                                                     value={newHistoryYear}
                                                     onChange={e => setNewHistoryYear(e.target.value)}
-                                                    placeholder="Ano (20/21)"
-                                                    className="bg-transparent text-xs w-20 outline-none border-b border-transparent focus:border-yellow-400 px-1 py-1"
-                                                />
+                                                    className="bg-transparent text-xs w-24 outline-none border-b border-transparent focus:border-yellow-400 px-1 py-1 appearance-none"
+                                                >
+                                                    <option value="" className="text-gray-500">Temp...</option>
+                                                    {Array.from({ length: 15 }, (_, i) => {
+                                                        const start = 2017 + i;
+                                                        const label = `${start}/${start + 1}`;
+                                                        return <option key={label} value={label} className="text-black">{label}</option>;
+                                                    })}
+                                                </select>
                                                 <select
                                                     value={newHistoryManager}
                                                     onChange={e => setNewHistoryManager(e.target.value)}
