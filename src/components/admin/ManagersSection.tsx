@@ -168,7 +168,7 @@ export const ManagersSection: React.FC<ManagersSectionProps> = ({ isDarkMode }) 
                             {/* Legacy Title Fallback if no new schema data */}
                             {!titleText && !manager.individual_titles && manager.titles_won && (
                                 <div className="flex items-center gap-2 justify-center sm:justify-start text-gray-400">
-                                    <Award size={12} className="text-yellow-400" />
+                                    <AwardIcon size={12} className="text-yellow-400" />
                                     <span>{manager.titles_won}</span>
                                 </div>
                             )}
