@@ -1,3 +1,4 @@
+import React, { useState, useEffect } from 'react';
 import { X, Save, Plus, Trash2, Edit2, Trophy, Award as AwardIcon, Star } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { Season, Team, SeasonStanding, Champion, Award, TeamRow, RecordItem } from '../../types';
