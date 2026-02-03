@@ -1,4 +1,3 @@
-```
 import React, { useState, useEffect } from 'react';
 import { useAdmin } from '../../context/AdminContext';
 import { supabase } from '../../lib/supabase';
@@ -28,7 +27,7 @@ export const ManagersSection: React.FC<ManagersSectionProps> = ({ isDarkMode }) 
     const { isEditing } = useAdmin();
     const [managers, setManagers] = useState<Manager[]>([]);
     const [selectedManager, setSelectedManager] = useState<Partial<Manager> | null>(null);
-    
+
     // Aux data
     const [teamsMap, setTeamsMap] = useState<Record<string, TeamRow>>({});
     const [championCounts, setChampionCounts] = useState<Record<string, number>>({});
@@ -75,22 +74,22 @@ export const ManagersSection: React.FC<ManagersSectionProps> = ({ isDarkMode }) 
         const linkedTeams = (manager.teams_managed_ids || [])
             .map(id => teamsMap[id])
             .filter(Boolean);
-        
+
         // Resolve Titles
         const titleCount = championCounts[manager.id] || 0;
-        const titleText = titleCount > 0 ? `${ titleCount }x Campeão` : '';
+        const titleText = titleCount > 0 ? `${titleCount}x Campeão` : '';
 
         return (
             <div
-                className={`relative rounded - 3xl overflow - hidden shadow - lg group cursor - pointer transition - transform hover: scale - [1.01] ${ isDarkMode ? 'bg-[#1a2c42]' : 'bg-white' } `}
+                className={`relative rounded-3xl overflow-hidden shadow-lg group cursor-pointer transition-transform hover:scale-[1.01] ${isDarkMode ? 'bg-[#1a2c42]' : 'bg-white'} `}
                 onClick={() => isEditing && setSelectedManager(manager)}
             >
                 {/* Background Gradient */}
-                <div className={`absolute inset - 0 opacity - 10 ${ isDarkMode ? 'bg-white' : 'bg-black' } `} />
+                <div className={`absolute inset-0 opacity-10 ${isDarkMode ? 'bg-white' : 'bg-black'} `} />
 
                 <div className="relative p-6 flex flex-col sm:flex-row gap-6 items-center sm:items-start text-center sm:text-left">
                     {/* Manager Image */}
-                    <div className={`w - 24 h - 24 rounded - full border - 4 overflow - hidden shadow - xl flex - shrink - 0 bg - gray - 300 ${ manager.is_active !== false ? 'border-yellow-400' : 'border-gray-500 grayscale' } `}>
+                    <div className={`w-24 h-24 rounded-full border-4 overflow-hidden shadow-xl flex-shrink-0 bg-gray-300 ${manager.is_active !== false ? 'border-yellow-400' : 'border-gray-500 grayscale'} `}>
                         {manager.image_url ? (
                             <img src={manager.image_url} alt={manager.name} className="w-full h-full object-cover" />
                         ) : (
@@ -103,7 +102,7 @@ export const ManagersSection: React.FC<ManagersSectionProps> = ({ isDarkMode }) 
                     {/* Info */}
                     <div className="flex-1 space-y-3">
                         <div>
-                            <h3 className={`text - 2xl font - black uppercase leading - none mb - 1 ${ isDarkMode ? 'text-white' : 'text-[#0B1D33]' } `}>
+                            <h3 className={`text-2xl font-black uppercase leading-none mb-1 ${isDarkMode ? 'text-white' : 'text-[#0B1D33]'} `}>
                                 {manager.name}
                             </h3>
                             {manager.bio && <p className="text-xs text-yellow-500 font-bold uppercase tracking-widest">{manager.bio}</p>}
@@ -210,4 +209,3 @@ export const ManagersSection: React.FC<ManagersSectionProps> = ({ isDarkMode }) 
         </div>
     );
 };
-```
