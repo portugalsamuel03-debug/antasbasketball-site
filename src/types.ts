@@ -157,6 +157,8 @@ export interface Award {
   winner_name: string;
   team_id?: string;
   team?: Team;
+  manager_id?: string; // New
+  manager?: { id: string; name: string; image_url: string };
   description?: string;
 }
 
@@ -210,6 +212,8 @@ export interface Champion {
   score: string;
   logo_url?: string;
   team_id?: string;
+  runner_up_team_id?: string;
+  runner_up_team?: { id: string; name: string; logo_url?: string }; // Join
   historic_players?: { name: string; icon?: string }[];
 }
 

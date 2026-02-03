@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useAdmin } from '../../context/AdminContext';
 import { supabase } from '../../lib/supabase';
-import { listTeams, listChampions } from '../../cms';
-import { TeamRow, Champion } from '../../types';
+import { listTeams, listChampions, listAwards } from '../../cms';
+import { TeamRow, Champion, Award } from '../../types';
 import { EditTrigger } from './EditTrigger';
-import { Users, Trash2, Award, Briefcase } from 'lucide-react';
+import { Users, Trash2, Award as AwardIcon, Briefcase } from 'lucide-react';
 import { ManagerDetailsModal } from './ManagerDetailsModal';
 
 export interface Manager {
@@ -31,6 +31,7 @@ export const ManagersSection: React.FC<ManagersSectionProps> = ({ isDarkMode }) 
     // Aux data
     const [teamsMap, setTeamsMap] = useState<Record<string, TeamRow>>({});
     const [championCounts, setChampionCounts] = useState<Record<string, number>>({});
+    const [managerAwards, setManagerAwards] = useState<Record<string, string[]>>({});
 
     const fetchData = async () => {
         // Fetch Managers
@@ -52,6 +53,17 @@ export const ManagersSection: React.FC<ManagersSectionProps> = ({ isDarkMode }) 
             }
         });
         setChampionCounts(cCounts);
+
+        // Fetch Awards
+        const { data: awardsData } = await listAwards();
+        const mAwards: Record<string, string[]> = {};
+        (awardsData as Award[])?.forEach(a => {
+            if (a.manager_id) {
+                if (!mAwards[a.manager_id]) mAwards[a.manager_id] = [];
+                mAwards[a.manager_id].push(`${a.year} ${a.category}`);
+            }
+        });
+        setManagerAwards(mAwards);
     };
 
     useEffect(() => {
@@ -78,6 +90,9 @@ export const ManagersSection: React.FC<ManagersSectionProps> = ({ isDarkMode }) 
         // Resolve Titles
         const titleCount = championCounts[manager.id] || 0;
         const titleText = titleCount > 0 ? `${titleCount}x Campeão` : '';
+
+        // Resolve Awards
+        const awards = managerAwards[manager.id] || [];
 
         return (
             <div
@@ -124,18 +139,26 @@ export const ManagersSection: React.FC<ManagersSectionProps> = ({ isDarkMode }) 
                                 </div>
                             ))}
 
-                            {/* Titles Logic: Show Auto-Titles + Individual Titles */}
-                            {(titleText || manager.individual_titles) && (
+                            {/* Titles Logic: Show Auto-Titles + Individual Titles + Awards */}
+                            {(titleText || manager.individual_titles || awards.length > 0) && (
                                 <div className="flex flex-col gap-1 justify-center sm:justify-start text-gray-400">
                                     {titleText && (
                                         <div className="flex items-center gap-2">
-                                            <Award size={12} className="text-yellow-400" />
+                                            <AwardIcon size={12} className="text-yellow-400" />
                                             <span className="font-bold text-yellow-500 uppercase">{titleText}</span>
                                         </div>
                                     )}
+                                    {/* Auto-Awards from DB */}
+                                    {awards.map((award, i) => (
+                                        <div key={i} className="flex items-center gap-2">
+                                            <AwardIcon size={12} className="text-yellow-400 opacity-80" />
+                                            <span>{award}</span>
+                                        </div>
+                                    ))}
+                                    {/* Manual Titles */}
                                     {manager.individual_titles && (
                                         <div className="flex items-center gap-2">
-                                            <Award size={12} className="text-yellow-400 opacity-50" />
+                                            <AwardIcon size={12} className="text-yellow-400 opacity-50" />
                                             <span>{manager.individual_titles}</span>
                                         </div>
                                     )}

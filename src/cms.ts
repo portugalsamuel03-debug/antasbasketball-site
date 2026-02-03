@@ -133,10 +133,14 @@ export async function upsertTag(payload: Partial<TagRow>) {
 // Champions
 // Champions
 export async function listChampions() {
-  return supabase.from("champions").select("*, manager:managers(id, name, image_url)").order("year", { ascending: false });
+  return supabase.from("champions")
+    .select("*, manager:managers(id, name, image_url), runner_up_team:teams!runner_up_team_id(id, name, logo_url)")
+    .order("year", { ascending: false });
 }
 export async function upsertChampion(payload: Partial<any>) {
-  return supabase.from("champions").upsert(payload).select("*, manager:managers(id, name, image_url)").single();
+  return supabase.from("champions").upsert(payload)
+    .select("*, manager:managers(id, name, image_url), runner_up_team:teams!runner_up_team_id(id, name, logo_url)")
+    .single();
 }
 export async function deleteChampion(id: string) {
   return supabase.from("champions").delete().eq("id", id);
@@ -320,7 +324,8 @@ export async function listAwards() {
     .from("awards")
     .select(`
       *,
-      team:teams(id, name, gm_name, logo_url)
+      team:teams(id, name, gm_name, logo_url),
+      manager:managers(id, name, image_url)
     `)
     .order("year", { ascending: false });
 }

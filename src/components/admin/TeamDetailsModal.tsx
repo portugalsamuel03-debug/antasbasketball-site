@@ -104,7 +104,7 @@ export const TeamDetailsModal: React.FC<TeamDetailsModalProps> = ({ team, onClos
                                 <input value={formData.logo_url || ''} onChange={e => setFormData({ ...formData, logo_url: e.target.value })} className={`${inputClass}`} placeholder="https://..." />
                             </div>
 
-                            <div className="grid grid-cols-2 gap-4">
+                            <div className="grid grid-cols-1 gap-4">
                                 <div>
                                     <label className="text-[10px] font-bold uppercase text-gray-500 block text-left">Gestor (Link)</label>
                                     <select
@@ -117,10 +117,6 @@ export const TeamDetailsModal: React.FC<TeamDetailsModalProps> = ({ team, onClos
                                             <option key={m.id} value={m.id} className="text-black">{m.name}</option>
                                         ))}
                                     </select>
-                                </div>
-                                <div>
-                                    <label className="text-[10px] font-bold uppercase text-gray-500 block text-left">GM (Texto Livre)</label>
-                                    <input value={formData.gm_name || ''} onChange={e => setFormData({ ...formData, gm_name: e.target.value })} className={`${inputClass} font-bold`} placeholder="Nome se não tiver gestor" />
                                 </div>
                             </div>
 

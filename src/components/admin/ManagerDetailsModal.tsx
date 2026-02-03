@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
-import { listTeams, listChampions } from '../../cms';
-import { TeamRow, Champion } from '../../types';
+import { listTeams, listChampions, listAwards } from '../../cms';
+import { TeamRow, Champion, Award } from '../../types';
 import { EditTrigger } from './EditTrigger';
 import { Users, Loader2, Image as ImageIcon, Check } from 'lucide-react';
 import { Manager } from './ManagersSection';
@@ -26,18 +26,28 @@ export const ManagerDetailsModal: React.FC<ManagerDetailsModalProps> = ({ manage
     // Data filtering state
     const [allTeams, setAllTeams] = useState<TeamRow[]>([]);
     const [calculatedTitles, setCalculatedTitles] = useState<string[]>([]);
+    const [calculatedAwards, setCalculatedAwards] = useState<string[]>([]);
 
     useEffect(() => {
         // Fetch Teams for dropdown
         listTeams().then(({ data }) => setAllTeams(data as TeamRow[] || []));
 
-        // Calculate Titles if manager has an ID
+        // Calculate Titles & Awards if manager has an ID
         if (manager.id) {
+            // Champions
             listChampions().then(({ data }) => {
                 const champions = data as Champion[] || [];
                 const wins = champions.filter(c => c.manager_id === manager.id);
                 const titles = wins.map(w => `${w.year} (${w.team})`);
                 setCalculatedTitles(titles);
+            });
+
+            // Awards
+            listAwards().then(({ data }) => {
+                const awards = data as Award[] || [];
+                const myAwards = awards.filter(a => a.manager_id === manager.id);
+                const awardStrings = myAwards.map(a => `${a.year}: ${a.category}`);
+                setCalculatedAwards(awardStrings);
             });
         }
     }, [manager.id]);
@@ -52,12 +62,6 @@ export const ManagerDetailsModal: React.FC<ManagerDetailsModalProps> = ({ manage
             const payload = { ...formData };
             // If new (no ID), delete ID 
             if (!payload.id) delete (payload as any).id;
-
-            // Clean up legacy text fields if we are transitioning? 
-            // For now, let's keep them if they exist or just rely on new cols.
-            // But user asked to remove "Times que comandou" text field usage.
-            // We can optionally construct the string representation for backward compatibility if we wanted to
-            // but let's assume we are moving fully to IDs.
 
             const { error } = await supabase.from('managers').upsert(payload);
 
@@ -174,20 +178,36 @@ export const ManagerDetailsModal: React.FC<ManagerDetailsModalProps> = ({ manage
                                     ))}
                                 </div>
                             ) : (
-                                <div className="text-[10px] text-gray-600 italic">Nenhum título registrado na aba Campeões.</div>
+                                <div className="text-[10px] text-gray-600 italic">Nenhum título registrado.</div>
                             )}
                         </div>
 
-                        {/* Individual Titles Input */}
+                        {/* Awards Section */}
+                        <div>
+                            <label className="text-[10px] font-bold uppercase text-gray-500 block text-left mb-1">
+                                Prêmios Individuais (Automático)
+                            </label>
+                            {calculatedAwards.length > 0 ? (
+                                <div className="text-xs text-white/80 font-medium bg-white/5 p-2 rounded-lg border border-white/10">
+                                    {calculatedAwards.map((t, i) => (
+                                        <div key={i}>🎖️ {t}</div>
+                                    ))}
+                                </div>
+                            ) : (
+                                <div className="text-[10px] text-gray-600 italic">Nenhum prêmio registrado.</div>
+                            )}
+                        </div>
+
+                        {/* Individual Titles Input (Manual) */}
                         <div>
                             <label className="text-[10px] font-bold uppercase text-gray-500 block text-left">
-                                Títulos Individuais (MVP, COY, etc)
+                                Outros Títulos (Manual)
                             </label>
                             <textarea
                                 value={formData.individual_titles || ''}
                                 onChange={e => setFormData({ ...formData, individual_titles: e.target.value })}
                                 className={`${inputClass} min-h-[50px] resize-none`}
-                                placeholder="Ex: 3x Coach of the Year, Hall of Fame 2024..."
+                                placeholder="Extras..."
                             />
                         </div>
                     </div>

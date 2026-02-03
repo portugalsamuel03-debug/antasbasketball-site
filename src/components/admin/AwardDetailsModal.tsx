@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Award, Team } from '../../types';
-import { upsertAward, listTeams } from '../../cms';
+import { upsertAward, listTeams, listManagers } from '../../cms';
 import { X } from 'lucide-react';
 
 interface AwardDetailsModalProps {
@@ -12,27 +12,41 @@ interface AwardDetailsModalProps {
 export const AwardDetailsModal: React.FC<AwardDetailsModalProps> = ({ award, isDarkMode, onClose }) => {
     const [editing, setEditing] = useState<Partial<Award>>(award);
     const [teams, setTeams] = useState<Team[]>([]);
+    const [managers, setManagers] = useState<any[]>([]);
     const [msg, setMsg] = useState<string | null>(null);
     const [categories, setCategories] = useState<string[]>(['MVP', 'GM do Ano', 'Defensor do Ano', 'Sexto Homem', 'Melhor Trade', 'Pior Trade']);
 
     useEffect(() => {
-        fetchTeams();
+        fetchData();
     }, []);
 
-    async function fetchTeams() {
-        const { data } = await listTeams();
-        setTeams(data || []);
+    async function fetchData() {
+        const { data: teamsData } = await listTeams();
+        setTeams(teamsData || []);
+        const { data: managersData } = await listManagers();
+        setManagers(managersData || []);
     }
 
     async function handleSave() {
-        if (!editing.year || !editing.category || !editing.winner_name) {
-            setMsg('Preencha ano, categoria e vencedor.');
+        if (!editing.year || !editing.category) {
+            setMsg('Preencha ano e categoria.');
             return;
         }
 
+        // Ensure winner_name is set (fallback to manual if needed, or sync from manager)
+        if (!editing.winner_name) {
+            setMsg('Selecione ou digite o Vencedor.');
+            return;
+        }
+
+        // Clean payload relations
+        const payload = { ...editing };
+        delete (payload as any).team;
+        delete (payload as any).manager;
+
         setMsg('Salvando...');
         try {
-            const { error } = await upsertAward(editing);
+            const { error } = await upsertAward(payload);
             if (error) throw error;
 
             setMsg('Salvo!');
@@ -85,13 +99,36 @@ export const AwardDetailsModal: React.FC<AwardDetailsModalProps> = ({ award, isD
                     </div>
 
                     <div>
-                        <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-2">Vencedor</label>
-                        <input
-                            className={inputClass}
-                            placeholder="Nome do vencedor"
-                            value={editing.winner_name || ''}
-                            onChange={e => setEditing({ ...editing, winner_name: e.target.value })}
-                        />
+                        <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-2">Vencedor (Gestor)</label>
+                        <select
+                            className={`${inputClass} appearance-none ${isDarkMode ? 'bg-[#1a2c42]' : 'bg-white'}`}
+                            value={editing.manager_id || ''}
+                            onChange={e => {
+                                const m = managers.find(man => man.id === e.target.value);
+                                setEditing({
+                                    ...editing,
+                                    manager_id: e.target.value,
+                                    winner_name: m ? m.name : editing.winner_name
+                                });
+                            }}
+                        >
+                            <option value="" className={isDarkMode ? 'bg-[#0B1D33] text-white' : 'bg-white text-black'}>Selecione...</option>
+                            {managers.map(m => (
+                                <option key={m.id} value={m.id} className={isDarkMode ? 'bg-[#0B1D33] text-white' : 'bg-white text-black'}>
+                                    {m.name}
+                                </option>
+                            ))}
+                        </select>
+
+                        {/* Fallback Text Input if manual entry is needed (e.g. for players, not managers?) Or explicitly requested "allow me to pull managers" */}
+                        <div className="mt-1">
+                            <input
+                                className={`${inputClass} text-xs py-2 opacity-60`}
+                                placeholder="Ou digite o nome (se não for gestor)..."
+                                value={editing.winner_name || ''}
+                                onChange={e => setEditing({ ...editing, winner_name: e.target.value })}
+                            />
+                        </div>
                     </div>
 
                     <div>
@@ -115,7 +152,7 @@ export const AwardDetailsModal: React.FC<AwardDetailsModalProps> = ({ award, isD
                             <option value="" className={isDarkMode ? 'bg-[#0B1D33] text-white' : 'bg-white text-black'}>Nenhum</option>
                             {teams.map(team => (
                                 <option key={team.id} value={team.id} className={isDarkMode ? 'bg-[#0B1D33] text-white' : 'bg-white text-black'}>
-                                    {team.name} - {team.gm_name}
+                                    {team.name}
                                 </option>
                             ))}
                         </select>
