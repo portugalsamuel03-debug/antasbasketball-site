@@ -134,12 +134,12 @@ export async function upsertTag(payload: Partial<TagRow>) {
 // Champions
 export async function listChampions() {
   return supabase.from("champions")
-    .select("*, manager:managers(id, name, image_url), runner_up_team:teams!runner_up_team_id(id, name, logo_url)")
+    .select("*, manager:managers!manager_id(id, name, image_url), runner_up_team:teams!runner_up_team_id(id, name, logo_url), runner_up_manager:managers!runner_up_manager_id(id, name, image_url)")
     .order("year", { ascending: false });
 }
 export async function upsertChampion(payload: Partial<any>) {
   return supabase.from("champions").upsert(payload)
-    .select("*, manager:managers(id, name, image_url), runner_up_team:teams!runner_up_team_id(id, name, logo_url)")
+    .select("*, manager:managers!manager_id(id, name, image_url), runner_up_team:teams!runner_up_team_id(id, name, logo_url), runner_up_manager:managers!runner_up_manager_id(id, name, image_url)")
     .single();
 }
 export async function deleteChampion(id: string) {

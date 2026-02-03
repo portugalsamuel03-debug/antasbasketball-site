@@ -14,7 +14,7 @@ export const AwardDetailsModal: React.FC<AwardDetailsModalProps> = ({ award, isD
     const [teams, setTeams] = useState<Team[]>([]);
     const [managers, setManagers] = useState<any[]>([]);
     const [msg, setMsg] = useState<string | null>(null);
-    const [categories, setCategories] = useState<string[]>(['MVP', 'GM do Ano', 'Defensor do Ano', 'Sexto Homem', 'Melhor Trade', 'Pior Trade']);
+    const [categories, setCategories] = useState<string[]>(['MVP', 'GM do Ano', 'Defensor do Ano', 'Sexto Homem', 'Melhor Trade', 'Pior Trade', 'Título de Divisão', 'Copa do Brasil', 'Time do Semestre']);
 
     useEffect(() => {
         fetchData();

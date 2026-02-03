@@ -38,8 +38,12 @@ export const ManagerDetailsModal: React.FC<ManagerDetailsModalProps> = ({ manage
             listChampions().then(({ data }) => {
                 const champions = data as Champion[] || [];
                 const wins = champions.filter(c => c.manager_id === manager.id);
-                const titles = wins.map(w => `${w.year} (${w.team})`);
-                setCalculatedTitles(titles);
+                const runnerUps = champions.filter(c => c.runner_up_manager_id === manager.id);
+
+                const winTitles = wins.map(w => `🏆 ${w.year} (${w.team})`);
+                const viceTitles = runnerUps.map(r => `🥈 ${r.year} (Vice - ${r.runner_up_team?.name || 'Time'})`);
+
+                setCalculatedTitles([...winTitles, ...viceTitles]);
             });
 
             // Awards
@@ -174,7 +178,7 @@ export const ManagerDetailsModal: React.FC<ManagerDetailsModalProps> = ({ manage
                             {calculatedTitles.length > 0 ? (
                                 <div className="text-xs text-yellow-500 font-bold bg-yellow-400/10 p-2 rounded-lg border border-yellow-400/20">
                                     {calculatedTitles.map((t, i) => (
-                                        <div key={i}>🏆 {t}</div>
+                                        <div key={i}>{t}</div>
                                     ))}
                                 </div>
                             ) : (

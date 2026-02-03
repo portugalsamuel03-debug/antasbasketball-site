@@ -56,6 +56,7 @@ export const ChampionDetailsModal: React.FC<ChampionDetailsModalProps> = ({ cham
         // Remove joined data that shouldn't be valid columns
         delete (payload as any).manager;
         delete (payload as any).runner_up_team;
+        delete (payload as any).runner_up_manager;
 
         // Save highlights as JSON array of objects
         payload.historic_players = highlightPlayers
@@ -159,7 +160,7 @@ export const ChampionDetailsModal: React.FC<ChampionDetailsModalProps> = ({ cham
                             </div>
 
                             <div>
-                                <label className="text-[10px] font-bold uppercase text-gray-500 block text-left">Vice-Campeão</label>
+                                <label className="text-[10px] font-bold uppercase text-gray-500 block text-left">Vice-Campeão (Time)</label>
                                 <select
                                     value={formData.runner_up_team_id || ''}
                                     onChange={e => setFormData({ ...formData, runner_up_team_id: e.target.value })}
@@ -168,6 +169,20 @@ export const ChampionDetailsModal: React.FC<ChampionDetailsModalProps> = ({ cham
                                     <option value="" className="text-gray-500">Selecione o Vice...</option>
                                     {teams.map(t => (
                                         <option key={t.id} value={t.id} className={isDarkMode ? 'bg-[#0B1D33] text-white' : 'bg-white text-black'}>{t.name}</option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            <div>
+                                <label className="text-[10px] font-bold uppercase text-gray-500 block text-left mb-1">Gestor do Vice (Opcional)</label>
+                                <select
+                                    value={formData.runner_up_manager_id || ''}
+                                    onChange={e => setFormData({ ...formData, runner_up_manager_id: e.target.value })}
+                                    className={`${inputClass} uppercase appearance-none ${isDarkMode ? 'bg-[#1a2c42]' : 'bg-white'}`}
+                                >
+                                    <option value="">Selecione o Gestor do Vice...</option>
+                                    {managers.map(m => (
+                                        <option key={m.id} value={m.id}>{m.name}</option>
                                     ))}
                                 </select>
                             </div>

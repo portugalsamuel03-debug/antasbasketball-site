@@ -190,6 +190,8 @@ export interface SeasonStanding {
   ties: number;
   trades_count: number;
   position: number;
+  highlight_players?: string; // New
+  team_achievements?: string; // New
   team?: Team; // Join
 }
 
@@ -206,6 +208,8 @@ export interface Champion {
   team_id?: string;
   runner_up_team_id?: string;
   runner_up_team?: { id: string; name: string; logo_url?: string }; // Join
+  runner_up_manager_id?: string;
+  runner_up_manager?: { id: string; name: string; image_url: string };
   historic_players?: { name: string; icon?: string }[];
 }
 

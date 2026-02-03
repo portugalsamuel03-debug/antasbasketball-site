@@ -31,6 +31,7 @@ export const ManagersSection: React.FC<ManagersSectionProps> = ({ isDarkMode }) 
     // Aux data
     const [teamsMap, setTeamsMap] = useState<Record<string, TeamRow>>({});
     const [championCounts, setChampionCounts] = useState<Record<string, number>>({});
+    const [runnerUpCounts, setRunnerUpCounts] = useState<Record<string, number>>({});
     const [managerAwards, setManagerAwards] = useState<Record<string, string[]>>({});
 
     const fetchData = async () => {
@@ -44,15 +45,21 @@ export const ManagersSection: React.FC<ManagersSectionProps> = ({ isDarkMode }) 
         teamsData?.forEach((t: any) => tMap[t.id] = t);
         setTeamsMap(tMap);
 
-        // Fetch Champions to count titles
+        // Fetch Champions to count titles & runner-ups
         const { data: champsData } = await listChampions();
         const cCounts: Record<string, number> = {};
+        const rCounts: Record<string, number> = {};
+
         (champsData as Champion[])?.forEach(c => {
             if (c.manager_id) {
                 cCounts[c.manager_id] = (cCounts[c.manager_id] || 0) + 1;
             }
+            if (c.runner_up_manager_id) {
+                rCounts[c.runner_up_manager_id] = (rCounts[c.runner_up_manager_id] || 0) + 1;
+            }
         });
         setChampionCounts(cCounts);
+        setRunnerUpCounts(rCounts);
 
         // Fetch Awards
         const { data: awardsData } = await listAwards();
@@ -87,9 +94,15 @@ export const ManagersSection: React.FC<ManagersSectionProps> = ({ isDarkMode }) 
             .map(id => teamsMap[id])
             .filter(Boolean);
 
-        // Resolve Titles
+        // Resolve Titles & Runner-ups
         const titleCount = championCounts[manager.id] || 0;
-        const titleText = titleCount > 0 ? `${titleCount}x Campeão` : '';
+        const runnerUpCount = runnerUpCounts[manager.id] || 0;
+
+        const parts = [];
+        if (titleCount > 0) parts.push(`${titleCount}x Campeão`);
+        if (runnerUpCount > 0) parts.push(`${runnerUpCount}x Vice`);
+
+        const titleText = parts.join(' • ');
 
         // Resolve Awards
         const awards = managerAwards[manager.id] || [];
