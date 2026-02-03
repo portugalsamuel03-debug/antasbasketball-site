@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
-import { upsertHallOfFame } from '../../cms';
-import { HallOfFame } from '../../types';
+import React, { useState, useEffect } from 'react';
+import { upsertHallOfFame, listManagers } from '../../cms';
+import { HallOfFame, Manager } from '../../types';
 import { EditTrigger } from './EditTrigger';
 import { useAdmin } from '../../context/AdminContext';
 import { Crown } from 'lucide-react';
@@ -17,13 +17,35 @@ export const HallOfFameDetailsModal: React.FC<HallOfFameDetailsModalProps> = ({ 
     const [isEditMode, setIsEditMode] = useState(false);
     const [formData, setFormData] = useState<HallOfFame>({ ...member });
     const [msg, setMsg] = useState<string | null>(null);
+    const [managers, setManagers] = useState<Manager[]>([]);
+
+    useEffect(() => {
+        listManagers().then(({ data }) => setManagers(data as Manager[] || []));
+    }, []);
 
     // Auto-enter edit mode if it's a new empty member
-    React.useEffect(() => {
+    useEffect(() => {
         if (!member.name && isEditing) {
             setIsEditMode(true);
         }
     }, [member, isEditing]);
+
+    const handleManagerSelect = (managerId: string) => {
+        setFormData(prev => ({ ...prev, manager_id: managerId }));
+
+        // Optional: Auto-fill if empty
+        if (managerId) {
+            const mgr = managers.find(m => m.id === managerId);
+            if (mgr) {
+                setFormData(prev => ({
+                    ...prev,
+                    manager_id: managerId,
+                    name: prev.name || mgr.name,
+                    image_url: prev.image_url || mgr.image_url
+                }));
+            }
+        }
+    };
 
     const handleSave = async () => {
         setMsg(null);
@@ -31,6 +53,8 @@ export const HallOfFameDetailsModal: React.FC<HallOfFameDetailsModalProps> = ({ 
 
         const payload = { ...formData };
         if (payload.id === "") delete (payload as any).id;
+        // Ensure year_inducted is set
+        if (!payload.year_inducted) payload.year_inducted = new Date().getFullYear().toString();
 
         const { error } = await upsertHallOfFame(payload);
         if (error) {
@@ -79,8 +103,22 @@ export const HallOfFameDetailsModal: React.FC<HallOfFameDetailsModalProps> = ({ 
 
                     {isEditMode ? (
                         <>
-                            <input value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} className={`${inputClass} text-center font-black text-lg`} placeholder="Nome" />
-                            <input value={formData.year_inducted || ''} onChange={e => setFormData({ ...formData, year_inducted: e.target.value })} className={`${inputClass} text-center text-xs text-yellow-500 font-bold`} placeholder="Ano de Indução" />
+                            <div className="w-full space-y-2">
+                                <label className={`text-[10px] font-bold uppercase tracking-widest block text-left ${isDarkMode ? 'text-gray-500' : 'text-gray-400'}`}>Vincular Gestor (Opcional)</label>
+                                <select
+                                    value={formData.manager_id || ''}
+                                    onChange={e => handleManagerSelect(e.target.value)}
+                                    className={`w-full bg-transparent border rounded px-2 py-1.5 text-xs outline-none focus:border-yellow-400 ${isDarkMode ? 'border-white/20 text-white' : 'border-black/20 text-black'}`}
+                                >
+                                    <option value="" className="text-gray-500">Sem vínculo / Manual</option>
+                                    {managers.map(m => (
+                                        <option key={m.id} value={m.id} className="text-black">{m.name}</option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            <input value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} className={`${inputClass} text-center font-black text-lg mt-2`} placeholder="Nome" />
+                            <input value={formData.year_inducted || ''} onChange={e => setFormData({ ...formData, year_inducted: e.target.value })} className={`${inputClass} text-center text-xs text-yellow-500 font-bold`} placeholder="Ano de Indução (Ex: 2026)" />
 
                             <div className="space-y-2 mt-2">
                                 <label className={`text-[10px] font-bold uppercase tracking-widest block text-left ${isDarkMode ? 'text-gray-500' : 'text-gray-400'}`}>Detalhes</label>
@@ -110,6 +148,9 @@ export const HallOfFameDetailsModal: React.FC<HallOfFameDetailsModalProps> = ({ 
                             <div className={`text-xs space-y-1 ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
                                 <p><span className="font-bold opacity-50">ROLE:</span> {member.role}</p>
                                 <p><span className="font-bold opacity-50">FEAT:</span> {member.achievement}</p>
+                                {member.manager && (
+                                    <p className="mt-2 text-[10px] italic opacity-60">Vinculado a: {member.manager.name}</p>
+                                )}
                             </div>
                         </>
                     )}

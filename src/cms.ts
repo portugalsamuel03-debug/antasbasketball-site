@@ -177,7 +177,7 @@ export async function listTeamHistory(teamId: string) {
 
 // Hall of Fame
 export async function listHallOfFame() {
-  return supabase.from("hall_of_fame").select("*").order("year_inducted", { ascending: false });
+  return supabase.from("hall_of_fame").select("*, manager:managers(id, name, image_url)").order("year_inducted", { ascending: false });
 }
 export async function upsertHallOfFame(payload: Partial<any>) {
   return supabase.from("hall_of_fame").upsert(payload).select("*").single();

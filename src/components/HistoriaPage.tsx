@@ -250,7 +250,7 @@ const HistoriaPage: React.FC<HistoriaPageProps> = ({ articles, isDarkMode, onArt
             <div className={`sticky top-[52px] z-30 py-3 border-b border-white/5 ${isDarkMode ? 'bg-black/95 backdrop-blur-md' : 'bg-[#FDFBF4]/95 backdrop-blur-md'}`}>
                 <div className="w-full max-w-7xl mx-auto px-4">
                     <div className="flex items-center gap-2 overflow-x-auto pb-1 md:pb-0 no-scrollbar md:flex-wrap md:justify-center">
-                        {(['ARTIGOS', 'CAMPEOES', 'RECORDES', 'TEMPORADAS', 'HALL_OF_FAME', 'AWARDS', 'TRADES', 'TIMES', 'GESTORES'] as SubTab[]).map(tab => (
+                        {(['ARTIGOS', 'CAMPEOES', 'RECORDES', 'TEMPORADAS', 'HALL_OF_FAME', 'AWARDS', 'TIMES', 'GESTORES'] as SubTab[]).map(tab => (
                             <button
                                 key={tab}
                                 onClick={() => setSubTab(tab)}

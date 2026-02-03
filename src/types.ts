@@ -56,6 +56,8 @@ export interface HallOfFame {
   role: string;
   achievement: string;
   image_url: string;
+  manager_id?: string;
+  manager?: { id: string; name: string; image_url: string };
 }
 
 export type ChampionRow = Champion;
