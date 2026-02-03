@@ -3,6 +3,7 @@ import { X, Save } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { RecordItem } from '../../types';
 import { SEASON_OPTIONS } from '../../utils/seasons';
+import { listTeams, listManagers } from '../../cms';
 
 interface RecordDetailsModalProps {
     record: Partial<RecordItem> | null;
@@ -12,30 +13,60 @@ interface RecordDetailsModalProps {
 }
 
 export const RecordDetailsModal: React.FC<RecordDetailsModalProps> = ({ record, isDarkMode, onClose, onSave }) => {
-    const [formData, setFormData] = useState<Partial<RecordItem>>({
+    const [formData, setFormData] = useState<Partial<RecordItem> & {
+        type?: 'INDIVIDUAL' | 'TEAM',
+        team_id?: string,
+        manager_id?: string
+    }>({
         title: '',
         description: '',
-        year: ''
+        year: '',
+        type: 'INDIVIDUAL'
     });
+
+    const [teams, setTeams] = useState<any[]>([]);
+    const [managers, setManagers] = useState<any[]>([]);
 
     useEffect(() => {
         if (record) setFormData(record);
+        fetchData();
     }, [record]);
+
+    const fetchData = async () => {
+        const { data: t } = await listTeams();
+        if (t) setTeams(t);
+        const { data: m } = await listManagers();
+        if (m) setManagers(m);
+    };
 
     const handleSave = async () => {
         if (!formData.title) return alert('O título é obrigatório');
 
         try {
-            if (record?.id) {
-                await supabase.from('records').update(formData).eq('id', record.id);
+            // Clean up fields based on type
+            const payload = { ...formData };
+            if (payload.type === 'TEAM') {
+                payload.manager_id = undefined;
             } else {
-                await supabase.from('records').insert(formData);
+                // If individual, can have manager_id. team_id is optional context? Or enforcing?
+                // User said "allow linking to a team or GM".
+            }
+
+            // To ensure compatibility if column doesn't exist yet, we rely on supabase ignoring undefined unless it's strict.
+            // But we should set empty strings to null for UUIDs
+            if (!payload.team_id) payload.team_id = null;
+            if (!payload.manager_id) payload.manager_id = null;
+
+            if (record?.id) {
+                await supabase.from('records').update(payload).eq('id', record.id);
+            } else {
+                await supabase.from('records').insert(payload);
             }
             onSave();
             onClose();
-        } catch (error) {
+        } catch (error: any) {
             console.error(error);
-            alert('Erro ao salvar recorde');
+            alert(`Erro ao salvar recorde: ${error.message}`);
         }
     };
 
@@ -47,8 +78,10 @@ export const RecordDetailsModal: React.FC<RecordDetailsModalProps> = ({ record, 
     return (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
             <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={onClose} />
-            <div className={`relative w-full max-w-md rounded-[40px] overflow-hidden shadow-2xl animate-in zoom-in-95 duration-300 ${isDarkMode ? 'bg-[#121212]' : 'bg-white'}`}>
-                <div className="p-8 pb-32 space-y-6">
+            <div className={`relative w-full max-w-md rounded-[40px] overflow-hidden shadow-2xl animate-in zoom-in-95 duration-300 ${isDarkMode ? 'bg-[#121212]' : 'bg-white'} flex flex-col max-h-[90vh]`}>
+
+                {/* Scrollable Body */}
+                <div className="flex-1 overflow-y-auto p-8 custom-scrollbar space-y-6">
                     <div className="flex justify-between items-center">
                         <h2 className={`text-xl font-black uppercase tracking-tighter ${isDarkMode ? 'text-white' : 'text-[#0B1D33]'}`}>
                             {record?.id ? 'Editar Recorde' : 'Novo Recorde'}
@@ -68,6 +101,71 @@ export const RecordDetailsModal: React.FC<RecordDetailsModalProps> = ({ record, 
                                 placeholder="EX: MAIS PONTOS EM UM JOGO"
                             />
                         </div>
+
+                        {/* Type Toggle */}
+                        <div className="flex gap-2">
+                            <button
+                                onClick={() => setFormData({ ...formData, type: 'INDIVIDUAL' })}
+                                className={`flex-1 py-3 rounded-xl font-black text-xs uppercase border ${formData.type !== 'TEAM'
+                                    ? 'bg-yellow-400 border-yellow-400 text-black'
+                                    : 'border-gray-500 text-gray-500 hover:border-gray-300'}`}
+                            >
+                                Individual
+                            </button>
+                            <button
+                                onClick={() => setFormData({ ...formData, type: 'TEAM' })}
+                                className={`flex-1 py-3 rounded-xl font-black text-xs uppercase border ${formData.type === 'TEAM'
+                                    ? 'bg-yellow-400 border-yellow-400 text-black'
+                                    : 'border-gray-500 text-gray-500 hover:border-gray-300'}`}
+                            >
+                                Time
+                            </button>
+                        </div>
+
+                        {formData.type === 'TEAM' ? (
+                            <div>
+                                <label className="text-[10px] font-bold uppercase text-gray-500 mb-1 block">Time</label>
+                                <select
+                                    value={formData.team_id || ''}
+                                    onChange={e => setFormData({ ...formData, team_id: e.target.value })}
+                                    className={`${inputClass} appearance-none`}
+                                >
+                                    <option value="" className="text-gray-500">Selecione o Time...</option>
+                                    {teams.map(t => (
+                                        <option key={t.id} value={t.id} className="text-black">{t.name}</option>
+                                    ))}
+                                </select>
+                            </div>
+                        ) : (
+                            <>
+                                <div>
+                                    <label className="text-[10px] font-bold uppercase text-gray-500 mb-1 block">Gestor / Jogador</label>
+                                    <select
+                                        value={formData.manager_id || ''}
+                                        onChange={e => setFormData({ ...formData, manager_id: e.target.value })}
+                                        className={`${inputClass} appearance-none`}
+                                    >
+                                        <option value="" className="text-gray-500">Selecione...</option>
+                                        {managers.map(m => (
+                                            <option key={m.id} value={m.id} className="text-black">{m.name}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="text-[10px] font-bold uppercase text-gray-500 mb-1 block">Time (Opcional)</label>
+                                    <select
+                                        value={formData.team_id || ''}
+                                        onChange={e => setFormData({ ...formData, team_id: e.target.value })}
+                                        className={`${inputClass} appearance-none`}
+                                    >
+                                        <option value="" className="text-gray-500">Selecione...</option>
+                                        {teams.map(t => (
+                                            <option key={t.id} value={t.id} className="text-black">{t.name}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                            </>
+                        )}
 
                         <div>
                             <label className="text-[10px] font-bold uppercase text-gray-500 mb-1 block">Temporada (Opcional)</label>
@@ -95,7 +193,8 @@ export const RecordDetailsModal: React.FC<RecordDetailsModalProps> = ({ record, 
                     </div>
                 </div>
 
-                <div className={`absolute bottom-0 left-0 right-0 p-6 border-t ${isDarkMode ? 'bg-[#121212] border-white/5' : 'bg-white border-[#0B1D33]/5'}`}>
+                {/* Fixed Footer */}
+                <div className={`flex-shrink-0 p-6 border-t ${isDarkMode ? 'bg-[#121212] border-white/5' : 'bg-white border-[#0B1D33]/5'}`}>
                     <button
                         onClick={handleSave}
                         className="w-full py-4 rounded-2xl bg-yellow-400 text-black font-black uppercase tracking-widest hover:bg-yellow-300 active:scale-95 transition-all flex items-center justify-center gap-2"

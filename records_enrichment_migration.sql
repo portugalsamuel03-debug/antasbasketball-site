@@ -1,0 +1,5 @@
+-- Add columns to records table
+ALTER TABLE records 
+ADD COLUMN IF NOT EXISTS type TEXT CHECK (type IN ('INDIVIDUAL', 'TEAM')) DEFAULT 'INDIVIDUAL',
+ADD COLUMN IF NOT EXISTS team_id UUID REFERENCES teams(id),
+ADD COLUMN IF NOT EXISTS manager_id UUID REFERENCES managers(id);

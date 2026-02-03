@@ -83,6 +83,10 @@ export const AwardDetailsModal: React.FC<AwardDetailsModalProps> = ({ award, isD
         }
     }
 
+    // Helper to check category type
+    const selectedCategoryObj = categories.find(c => c.name === editing.category);
+    const isTeamAward = selectedCategoryObj?.type === 'TEAM';
+
     const inputClass = `w-full px-4 py-3 rounded-2xl text-sm font-medium ${isDarkMode ? 'bg-white/10 text-white' : 'bg-gray-100 text-[#0B1D33]'
         } focus:outline-none focus:ring-2 focus:ring-yellow-400`;
 
@@ -111,22 +115,39 @@ export const AwardDetailsModal: React.FC<AwardDetailsModalProps> = ({ award, isD
                                 <button onClick={() => setIsManagingCategories(false)} className="text-xs underline text-gray-500">Voltar</button>
                             </div>
 
-                            <div className="flex gap-2 mb-4">
+                            <div className="flex flex-col gap-2 mb-4">
                                 <input
                                     value={newCategoryName}
                                     onChange={e => setNewCategoryName(e.target.value)}
                                     placeholder="Nova Categoria..."
                                     className={`${inputClass} py-2 text-xs`}
                                 />
-                                <button onClick={handleAddCategory} className="bg-yellow-400 text-black p-2 rounded-xl">
-                                    <Plus size={16} />
+                                <div className="flex gap-2">
+                                    <button
+                                        onClick={() => setNewCategoryType('INDIVIDUAL')}
+                                        className={`flex-1 py-2 text-[10px] font-black uppercase rounded-xl border ${newCategoryType === 'INDIVIDUAL' ? 'bg-yellow-400 text-black border-yellow-400' : 'border-gray-500 text-gray-500'}`}
+                                    >
+                                        Individual
+                                    </button>
+                                    <button
+                                        onClick={() => setNewCategoryType('TEAM')}
+                                        className={`flex-1 py-2 text-[10px] font-black uppercase rounded-xl border ${newCategoryType === 'TEAM' ? 'bg-yellow-400 text-black border-yellow-400' : 'border-gray-500 text-gray-500'}`}
+                                    >
+                                        Time
+                                    </button>
+                                </div>
+                                <button onClick={handleAddCategory} className="bg-white/10 text-white p-2 rounded-xl text-xs font-bold mt-1 hover:bg-white/20">
+                                    Adicionar
                                 </button>
                             </div>
 
-                            <div className="space-y-2 max-h-[200px] overflow-y-auto">
+                            <div className="space-y-1 max-h-[150px] overflow-y-auto">
                                 {categories.map(c => (
                                     <div key={c.id} className="flex justify-between items-center text-xs p-2 rounded hover:bg-white/5">
-                                        <span className={isDarkMode ? 'text-white' : 'text-black'}>{c.name}</span>
+                                        <div className="flex flex-col">
+                                            <span className={isDarkMode ? 'text-white' : 'text-black'}>{c.name}</span>
+                                            <span className="text-[9px] text-gray-500">{c.type === 'TEAM' ? 'TIME' : 'INDIVIDUAL'}</span>
+                                        </div>
                                         <button onClick={() => handleDeleteCategory(c.id)} className="text-red-400 hover:text-red-300">
                                             <Trash2 size={12} />
                                         </button>
@@ -167,83 +188,113 @@ export const AwardDetailsModal: React.FC<AwardDetailsModalProps> = ({ award, isD
                                 >
                                     <option value="">Selecione ou digite abaixo...</option>
                                     {categories.map(c => (
-                                        <option key={c.id} value={c.name}>{c.name}</option>
+                                        <option key={c.id} value={c.name}>{c.name} ({c.type === 'TEAM' ? 'Time' : 'Ind'})</option>
                                     ))}
                                 </select>
-                                {/* Fallback for custom typing not in list yet, or if they want to type manually */}
+                                {/* Only show manual input if not a team award, or generic */}
                                 <input
-                                    className={`${inputClass} mt-2 text-xs opacity-80`}
-                                    placeholder="Ou digite uma categoria personalizada..."
+                                    className={`${inputClass} mt-2 text-xs opacity-50 focus:opacity-100 transition-opacity`}
+                                    placeholder="Ou digite manualmente..."
                                     value={editing.category || ''}
                                     onChange={e => setEditing({ ...editing, category: e.target.value })}
                                 />
                             </div>
 
-                            <div>
-                                <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-2">Vencedor (Gestor)</label>
-                                <select
-                                    className={`${inputClass} appearance-none ${isDarkMode ? 'bg-[#1a2c42]' : 'bg-white'}`}
-                                    value={editing.manager_id || ''}
-                                    onChange={e => {
-                                        const m = managers.find(man => man.id === e.target.value);
-                                        setEditing({
-                                            ...editing,
-                                            manager_id: e.target.value,
-                                            winner_name: m ? m.name : editing.winner_name
-                                        });
-                                    }}
-                                >
-                                    <option value="" className={isDarkMode ? 'bg-[#0B1D33] text-white' : 'bg-white text-black'}>Selecione...</option>
-                                    {managers.map(m => (
-                                        <option key={m.id} value={m.id} className={isDarkMode ? 'bg-[#0B1D33] text-white' : 'bg-white text-black'}>
-                                            {m.name}
-                                        </option>
-                                    ))}
-                                </select>
-
-                                <div className="mt-1">
-                                    <input
-                                        className={`${inputClass} text-xs py-2 opacity-60`}
-                                        placeholder="Ou digite o nome (se não for gestor)..."
-                                        value={editing.winner_name || ''}
-                                        onChange={e => setEditing({ ...editing, winner_name: e.target.value })}
-                                    />
+                            {/* DYNAMIC FIELDS BASED ON TYPE */}
+                            {isTeamAward ? (
+                                <div>
+                                    <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-2">Time Vencedor</label>
+                                    <select
+                                        className={`${inputClass} appearance-none ${isDarkMode ? 'bg-[#1a2c42]' : 'bg-white'}`}
+                                        value={editing.team_id || ''}
+                                        onChange={e => {
+                                            const t = teams.find(team => team.id === e.target.value);
+                                            setEditing({
+                                                ...editing,
+                                                team_id: e.target.value,
+                                                winner_name: t ? t.name : ''
+                                            });
+                                        }}
+                                    >
+                                        <option value="" className={isDarkMode ? 'bg-[#0B1D33] text-white' : 'bg-white text-black'}>Selecione o Time...</option>
+                                        {teams.map(team => (
+                                            <option key={team.id} value={team.id} className={isDarkMode ? 'bg-[#0B1D33] text-white' : 'bg-white text-black'}>
+                                                {team.name}
+                                            </option>
+                                        ))}
+                                    </select>
                                 </div>
-                            </div>
+                            ) : (
+                                <>
+                                    <div>
+                                        <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-2">Vencedor (Gestor)</label>
+                                        <select
+                                            className={`${inputClass} appearance-none ${isDarkMode ? 'bg-[#1a2c42]' : 'bg-white'}`}
+                                            value={editing.manager_id || ''}
+                                            onChange={e => {
+                                                const m = managers.find(man => man.id === e.target.value);
+                                                setEditing({
+                                                    ...editing,
+                                                    manager_id: e.target.value,
+                                                    winner_name: m ? m.name : editing.winner_name
+                                                });
+                                            }}
+                                        >
+                                            <option value="" className={isDarkMode ? 'bg-[#0B1D33] text-white' : 'bg-white text-black'}>Selecione...</option>
+                                            {managers.map(m => (
+                                                <option key={m.id} value={m.id} className={isDarkMode ? 'bg-[#0B1D33] text-white' : 'bg-white text-black'}>
+                                                    {m.name}
+                                                </option>
+                                            ))}
+                                        </select>
+
+                                        <div className="mt-1">
+                                            <input
+                                                className={`${inputClass} text-xs py-2 opacity-60`}
+                                                placeholder="Ou digite o nome..."
+                                                value={editing.winner_name || ''}
+                                                onChange={e => setEditing({ ...editing, winner_name: e.target.value })}
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <div>
+                                        <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-2">Time (Opcional - Contexto)</label>
+                                        <select
+                                            className={`${inputClass} appearance-none ${isDarkMode ? 'bg-[#1a2c42]' : 'bg-white'}`}
+                                            value={editing.team_id || ''}
+                                            onChange={e => setEditing({ ...editing, team_id: e.target.value })}
+                                        >
+                                            <option value="" className={isDarkMode ? 'bg-[#0B1D33] text-white' : 'bg-white text-black'}>Nenhum</option>
+                                            {teams.map(team => (
+                                                <option key={team.id} value={team.id} className={isDarkMode ? 'bg-[#0B1D33] text-white' : 'bg-white text-black'}>
+                                                    {team.name}
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                </>
+                            )}
 
                             <div>
                                 <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-2">Descrição (Opcional)</label>
                                 <textarea
                                     className={inputClass}
                                     placeholder="Detalhes sobre o prêmio..."
-                                    rows={3}
+                                    rows={2}
                                     value={editing.description || ''}
                                     onChange={e => setEditing({ ...editing, description: e.target.value })}
                                 />
                             </div>
-
-                            <div>
-                                <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-2">Time (Opcional)</label>
-                                <select
-                                    className={`${inputClass} appearance-none ${isDarkMode ? 'bg-[#1a2c42]' : 'bg-white'}`}
-                                    value={editing.team_id || ''}
-                                    onChange={e => setEditing({ ...editing, team_id: e.target.value })}
-                                >
-                                    <option value="" className={isDarkMode ? 'bg-[#0B1D33] text-white' : 'bg-white text-black'}>Nenhum</option>
-                                    {teams.map(team => (
-                                        <option key={team.id} value={team.id} className={isDarkMode ? 'bg-[#0B1D33] text-white' : 'bg-white text-black'}>
-                                            {team.name}
-                                        </option>
-                                    ))}
-                                </select>
-                            </div>
                         </>
                     )}
+                </div>
 
+                {/* Footer fixed */}
+                <div className="flex-shrink-0 pt-4 border-t border-gray-500/10 mt-2">
                     {msg && (
-                        <div className="text-center text-sm text-yellow-400">{msg}</div>
+                        <div className="text-center text-sm text-yellow-400 mb-2">{msg}</div>
                     )}
-
                     {!isManagingCategories && (
                         <button
                             onClick={handleSave}
