@@ -45,6 +45,12 @@ export const TeamDetailsModal: React.FC<TeamDetailsModalProps> = ({ team, onClos
         // Ensure is_active is boolean or default
         if (payload.is_active === undefined) payload.is_active = true;
 
+        // Legacy Support: Ensure gm_name is filled (DB Constraint)
+        if (!payload.gm_name) {
+            const linkedManager = managers.find(m => m.id === payload.manager_id);
+            payload.gm_name = linkedManager ? linkedManager.name : "-";
+        }
+
         const { error } = await upsertTeam(payload);
         if (error) {
             console.error(error);
