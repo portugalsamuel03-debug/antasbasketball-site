@@ -53,6 +53,7 @@ export const HallOfFameDetailsModal: React.FC<HallOfFameDetailsModalProps> = ({ 
 
         const payload = { ...formData };
         if (payload.id === "") delete (payload as any).id;
+        delete (payload as any).manager; // Remove joined object
         // Ensure year_inducted is set
         if (!payload.year_inducted) payload.year_inducted = new Date().getFullYear().toString();
 
