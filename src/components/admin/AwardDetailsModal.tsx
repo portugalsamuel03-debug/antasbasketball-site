@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Award, Team } from '../../types';
-import { upsertAward, listTeams, listManagers, listAwardCategories, insertAwardCategory, deleteAwardCategory } from '../../cms';
+import { upsertAward, listTeams, listManagers, listAwardCategories, insertAwardCategory, deleteAwardCategory, updateAwardCategory } from '../../cms';
 import { SEASON_OPTIONS } from '../../utils/seasons';
-import { X, Plus, Trash2, Settings } from 'lucide-react';
+import { X, Plus, Trash2, Settings, Edit2 } from 'lucide-react';
 
 interface AwardDetailsModalProps {
     award: Award;
@@ -19,8 +19,11 @@ export const AwardDetailsModal: React.FC<AwardDetailsModalProps> = ({ award, isD
     // Dynamic Categories
     const [categories, setCategories] = useState<any[]>([]);
     const [isManagingCategories, setIsManagingCategories] = useState(false);
-    const [newCategoryName, setNewCategoryName] = useState('');
-    const [newCategoryType, setNewCategoryType] = useState<'INDIVIDUAL' | 'TEAM'>('INDIVIDUAL');
+
+    // Category Form State
+    const [editingCategory, setEditingCategory] = useState<{ id: string, name: string, type: 'INDIVIDUAL' | 'TEAM' } | null>(null);
+    const [categoryName, setCategoryName] = useState('');
+    const [categoryType, setCategoryType] = useState<'INDIVIDUAL' | 'TEAM'>('INDIVIDUAL');
 
     useEffect(() => {
         fetchData();
@@ -39,11 +42,31 @@ export const AwardDetailsModal: React.FC<AwardDetailsModalProps> = ({ award, isD
         if (data) setCategories(data);
     }
 
-    async function handleAddCategory() {
-        if (!newCategoryName.trim()) return;
-        await insertAwardCategory(newCategoryName.trim(), newCategoryType);
-        setNewCategoryName('');
+    async function handleSaveCategory() {
+        if (!categoryName.trim()) return;
+
+        if (editingCategory) {
+            await updateAwardCategory(editingCategory.id, categoryName.trim(), categoryType);
+            setEditingCategory(null);
+        } else {
+            await insertAwardCategory(categoryName.trim(), categoryType);
+        }
+
+        setCategoryName('');
+        setCategoryType('INDIVIDUAL');
         fetchCategories();
+    }
+
+    function handleEditCategory(cat: any) {
+        setEditingCategory(cat);
+        setCategoryName(cat.name);
+        setCategoryType(cat.type);
+    }
+
+    function handleCancelCategoryEdit() {
+        setEditingCategory(null);
+        setCategoryName('');
+        setCategoryType('INDIVIDUAL');
     }
 
     async function handleDeleteCategory(id: string) {
@@ -60,7 +83,7 @@ export const AwardDetailsModal: React.FC<AwardDetailsModalProps> = ({ award, isD
 
         // Ensure winner_name is set (fallback to manual if needed, or sync from manager)
         if (!editing.winner_name) {
-            setMsg('Selecione ou digite o Vencedor.');
+            setMsg('Selecione o Vencedor.');
             return;
         }
 
@@ -94,8 +117,8 @@ export const AwardDetailsModal: React.FC<AwardDetailsModalProps> = ({ award, isD
     const selectedCategoryObj = categories.find(c => c.name === editing.category);
     const isTeamAward = selectedCategoryObj?.type === 'TEAM';
 
-    const inputClass = `w-full px-4 py-3 rounded-2xl text-sm font-medium ${isDarkMode ? 'bg-white/10 text-white' : 'bg-gray-100 text-[#0B1D33]'
-        } focus:outline-none focus:ring-2 focus:ring-yellow-400`;
+    const inputClass = `w-full px-4 py-3 rounded-2xl text-sm font-medium ${isDarkMode ? 'bg-white/10 text-white placeholder-gray-400' : 'bg-gray-100 text-[#0B1D33] placeholder-gray-500'
+        } focus:outline-none focus:ring-2 focus:ring-yellow-400 border border-transparent`;
 
     return (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
@@ -112,52 +135,66 @@ export const AwardDetailsModal: React.FC<AwardDetailsModalProps> = ({ award, isD
                 </div>
 
                 {/* Scrollable Content */}
-                <div className="space-y-4 overflow-y-auto custom-scrollbar flex-1 pr-2">
+                <div className="space-y-4 overflow-y-auto custom-scrollbar flex-1 pr-2 min-h-0">
 
                     {/* Category Management Mode */}
                     {isManagingCategories ? (
                         <div className={`p-4 rounded-2xl border ${isDarkMode ? 'border-white/10 bg-white/5' : 'border-black/5 bg-gray-50'}`}>
                             <div className="flex justify-between items-center mb-3">
-                                <h3 className="text-xs font-black uppercase tracking-widest text-gray-400">Gerenciar Categorias</h3>
-                                <button onClick={() => setIsManagingCategories(false)} className="text-xs underline text-gray-500">Voltar</button>
+                                <h3 className="text-xs font-black uppercase tracking-widest text-gray-400">
+                                    {editingCategory ? 'Editar Categoria' : 'Gerenciar Categorias'}
+                                </h3>
+                                <button onClick={() => { setIsManagingCategories(false); handleCancelCategoryEdit(); }} className="text-xs underline text-gray-500">Voltar</button>
                             </div>
 
                             <div className="flex flex-col gap-2 mb-4">
                                 <input
-                                    value={newCategoryName}
-                                    onChange={e => setNewCategoryName(e.target.value)}
-                                    placeholder="Nova Categoria..."
+                                    value={categoryName}
+                                    onChange={e => setCategoryName(e.target.value)}
+                                    placeholder="Nome da Categoria..."
                                     className={`${inputClass} py-2 text-xs`}
                                 />
                                 <div className="flex gap-2">
                                     <button
-                                        onClick={() => setNewCategoryType('INDIVIDUAL')}
-                                        className={`flex-1 py-2 text-[10px] font-black uppercase rounded-xl border ${newCategoryType === 'INDIVIDUAL' ? 'bg-yellow-400 text-black border-yellow-400' : 'border-gray-500 text-gray-500'}`}
+                                        onClick={() => setCategoryType('INDIVIDUAL')}
+                                        className={`flex-1 py-2 text-[10px] font-black uppercase rounded-xl border ${categoryType === 'INDIVIDUAL' ? 'bg-yellow-400 text-black border-yellow-400' : 'border-gray-500 text-gray-500'}`}
                                     >
                                         Individual
                                     </button>
                                     <button
-                                        onClick={() => setNewCategoryType('TEAM')}
-                                        className={`flex-1 py-2 text-[10px] font-black uppercase rounded-xl border ${newCategoryType === 'TEAM' ? 'bg-yellow-400 text-black border-yellow-400' : 'border-gray-500 text-gray-500'}`}
+                                        onClick={() => setCategoryType('TEAM')}
+                                        className={`flex-1 py-2 text-[10px] font-black uppercase rounded-xl border ${categoryType === 'TEAM' ? 'bg-yellow-400 text-black border-yellow-400' : 'border-gray-500 text-gray-500'}`}
                                     >
                                         Time
                                     </button>
                                 </div>
-                                <button onClick={handleAddCategory} className="bg-white/10 text-white p-2 rounded-xl text-xs font-bold mt-1 hover:bg-white/20">
-                                    Adicionar
-                                </button>
+                                <div className="flex gap-2 mt-1">
+                                    {editingCategory && (
+                                        <button onClick={handleCancelCategoryEdit} className="flex-1 bg-white/10 text-white p-2 rounded-xl text-xs font-bold hover:bg-white/20">
+                                            Cancelar
+                                        </button>
+                                    )}
+                                    <button onClick={handleSaveCategory} className="flex-1 bg-yellow-400 text-black p-2 rounded-xl text-xs font-black hover:bg-yellow-300">
+                                        {editingCategory ? 'Atualizar' : 'Adicionar'}
+                                    </button>
+                                </div>
                             </div>
 
-                            <div className="space-y-1 max-h-[150px] overflow-y-auto">
+                            <div className="space-y-1 max-h-[150px] overflow-y-auto custom-scrollbar">
                                 {categories.map(c => (
-                                    <div key={c.id} className="flex justify-between items-center text-xs p-2 rounded hover:bg-white/5">
+                                    <div key={c.id} className="flex justify-between items-center text-xs p-2 rounded hover:bg-white/5 group">
                                         <div className="flex flex-col">
-                                            <span className={isDarkMode ? 'text-white' : 'text-black'}>{c.name}</span>
+                                            <span className={`font-bold ${isDarkMode ? 'text-white' : 'text-black'}`}>{c.name}</span>
                                             <span className="text-[9px] text-gray-500">{c.type === 'TEAM' ? 'TIME' : 'INDIVIDUAL'}</span>
                                         </div>
-                                        <button onClick={() => handleDeleteCategory(c.id)} className="text-red-400 hover:text-red-300">
-                                            <Trash2 size={12} />
-                                        </button>
+                                        <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                            <button onClick={() => handleEditCategory(c)} className="text-blue-400 hover:text-blue-300">
+                                                <Edit2 size={12} />
+                                            </button>
+                                            <button onClick={() => handleDeleteCategory(c.id)} className="text-red-400 hover:text-red-300">
+                                                <Trash2 size={12} />
+                                            </button>
+                                        </div>
                                     </div>
                                 ))}
                             </div>
@@ -171,9 +208,9 @@ export const AwardDetailsModal: React.FC<AwardDetailsModalProps> = ({ award, isD
                                     value={editing.year || ''}
                                     onChange={e => setEditing({ ...editing, year: e.target.value })}
                                 >
-                                    <option value="">Selecione...</option>
+                                    <option value="" className="text-black">Selecione...</option>
                                     {SEASON_OPTIONS.map(s => (
-                                        <option key={s} value={s}>{s}</option>
+                                        <option key={s} value={s} className="text-black">{s}</option>
                                     ))}
                                 </select>
                             </div>
@@ -193,18 +230,11 @@ export const AwardDetailsModal: React.FC<AwardDetailsModalProps> = ({ award, isD
                                     value={editing.category || ''}
                                     onChange={e => setEditing({ ...editing, category: e.target.value })}
                                 >
-                                    <option value="">Selecione ou digite abaixo...</option>
+                                    <option value="" className="text-black">Selecione...</option>
                                     {categories.map(c => (
-                                        <option key={c.id} value={c.name}>{c.name} ({c.type === 'TEAM' ? 'Time' : 'Ind'})</option>
+                                        <option key={c.id} value={c.name} className="text-black">{c.name} ({c.type === 'TEAM' ? 'Time' : 'Ind'})</option>
                                     ))}
                                 </select>
-                                {/* Only show manual input if not a team award, or generic */}
-                                <input
-                                    className={`${inputClass} mt-2 text-xs opacity-50 focus:opacity-100 transition-opacity`}
-                                    placeholder="Ou digite manualmente..."
-                                    value={editing.category || ''}
-                                    onChange={e => setEditing({ ...editing, category: e.target.value })}
-                                />
                             </div>
 
                             {/* DYNAMIC FIELDS BASED ON TYPE */}
@@ -223,9 +253,9 @@ export const AwardDetailsModal: React.FC<AwardDetailsModalProps> = ({ award, isD
                                             });
                                         }}
                                     >
-                                        <option value="" className={isDarkMode ? 'bg-[#0B1D33] text-white' : 'bg-white text-black'}>Selecione o Time...</option>
+                                        <option value="" className="text-black">Selecione o Time...</option>
                                         {teams.map(team => (
-                                            <option key={team.id} value={team.id} className={isDarkMode ? 'bg-[#0B1D33] text-white' : 'bg-white text-black'}>
+                                            <option key={team.id} value={team.id} className="text-black">
                                                 {team.name}
                                             </option>
                                         ))}
@@ -247,22 +277,13 @@ export const AwardDetailsModal: React.FC<AwardDetailsModalProps> = ({ award, isD
                                                 });
                                             }}
                                         >
-                                            <option value="" className={isDarkMode ? 'bg-[#0B1D33] text-white' : 'bg-white text-black'}>Selecione...</option>
+                                            <option value="" className="text-black">Selecione...</option>
                                             {managers.map(m => (
-                                                <option key={m.id} value={m.id} className={isDarkMode ? 'bg-[#0B1D33] text-white' : 'bg-white text-black'}>
+                                                <option key={m.id} value={m.id} className="text-black">
                                                     {m.name}
                                                 </option>
                                             ))}
                                         </select>
-
-                                        <div className="mt-1">
-                                            <input
-                                                className={`${inputClass} text-xs py-2 opacity-60`}
-                                                placeholder="Ou digite o nome..."
-                                                value={editing.winner_name || ''}
-                                                onChange={e => setEditing({ ...editing, winner_name: e.target.value })}
-                                            />
-                                        </div>
                                     </div>
 
                                     <div>
@@ -272,9 +293,9 @@ export const AwardDetailsModal: React.FC<AwardDetailsModalProps> = ({ award, isD
                                             value={editing.team_id || ''}
                                             onChange={e => setEditing({ ...editing, team_id: e.target.value })}
                                         >
-                                            <option value="" className={isDarkMode ? 'bg-[#0B1D33] text-white' : 'bg-white text-black'}>Nenhum</option>
+                                            <option value="" className="text-black">Nenhum</option>
                                             {teams.map(team => (
-                                                <option key={team.id} value={team.id} className={isDarkMode ? 'bg-[#0B1D33] text-white' : 'bg-white text-black'}>
+                                                <option key={team.id} value={team.id} className="text-black">
                                                     {team.name}
                                                 </option>
                                             ))}

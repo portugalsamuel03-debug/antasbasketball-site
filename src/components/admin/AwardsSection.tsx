@@ -18,7 +18,9 @@ export const AwardsSection: React.FC<AwardsSectionProps> = ({ isDarkMode }) => {
     const [viewingAward, setViewingAward] = useState<Award | null>(null);
     const [showModal, setShowModal] = useState(false);
 
-    // ... useEffect ...
+    useEffect(() => {
+        fetchAwards();
+    }, []);
 
     function handleEdit(award: Award) {
         setEditingAward(award);
