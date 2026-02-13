@@ -121,7 +121,7 @@ export const AwardDetailsModal: React.FC<AwardDetailsModalProps> = ({ award, isD
         } focus:outline-none focus:ring-2 focus:ring-yellow-400 border border-transparent`;
 
     return (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[200] flex items-center justify-center p-4">
             <div className={`w-full max-w-md rounded-3xl p-6 ${isDarkMode ? 'bg-[#0B1D33]' : 'bg-white'} flex flex-col max-h-[90vh]`}>
 
                 {/* Header */}

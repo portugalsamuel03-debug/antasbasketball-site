@@ -85,11 +85,11 @@ export const AwardsSection: React.FC<AwardsSectionProps> = ({ isDarkMode }) => {
                                 <div className={`p-3 rounded-2xl ${isDarkMode ? 'bg-black/30' : 'bg-gray-100'}`}>
                                     <Trophy size={24} className="text-yellow-400" />
                                 </div>
-                                <div>
-                                    <h3 className={`text-xl font-black ${isDarkMode ? 'text-white' : 'text-[#0B1D33]'}`}>
+                                <div className="flex-1 min-w-0">
+                                    <h3 className={`text-xl font-black truncate ${isDarkMode ? 'text-white' : 'text-[#0B1D33]'}`}>
                                         {year}
                                     </h3>
-                                    <p className="text-xs text-gray-400 font-bold uppercase tracking-wider">
+                                    <p className="text-xs text-gray-400 font-bold uppercase tracking-wider truncate">
                                         {awardsByYear[year].length} Prêmios
                                     </p>
                                 </div>
