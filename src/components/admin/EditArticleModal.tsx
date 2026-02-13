@@ -164,8 +164,8 @@ export const EditArticleModal: React.FC<EditArticleModalProps> = ({ article, onC
             if (payload.id === "") delete payload.id;
             payload.slug = payload.slug?.trim() || slugify(payload.title);
 
-            // Ensure author_id is preserved or explicitly nulled if empty string
-            if (payload.author_id === "") payload.author_id = null;
+            // Ensure author_id is preserved or explicitly nulled if empty string or "unknown"
+            if (payload.author_id === "" || payload.author_id === "unknown") payload.author_id = null;
 
             console.log("EditArticleModal: Saving article payload...", payload);
 
@@ -223,7 +223,7 @@ export const EditArticleModal: React.FC<EditArticleModalProps> = ({ article, onC
                 <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-1">
                         <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-2">Título *</label>
-                        <input className={inputClass} placeholder="Título do post" value={editing.title || ''} onChange={e => setEditing({ ...editing, title: e.target.value })} />
+                        <input className={inputClass} placeholder="Título do post / episódio" value={editing.title || ''} onChange={e => setEditing({ ...editing, title: e.target.value })} />
                     </div>
                     <div className="space-y-1">
                         <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-2">Slug</label>
@@ -239,14 +239,41 @@ export const EditArticleModal: React.FC<EditArticleModalProps> = ({ article, onC
                             {availableCategories.length === 0 && <option value="NOTICIAS">Carregando...</option>}
                         </select>
                     </div>
-                    <div className="space-y-1">
-                        <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-2">Subcategoria</label>
-                        <select className={inputClass} value={editing.subcategory || ''} onChange={e => setEditing({ ...editing, subcategory: e.target.value || null })}>
-                            <option value="">Sem subcategoria</option>
-                            {availableSubcategories.map(s => <option key={s.id} value={s.label}>{s.label}</option>)}
-                        </select>
-                    </div>
+                    {editing.category !== 'PODCAST' && (
+                        <div className="space-y-1">
+                            <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-2">Subcategoria</label>
+                            <select className={inputClass} value={editing.subcategory || ''} onChange={e => setEditing({ ...editing, subcategory: e.target.value || null })}>
+                                <option value="">Sem subcategoria</option>
+                                {availableSubcategories.map(s => <option key={s.id} value={s.label}>{s.label}</option>)}
+                            </select>
+                        </div>
+                    )}
                 </div>
+
+                {editing.category === 'PODCAST' ? (
+                    <div className="space-y-1">
+                        <label className="text-[9px] font-black text-yellow-500 uppercase tracking-widest ml-2">Link do Episódio (Spotify / YouTube) *</label>
+                        <input
+                            className={`${inputClass} border-yellow-500/50 bg-yellow-400/5`}
+                            placeholder="https://open.spotify.com/episode/... ou https://youtube.com/watch?v=..."
+                            value={editing.video_url || ''}
+                            onChange={e => setEditing({ ...editing, video_url: e.target.value })}
+                        />
+                        <div className="ml-2 text-[10px] text-gray-500">
+                            Cole o link completo do episódio. O player aparecerá automaticamente no card.
+                        </div>
+                    </div>
+                ) : (
+                    <div className="space-y-1">
+                        <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-2">Link do Vídeo (Opcional)</label>
+                        <input
+                            className={inputClass}
+                            placeholder="YouTube / Spotify"
+                            value={editing.video_url || ''}
+                            onChange={e => setEditing({ ...editing, video_url: e.target.value })}
+                        />
+                    </div>
+                )}
 
                 <div className="space-y-1">
                     <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-2">Tags</label>
@@ -259,10 +286,10 @@ export const EditArticleModal: React.FC<EditArticleModalProps> = ({ article, onC
                 </div>
 
                 <div className="space-y-1">
-                    <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-2">Resumo</label>
+                    <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-2">{editing.category === 'PODCAST' ? 'Descrição Curta' : 'Resumo'}</label>
                     <textarea
                         className={`${inputClass} min-h-[60px]`}
-                        placeholder="Uma breve descrição para o card..."
+                        placeholder="Breve descrição..."
                         value={editing.excerpt || ''}
                         onChange={e => setEditing({ ...editing, excerpt: e.target.value })}
                     />
@@ -289,41 +316,35 @@ export const EditArticleModal: React.FC<EditArticleModalProps> = ({ article, onC
                     <input className={inputClass} placeholder="Ou cole a URL da imagem aqui" value={editing.cover_url || ''} onChange={e => setEditing({ ...editing, cover_url: e.target.value })} />
                 </div>
 
-                <div className="space-y-1">
-                    <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-2">Link do Podcast / Vídeo (Spotify, YouTube)</label>
-                    <input
-                        className={inputClass}
-                        placeholder="https://open.spotify.com/episode/... ou https://youtube.com/watch?v=..."
-                        value={editing.video_url || ''}
-                        onChange={e => setEditing({ ...editing, video_url: e.target.value })}
-                    />
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                    <div className="space-y-1">
-                        <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-2">Autor</label>
-                        <select className={inputClass} value={editing.author_id || ''} onChange={e => setEditing({ ...editing, author_id: e.target.value || null })}>
-                            <option value="">Sem autor</option>
-                            {authors.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
-                        </select>
+                {editing.category !== 'PODCAST' && (
+                    <div className="grid grid-cols-2 gap-3">
+                        <div className="space-y-1">
+                            <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-2">Autor</label>
+                            <select className={inputClass} value={editing.author_id || ''} onChange={e => setEditing({ ...editing, author_id: e.target.value || null })}>
+                                <option value="">Sem autor</option>
+                                {authors.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+                            </select>
+                        </div>
+                        <div className="space-y-1">
+                            <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-2">Tempo de Leitura</label>
+                            <input
+                                type="number"
+                                className={inputClass}
+                                placeholder="Minutos"
+                                value={editing.reading_minutes || 5}
+                                onChange={e => setEditing({ ...editing, reading_minutes: parseInt(e.target.value) || 5 })}
+                            />
+                        </div>
                     </div>
-                    <div className="space-y-1">
-                        <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-2">Tempo de Leitura</label>
-                        <input
-                            type="number"
-                            className={inputClass}
-                            placeholder="Minutos"
-                            value={editing.reading_minutes || 5}
-                            onChange={e => setEditing({ ...editing, reading_minutes: parseInt(e.target.value) || 5 })}
-                        />
-                    </div>
-                </div>
+                )}
 
                 <div className="space-y-1">
-                    <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-2">Conteúdo *</label>
+                    <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-2">
+                        {editing.category === 'PODCAST' ? 'Notas do Episódio / Detalhes (Opcional)' : 'Conteúdo *'}
+                    </label>
                     <textarea
-                        className={`${inputClass} min-h-[400px] font-mono text-[13px] leading-relaxed resize-y`}
-                        placeholder="# Escreva aqui seu post em Markdown..."
+                        className={`${inputClass} min-h-[${editing.category === 'PODCAST' ? '150px' : '400px'}] font-mono text-[13px] leading-relaxed resize-y`}
+                        placeholder="# Escreva aqui..."
                         value={editing.content || ''}
                         onChange={e => setEditing({ ...editing, content: e.target.value })}
                     />

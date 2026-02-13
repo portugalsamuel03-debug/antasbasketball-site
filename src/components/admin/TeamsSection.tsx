@@ -1,19 +1,33 @@
 import React, { useState, useEffect } from 'react';
+import { supabase } from '../../lib/supabase';
 import { listTeams, deleteTeam } from '../../cms';
 import { TeamRow } from '../../types';
 import { useAdmin } from '../../context/AdminContext';
 import { EditTrigger } from './EditTrigger';
-import { Trophy, CheckCircle, XCircle } from 'lucide-react';
+import { Trophy, Shield, ArrowRight } from 'lucide-react';
 import { TeamDetailsModal } from './TeamDetailsModal';
+import { TeamsListModal } from './TeamsListModal';
 
 export const TeamsSection: React.FC<{ isDarkMode: boolean }> = ({ isDarkMode }) => {
     const [teams, setTeams] = useState<TeamRow[]>([]);
     const { isEditing } = useAdmin();
     const [selectedTeam, setSelectedTeam] = useState<Partial<TeamRow> | null>(null);
+    const [viewingList, setViewingList] = useState<'ACTIVE' | 'HISTORIC' | null>(null);
+    const [teamTrades, setTeamTrades] = useState<Record<string, number>>({});
 
     const fetchTeams = async () => {
         const { data } = await listTeams();
         if (data) setTeams(data as TeamRow[]);
+
+        // Fetch Trades from Standings
+        const { data: standings } = await supabase.from('season_standings').select('team_id, trades_count');
+        const counts: Record<string, number> = {};
+        standings?.forEach((st: any) => {
+            if (st.team_id && st.trades_count) {
+                counts[st.team_id] = (counts[st.team_id] || 0) + st.trades_count;
+            }
+        });
+        setTeamTrades(counts);
     };
 
     useEffect(() => { fetchTeams(); }, []);
@@ -26,61 +40,95 @@ export const TeamsSection: React.FC<{ isDarkMode: boolean }> = ({ isDarkMode }) 
         }
     };
 
-    // Split teams into Active and Inactive if needed, or just list them with indicator
-    // User asked for "active or not active" option to see if team is current.
-    // We can group them or just tag them. Grouping is nicer.
+    const activeTeamsCount = teams.filter(t => t.is_active !== false).length;
+    const historicTeamsCount = teams.filter(t => t.is_active === false).length;
 
-    const activeTeams = teams.filter(t => t.is_active !== false); // Default true
-    const inactiveTeams = teams.filter(t => t.is_active === false);
+    return (
+        <div className="px-6 pb-20 space-y-12">
 
-    const renderTeamCard = (t: TeamRow) => (
-        <div
-            key={t.id}
-            onClick={() => setSelectedTeam(t)}
-            className={`relative p-5 rounded-[24px] border flex flex-col items-center text-center gap-3 cursor-pointer transition-all active:scale-95 group ${isDarkMode ? 'bg-white/5 border-white/10 hover:bg-white/10' : 'bg-white border-[#0B1D33]/10 hover:bg-[#0B1D33]/5'}`}
-        >
+            {/* Entry Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-4xl mx-auto">
+
+                {/* ACTIVE TEAMS CARD */}
+                <div
+                    onClick={() => setViewingList('ACTIVE')}
+                    className={`relative overflow-hidden p-8 rounded-[32px] border transition-all duration-300 group cursor-pointer ${isDarkMode ? 'bg-[#1a2c42] border-white/5 hover:border-yellow-500/50 hover:bg-[#23354d]' : 'bg-white border-gray-100 hover:border-yellow-400 hover:shadow-xl'
+                        }`}
+                >
+                    <div className="absolute top-0 right-0 p-8 opacity-10 group-hover:opacity-20 transition-opacity">
+                        <Shield size={120} className={isDarkMode ? 'text-white' : 'text-black'} />
+                    </div>
+
+                    <div className="relative z-10 flex flex-col items-start h-full justify-between gap-8">
+                        <div className={`p-4 rounded-2xl ${isDarkMode ? 'bg-black/30' : 'bg-yellow-50'}`}>
+                            <Shield size={32} className="text-yellow-500" />
+                        </div>
+                        <div>
+                            <div className="text-xs font-black uppercase tracking-widest text-gray-500 mb-1">
+                                {activeTeamsCount} Times
+                            </div>
+                            <h3 className={`text-2xl font-black uppercase tracking-tighter leading-none ${isDarkMode ? 'text-white' : 'text-[#0B1D33]'}`}>
+                                Times Ativos
+                            </h3>
+                        </div>
+                        <div className={`flex items-center gap-2 font-bold text-xs uppercase tracking-widest ${isDarkMode ? 'text-yellow-400' : 'text-yellow-600'} group-hover:gap-4 transition-all`}>
+                            Ver Todos <ArrowRight size={16} />
+                        </div>
+                    </div>
+                </div>
+
+                {/* HISTORIC TEAMS CARD */}
+                <div
+                    onClick={() => setViewingList('HISTORIC')}
+                    className={`relative overflow-hidden p-8 rounded-[32px] border transition-all duration-300 group cursor-pointer ${isDarkMode ? 'bg-[#1a2c42] border-white/5 hover:border-gray-400/50 hover:bg-[#23354d]' : 'bg-white border-gray-100 hover:border-gray-400 hover:shadow-xl'
+                        }`}
+                >
+                    <div className="absolute top-0 right-0 p-8 opacity-10 group-hover:opacity-20 transition-opacity">
+                        <Trophy size={120} className={isDarkMode ? 'text-white' : 'text-black'} />
+                    </div>
+
+                    <div className="relative z-10 flex flex-col items-start h-full justify-between gap-8">
+                        <div className={`p-4 rounded-2xl ${isDarkMode ? 'bg-black/30' : 'bg-gray-50'}`}>
+                            <Trophy size={32} className="text-gray-400" />
+                        </div>
+                        <div>
+                            <div className="text-xs font-black uppercase tracking-widest text-gray-500 mb-1">
+                                {historicTeamsCount} Times
+                            </div>
+                            <h3 className={`text-2xl font-black uppercase tracking-tighter leading-none ${isDarkMode ? 'text-white' : 'text-[#0B1D33]'}`}>
+                                Times Históricos
+                            </h3>
+                        </div>
+                        <div className={`flex items-center gap-2 font-bold text-xs uppercase tracking-widest ${isDarkMode ? 'text-gray-400' : 'text-gray-600'} group-hover:gap-4 transition-all`}>
+                            Ver Todos <ArrowRight size={16} />
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             {isEditing && (
-                <div className="absolute -top-2 -right-2 z-10">
-                    <EditTrigger type="delete" size={14} onClick={(e) => handleDelete(t.id, e)} />
+                <div className="flex justify-center mt-8">
+                    <button
+                        onClick={() => setSelectedTeam({ is_active: true })}
+                        className="px-6 py-3 bg-yellow-400 text-black text-xs font-black uppercase tracking-widest rounded-full shadow-lg hover:scale-105 transition-transform flex items-center gap-2"
+                    >
+                        <EditTrigger type="add" onClick={(e) => { e.stopPropagation(); setSelectedTeam({ is_active: true }); }} />
+                        Adicionar Novo Time
+                    </button>
                 </div>
             )}
 
-            <div className="w-16 h-16 rounded-2xl bg-white/5 flex items-center justify-center p-2 relative">
-                {t.logo_url ? <img src={t.logo_url} className="w-full h-full object-contain" /> : <Trophy className="text-yellow-500/20" />}
-                {!t.is_active && <div className="absolute inset-0 bg-black/60 rounded-2xl flex items-center justify-center backdrop-blur-[1px]"><XCircle className="text-red-500" size={20} /></div>}
-            </div>
-
-            <div>
-                <div className={`text-xs font-black uppercase ${isDarkMode ? 'text-white' : 'text-[#0B1D33]'}`}>{t.name}</div>
-                {t.manager && (
-                    <div className="text-[9px] font-bold text-gray-500 uppercase mt-1">Gestor: {t.manager.name}</div>
-                )}
-                {!t.manager && t.gm_name && (
-                    <div className="text-[9px] font-bold text-gray-500 uppercase mt-1">GM: {t.gm_name}</div>
-                )}
-            </div>
-        </div>
-    );
-
-    return (
-        <div className="space-y-8 px-6 pb-20">
-            {/* Header */}
-            <div className="flex justify-between items-center">
-                <div className="text-xs font-black uppercase tracking-widest text-gray-500">Times Ativos</div>
-                {isEditing && <EditTrigger type="add" onClick={() => setSelectedTeam({ is_active: true })} />}
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-                {activeTeams.map(renderTeamCard)}
-            </div>
-
-            {inactiveTeams.length > 0 && (
-                <>
-                    <div className="text-xs font-black uppercase tracking-widest text-gray-500 mt-8">Times Inativos / Históricos</div>
-                    <div className="grid grid-cols-2 gap-4 opacity-70">
-                        {inactiveTeams.map(renderTeamCard)}
-                    </div>
-                </>
+            {/* Modals */}
+            {viewingList && (
+                <TeamsListModal
+                    teams={teams}
+                    initialTab={viewingList}
+                    isDarkMode={isDarkMode}
+                    onClose={() => setViewingList(null)}
+                    onSelectTeam={setSelectedTeam}
+                    onDeleteTeam={handleDelete}
+                    teamTrades={teamTrades}
+                />
             )}
 
             {selectedTeam && (
@@ -93,4 +141,4 @@ export const TeamsSection: React.FC<{ isDarkMode: boolean }> = ({ isDarkMode }) 
             )}
         </div>
     );
-}
+};

@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { Award } from '../../types';
-import { listAwards, deleteAward } from '../../cms';
+import { listAwards, deleteAward, listAwardCategories } from '../../cms';
 import { useAdmin } from '../../context/AdminContext';
 import { EditTrigger } from './EditTrigger';
-import { Trophy, ChevronRight, ChevronLeft, Calendar } from 'lucide-react';
+import { Trophy, ChevronRight, ChevronLeft, User, Users, X, ArrowRight } from 'lucide-react';
 import { AwardDetailsModal } from './AwardDetailsModal';
 import { AwardPopup } from './AwardPopup';
+import { AwardGroupPopup } from './AwardGroupPopup';
 
 interface AwardsSectionProps {
     isDarkMode: boolean;
@@ -14,15 +15,23 @@ interface AwardsSectionProps {
 export const AwardsSection: React.FC<AwardsSectionProps> = ({ isDarkMode }) => {
     const { isEditing } = useAdmin();
     const [awards, setAwards] = useState<Award[]>([]);
+    const [awardCategories, setAwardCategories] = useState<Record<string, 'INDIVIDUAL' | 'TEAM'>>({});
 
     // UI State
     const [selectedSeason, setSelectedSeason] = useState<string | null>(null);
-    const [viewingAward, setViewingAward] = useState<Award | null>(null); // For single award view (visitor)
-    const [editingAward, setEditingAward] = useState<Award | null>(null); // For edit modal (admin)
+
+    // Navigation Levels
+    const [viewingCategory, setViewingCategory] = useState<'INDIVIDUAL' | 'TEAM' | null>(null);
+    const [viewingAward, setViewingAward] = useState<Award | null>(null); // Single view
+    const [viewingGroup, setViewingGroup] = useState<{ title: string, winnerName: string, awards: Award[] } | null>(null); // Group view
+
+    // Admin State
+    const [editingAward, setEditingAward] = useState<Award | null>(null);
     const [showEditModal, setShowEditModal] = useState(false);
 
     useEffect(() => {
         fetchAwards();
+        fetchCategories();
     }, []);
 
     async function fetchAwards() {
@@ -30,7 +39,16 @@ export const AwardsSection: React.FC<AwardsSectionProps> = ({ isDarkMode }) => {
         setAwards(data || []);
     }
 
-    // Group awards by year
+    async function fetchCategories() {
+        const { data } = await listAwardCategories();
+        if (data) {
+            const map: Record<string, 'INDIVIDUAL' | 'TEAM'> = {};
+            data.forEach((c: any) => map[c.name] = c.type);
+            setAwardCategories(map);
+        }
+    }
+
+    // Group awards by year first
     const awardsByYear = awards.reduce((acc, award) => {
         if (!acc[award.year]) acc[award.year] = [];
         acc[award.year].push(award);
@@ -39,23 +57,56 @@ export const AwardsSection: React.FC<AwardsSectionProps> = ({ isDarkMode }) => {
 
     const seasons = Object.keys(awardsByYear).sort((a, b) => b.localeCompare(a));
 
-    // Auto-select latest season on load
     useEffect(() => {
         if (!selectedSeason && seasons.length > 0) {
             setSelectedSeason(seasons[0]);
         }
     }, [seasons, selectedSeason]);
 
+    // Grouping Logic for Selected Season
+    const getSeasonGroups = () => {
+        if (!selectedSeason) return { individual: [], team: [] };
+
+        const currentAwards = awardsByYear[selectedSeason] || [];
+        const groups: Record<string, { awards: Award[], type: 'INDIVIDUAL' | 'TEAM' }> = {};
+
+        currentAwards.forEach(aw => {
+            const type = awardCategories[aw.category] || 'INDIVIDUAL';
+            const key = `${aw.category}-${aw.winner_name}`;
+
+            if (!groups[key]) {
+                groups[key] = { awards: [], type };
+            }
+            groups[key].awards.push(aw);
+        });
+
+        const individual: any[] = [];
+        const team: any[] = [];
+
+        Object.entries(groups).forEach(([key, group]) => {
+            const representative = group.awards[0];
+            const item = {
+                ...representative,
+                count: group.awards.length,
+                allAwards: group.awards
+            };
+            if (group.type === 'TEAM') team.push(item);
+            else individual.push(item);
+        });
+
+        // SORTING: Sort by count (descending) so "4x" appears first
+        individual.sort((a, b) => b.count - a.count);
+        team.sort((a, b) => b.count - a.count);
+
+        return { individual, team };
+    };
+
+    const { individual, team } = getSeasonGroups();
+
     // Navigation Handlers
     function handlePrevSeason() {
         if (!selectedSeason) return;
         const index = seasons.indexOf(selectedSeason);
-        // "Previous" (Right Arrow visually for "Next Year", but list is descending)
-        // Let's stick to: Left Arrow = Older, Right Arrow = Newer
-        // List is DESC: [2024, 2023, 2022...]
-        // Newer (Right) -> Index decrease (0 is newest)
-        // Older (Left) -> Index increase
-
         if (index < seasons.length - 1) {
             setSelectedSeason(seasons[index + 1]);
         }
@@ -86,18 +137,122 @@ export const AwardsSection: React.FC<AwardsSectionProps> = ({ isDarkMode }) => {
         setShowEditModal(true);
     }
 
+    function handleAwardClick(item: any) {
+        if (isEditing) {
+            handleEdit(item);
+        } else {
+            // Visitor View
+            if (item.count > 1) {
+                setViewingGroup({
+                    title: item.category,
+                    winnerName: item.winner_name,
+                    awards: item.allAwards
+                });
+            } else {
+                setViewingAward(item);
+            }
+        }
+    }
+
     function handleCloseEditModal() {
         setShowEditModal(false);
         setEditingAward(null);
         fetchAwards();
     }
 
+    // Modal Content for Category List
+    const CategoryListModal = ({ type, items, onClose }: { type: 'TEAM' | 'INDIVIDUAL', items: any[], onClose: () => void }) => (
+        <div className="fixed inset-0 z-[120] flex items-center justify-center p-4">
+            <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={onClose} />
+            <div className={`relative w-full max-w-2xl ${isDarkMode ? 'bg-[#121212]' : 'bg-white'} rounded-[40px] shadow-2xl animate-in zoom-in-95 duration-200 flex flex-col h-[85vh]`}>
+
+                {/* Header */}
+                <div className={`p-8 border-b ${isDarkMode ? 'border-white/5' : 'border-gray-100'} flex justify-between items-center bg-inherit rounded-t-[40px] z-10`}>
+                    <div className="flex items-center gap-4">
+                        <div className={`p-4 rounded-2xl ${isDarkMode ? 'bg-white/5' : 'bg-gray-50'}`}>
+                            {type === 'TEAM' ? <Users size={24} className="text-yellow-500" /> : <User size={24} className="text-blue-400" />}
+                        </div>
+                        <div>
+                            <div className="text-xs font-black uppercase tracking-widest text-gray-500 mb-1">
+                                {items.length} Prêmios
+                            </div>
+                            <h2 className={`text-2xl font-black uppercase tracking-tighter ${isDarkMode ? 'text-white' : 'text-[#0B1D33]'}`}>
+                                {type === 'TEAM' ? 'Prêmios de Time' : 'Prêmios Individuais'}
+                            </h2>
+                        </div>
+                    </div>
+                    <button onClick={onClose} className={`p-3 rounded-full transition-colors ${isDarkMode ? 'hover:bg-white/10 text-white' : 'hover:bg-black/5 text-black'}`}>
+                        <X size={24} />
+                    </button>
+                </div>
+
+                {/* List */}
+                <div className="flex-1 overflow-y-auto p-6 space-y-3 custom-scrollbar">
+                    {items.map((award: any) => (
+                        <div
+                            key={award.id}
+                            className={`relative flex items-center justify-between p-5 rounded-2xl border ${isDarkMode
+                                ? 'bg-[#1a2c42] border-white/5 hover:border-white/10'
+                                : 'bg-white border-gray-100 hover:border-gray-200 shadow-sm'
+                                } group cursor-pointer transition-all active:scale-[0.99]`}
+                            onClick={() => handleAwardClick(award)}
+                        >
+                            <div className="flex items-center gap-5">
+                                <div className="relative">
+                                    <div className={`p-3 rounded-xl ${isDarkMode ? 'bg-black/30' : 'bg-gray-50'}`}>
+                                        <Trophy size={22} className={type === 'TEAM' ? "text-yellow-400" : "text-blue-400"} />
+                                    </div>
+                                    {award.count > 1 && (
+                                        <div className={`absolute -top-2 -right-2 ${type === 'TEAM' ? 'bg-yellow-400 text-black' : 'bg-blue-400 text-white'} text-[10px] font-black px-2 py-0.5 rounded-full shadow-lg`}>
+                                            {award.count}x
+                                        </div>
+                                    )}
+                                </div>
+                                <div>
+                                    <div className={`font-black text-sm uppercase tracking-wide ${isDarkMode ? 'text-white' : 'text-[#0B1D33]'}`}>
+                                        {award.category}
+                                    </div>
+                                    <div className="flex items-center gap-2 mt-1">
+                                        <span className={`text-sm font-medium ${isDarkMode ? 'text-gray-300' : 'text-gray-600'}`}>
+                                            {/* For Team Awards, we prefer the Team Name. usually winner_name IS the team name, but let's be safe */}
+                                            {type === 'TEAM' && award.team ? award.team.name : award.winner_name}
+                                        </span>
+
+                                        {/* Show Manager name if available for Team Awards */}
+                                        {type === 'TEAM' && award.manager && (
+                                            <>
+                                                <span className="text-gray-600">•</span>
+                                                <span className={`text-xs font-bold uppercase ${isDarkMode ? 'text-yellow-500' : 'text-yellow-600'}`}>
+                                                    {award.manager.name}
+                                                </span>
+                                            </>
+                                        )}
+
+                                        {/* Fallback to team display for Individual awards if linked */}
+                                        {type === 'INDIVIDUAL' && award.team && award.winner_name.toLowerCase() !== award.team.name.toLowerCase() && (
+                                            <>
+                                                <span className="text-gray-600">•</span>
+                                                <span className="text-xs text-gray-500 font-bold uppercase">
+                                                    {award.team.name}
+                                                </span>
+                                            </>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+                            <ChevronRight size={20} className="text-gray-400 opacity-50 group-hover:opacity-100 transition-opacity" />
+                        </div>
+                    ))}
+                </div>
+            </div>
+        </div>
+    );
+
     return (
         <div className="px-6 pb-20">
             {isEditing && (
                 <div className="flex justify-between items-center mb-4">
                     <div className="text-[10px] font-black uppercase tracking-widest text-gray-500">Admin: Awards</div>
-                    {/* Only show generic add if no season selected, otherwise use season-specific add button */}
                     {!selectedSeason && <EditTrigger type="add" onClick={() => handleCreate()} />}
                 </div>
             )}
@@ -123,14 +278,13 @@ export const AwardsSection: React.FC<AwardsSectionProps> = ({ isDarkMode }) => {
 
                     {/* SEASON NAV HEADER */}
                     <div className="flex flex-col items-center justify-center mb-8 relative">
-                        {/* ABSOLUTE ARROWS for desktop/centering, or FLEX for simple layout */}
                         <div className="flex items-center gap-6 z-10">
                             <button
                                 onClick={handlePrevSeason}
                                 disabled={seasons.indexOf(selectedSeason) >= seasons.length - 1}
                                 className={`p-4 rounded-full transition-all active:scale-95 ${seasons.indexOf(selectedSeason) >= seasons.length - 1
-                                        ? 'opacity-20 cursor-not-allowed'
-                                        : isDarkMode ? 'bg-white/5 hover:bg-white/10 text-white' : 'bg-gray-100 hover:bg-gray-200 text-black'
+                                    ? 'opacity-20 cursor-not-allowed'
+                                    : isDarkMode ? 'bg-white/5 hover:bg-white/10 text-white' : 'bg-gray-100 hover:bg-gray-200 text-black'
                                     }`}
                             >
                                 <ChevronLeft size={24} />
@@ -149,8 +303,8 @@ export const AwardsSection: React.FC<AwardsSectionProps> = ({ isDarkMode }) => {
                                 onClick={handleNextSeason}
                                 disabled={seasons.indexOf(selectedSeason) <= 0}
                                 className={`p-4 rounded-full transition-all active:scale-95 ${seasons.indexOf(selectedSeason) <= 0
-                                        ? 'opacity-20 cursor-not-allowed'
-                                        : isDarkMode ? 'bg-white/5 hover:bg-white/10 text-white' : 'bg-gray-100 hover:bg-gray-200 text-black'
+                                    ? 'opacity-20 cursor-not-allowed'
+                                    : isDarkMode ? 'bg-white/5 hover:bg-white/10 text-white' : 'bg-gray-100 hover:bg-gray-200 text-black'
                                     }`}
                             >
                                 <ChevronRight size={24} />
@@ -158,9 +312,8 @@ export const AwardsSection: React.FC<AwardsSectionProps> = ({ isDarkMode }) => {
                         </div>
                     </div>
 
-                    {/* AWARDS LIST */}
-                    <div className="grid grid-cols-1 gap-3 max-w-2xl mx-auto">
-                        {isEditing && (
+                    {isEditing && (
+                        <div className="max-w-2xl mx-auto mb-6">
                             <button
                                 onClick={() => handleCreate(selectedSeason)}
                                 className="w-full py-4 mb-2 border-2 border-dashed border-gray-500/20 hover:border-yellow-400/50 rounded-2xl flex items-center justify-center gap-2 text-gray-400 hover:text-yellow-400 transition-colors group"
@@ -170,53 +323,81 @@ export const AwardsSection: React.FC<AwardsSectionProps> = ({ isDarkMode }) => {
                                 </div>
                                 <span className="font-bold text-sm uppercase tracking-wider">Adicionar Prêmio em {selectedSeason}</span>
                             </button>
-                        )}
+                        </div>
+                    )}
 
-                        {awardsByYear[selectedSeason]?.map(award => (
-                            <div
-                                key={award.id}
-                                className={`flex items-center justify-between p-4 rounded-2xl border ${isDarkMode
-                                        ? 'bg-[#1a2c42] border-white/5 hover:border-white/10'
-                                        : 'bg-white border-gray-100 hover:border-gray-200 shadow-sm'
-                                    } group cursor-pointer transition-all`}
-                                onClick={() => isEditing ? handleEdit(award) : setViewingAward(award)}
-                            >
-                                <div className="flex items-center gap-4">
-                                    <div className={`p-3 rounded-xl ${isDarkMode ? 'bg-black/30' : 'bg-gray-50'}`}>
-                                        <Trophy size={20} className="text-yellow-400" />
-                                    </div>
-                                    <div>
-                                        <div className={`font-black text-sm uppercase tracking-wide ${isDarkMode ? 'text-white' : 'text-[#0B1D33]'}`}>
-                                            {award.category}
-                                        </div>
-                                        <div className="flex items-center gap-2 mt-0.5">
-                                            <span className={`text-sm font-medium ${isDarkMode ? 'text-gray-300' : 'text-gray-600'}`}>
-                                                {award.winner_name}
-                                            </span>
-                                            {award.team && (
-                                                <>
-                                                    <span className="text-gray-600">•</span>
-                                                    <span className="text-xs text-gray-500 font-bold uppercase">
-                                                        {award.team.name}
-                                                    </span>
-                                                </>
-                                            )}
-                                        </div>
-                                    </div>
-                                </div>
+                    {/* MAIN CATEGORY CARDS */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-4xl mx-auto">
 
-                                {isEditing ? (
-                                    <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                        <EditTrigger type="edit" onClick={(e) => { e.stopPropagation(); handleEdit(award); }} />
-                                        <EditTrigger type="delete" onClick={(e) => handleDelete(award.id, e)} />
-                                    </div>
-                                ) : (
-                                    <ChevronRight size={18} className="text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity" />
-                                )}
+                        {/* TEAM AWARDS CARD */}
+                        <div
+                            onClick={() => team.length > 0 && setViewingCategory('TEAM')}
+                            className={`relative overflow-hidden p-8 rounded-[32px] border transition-all duration-300 group cursor-pointer ${team.length === 0 ? 'opacity-50 cursor-not-allowed grayscale' :
+                                    isDarkMode ? 'bg-[#1a2c42] border-white/5 hover:border-yellow-500/50 hover:bg-[#23354d]' : 'bg-white border-gray-100 hover:border-yellow-400 hover:shadow-xl'
+                                }`}
+                        >
+                            <div className="absolute top-0 right-0 p-8 opacity-10 group-hover:opacity-20 transition-opacity">
+                                <Users size={120} className={isDarkMode ? 'text-white' : 'text-black'} />
                             </div>
-                        ))}
+
+                            <div className="relative z-10 flex flex-col items-start h-full justify-between gap-8">
+                                <div className={`p-4 rounded-2xl ${isDarkMode ? 'bg-black/30' : 'bg-yellow-50'}`}>
+                                    <Users size={32} className="text-yellow-500" />
+                                </div>
+                                <div>
+                                    <div className="text-xs font-black uppercase tracking-widest text-gray-500 mb-1">
+                                        {team.length > 0 ? `${team.length} Registros` : 'Vazio'}
+                                    </div>
+                                    <h3 className={`text-2xl font-black uppercase tracking-tighter leading-none ${isDarkMode ? 'text-white' : 'text-[#0B1D33]'}`}>
+                                        Prêmios de Time
+                                    </h3>
+                                </div>
+                                <div className={`flex items-center gap-2 font-bold text-xs uppercase tracking-widest ${isDarkMode ? 'text-yellow-400' : 'text-yellow-600'} group-hover:gap-4 transition-all`}>
+                                    Ver Todos <ArrowRight size={16} />
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* INDIVIDUAL AWARDS CARD */}
+                        <div
+                            onClick={() => individual.length > 0 && setViewingCategory('INDIVIDUAL')}
+                            className={`relative overflow-hidden p-8 rounded-[32px] border transition-all duration-300 group cursor-pointer ${individual.length === 0 ? 'opacity-50 cursor-not-allowed grayscale' :
+                                    isDarkMode ? 'bg-[#1a2c42] border-white/5 hover:border-blue-400/50 hover:bg-[#23354d]' : 'bg-white border-gray-100 hover:border-blue-400 hover:shadow-xl'
+                                }`}
+                        >
+                            <div className="absolute top-0 right-0 p-8 opacity-10 group-hover:opacity-20 transition-opacity">
+                                <User size={120} className={isDarkMode ? 'text-white' : 'text-black'} />
+                            </div>
+
+                            <div className="relative z-10 flex flex-col items-start h-full justify-between gap-8">
+                                <div className={`p-4 rounded-2xl ${isDarkMode ? 'bg-black/30' : 'bg-blue-50'}`}>
+                                    <User size={32} className="text-blue-400" />
+                                </div>
+                                <div>
+                                    <div className="text-xs font-black uppercase tracking-widest text-gray-500 mb-1">
+                                        {individual.length > 0 ? `${individual.length} Registros` : 'Vazio'}
+                                    </div>
+                                    <h3 className={`text-2xl font-black uppercase tracking-tighter leading-none ${isDarkMode ? 'text-white' : 'text-[#0B1D33]'}`}>
+                                        Prêmios Individuais
+                                    </h3>
+                                </div>
+                                <div className={`flex items-center gap-2 font-bold text-xs uppercase tracking-widest ${isDarkMode ? 'text-blue-400' : 'text-blue-600'} group-hover:gap-4 transition-all`}>
+                                    Ver Todos <ArrowRight size={16} />
+                                </div>
+                            </div>
+                        </div>
+
                     </div>
                 </div>
+            )}
+
+            {/* CATEGORY LIST MODAL */}
+            {viewingCategory && (
+                <CategoryListModal
+                    type={viewingCategory}
+                    items={viewingCategory === 'TEAM' ? team : individual}
+                    onClose={() => setViewingCategory(null)}
+                />
             )}
 
             {/* EDIT/CREATE MODAL */}
@@ -234,6 +415,17 @@ export const AwardsSection: React.FC<AwardsSectionProps> = ({ isDarkMode }) => {
                     award={viewingAward}
                     isDarkMode={isDarkMode}
                     onClose={() => setViewingAward(null)}
+                />
+            )}
+
+            {/* VIEW GROUP DETAIL (Visitor) */}
+            {viewingGroup && (
+                <AwardGroupPopup
+                    title={viewingGroup.title}
+                    winnerName={viewingGroup.winnerName}
+                    awards={viewingGroup.awards}
+                    isDarkMode={isDarkMode}
+                    onClose={() => setViewingGroup(null)}
                 />
             )}
         </div>

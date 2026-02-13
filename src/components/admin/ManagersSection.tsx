@@ -2,10 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { useAdmin } from '../../context/AdminContext';
 import { supabase } from '../../lib/supabase';
 import { listTeams, listChampions, listAwards, listHallOfFame } from '../../cms';
-import { TeamRow, Champion, Award, HallOfFame } from '../../types';
+import { TeamRow, Champion, Award, HallOfFame, ManagerHistory } from '../../types';
 import { EditTrigger } from './EditTrigger';
-import { Users, Trash2, Award as AwardIcon, Briefcase, ChevronLeft, ChevronRight, Crown } from 'lucide-react';
+import { Users, Crown, ArrowRight, Briefcase } from 'lucide-react';
 import { ManagerDetailsModal } from './ManagerDetailsModal';
+import { ManagersListModal } from './ManagersListModal';
 
 export interface Manager {
     id: string;
@@ -23,22 +24,17 @@ interface ManagersSectionProps {
     isDarkMode: boolean;
 }
 
-const ITEMS_PER_PAGE = 5;
-
 export const ManagersSection: React.FC<ManagersSectionProps> = ({ isDarkMode }) => {
     const { isEditing } = useAdmin();
     const [managers, setManagers] = useState<Manager[]>([]);
     const [selectedManager, setSelectedManager] = useState<Partial<Manager> | null>(null);
-
-    // Pagination State
-    const [currentPage, setCurrentPage] = useState(1);
+    const [viewingList, setViewingList] = useState<'ACTIVE' | 'LEGEND' | null>(null);
 
     // Aux data
     const [teamsMap, setTeamsMap] = useState<Record<string, TeamRow>>({});
     const [championCounts, setChampionCounts] = useState<Record<string, number>>({});
-    const [runnerUpCounts, setRunnerUpCounts] = useState<Record<string, number>>({});
-    const [managerAwards, setManagerAwards] = useState<Record<string, string[]>>({});
     const [hofIds, setHofIds] = useState<Set<string>>(new Set());
+    const [managerTrades, setManagerTrades] = useState<Record<string, number>>({});
 
     const fetchData = async () => {
         // Fetch Managers
@@ -51,32 +47,15 @@ export const ManagersSection: React.FC<ManagersSectionProps> = ({ isDarkMode }) 
         teamsData?.forEach((t: any) => tMap[t.id] = t);
         setTeamsMap(tMap);
 
-        // Fetch Champions to count titles & runner-ups
+        // Fetch Champions to count titles
         const { data: champsData } = await listChampions();
         const cCounts: Record<string, number> = {};
-        const rCounts: Record<string, number> = {};
-
         (champsData as Champion[])?.forEach(c => {
             if (c.manager_id) {
                 cCounts[c.manager_id] = (cCounts[c.manager_id] || 0) + 1;
             }
-            if (c.runner_up_manager_id) {
-                rCounts[c.runner_up_manager_id] = (rCounts[c.runner_up_manager_id] || 0) + 1;
-            }
         });
         setChampionCounts(cCounts);
-        setRunnerUpCounts(rCounts);
-
-        // Fetch Awards
-        const { data: awardsData } = await listAwards();
-        const mAwards: Record<string, string[]> = {};
-        (awardsData as Award[])?.forEach(a => {
-            if (a.manager_id) {
-                if (!mAwards[a.manager_id]) mAwards[a.manager_id] = [];
-                mAwards[a.manager_id].push(`${a.year} ${a.category}`);
-            }
-        });
-        setManagerAwards(mAwards);
 
         // Fetch Hall of Fame
         const { data: hofData } = await listHallOfFame();
@@ -85,6 +64,34 @@ export const ManagersSection: React.FC<ManagersSectionProps> = ({ isDarkMode }) 
             if (h.manager_id) hIds.add(h.manager_id);
         });
         setHofIds(hIds);
+
+        // Fetch Trades (via Manager History + Season Standings)
+        // 1. Get all manager history
+        const { data: historyData } = await supabase.from('manager_history').select('*');
+        // 2. Get all season standings (where trades_count is stored)
+        const { data: standingsData } = await supabase.from('season_standings').select('season_id, team_id, trades_count');
+
+        // 3. Map standings by season_id + team_id
+        const standingsMap: Record<string, number> = {};
+
+        const { data: seasonsData } = await supabase.from('seasons').select('id, year');
+        const seasonYearIdMap: Record<string, string> = {}; // year -> id
+        seasonsData?.forEach((s: any) => seasonYearIdMap[s.year] = s.id);
+
+        standingsData?.forEach((st: any) => {
+            standingsMap[`${st.season_id}-${st.team_id}`] = st.trades_count || 0;
+        });
+
+        const mTrades: Record<string, number> = {};
+        (historyData as ManagerHistory[])?.forEach(h => {
+            if (!h.team_id || !h.manager_id) return;
+            const seasonId = seasonYearIdMap[h.year];
+            if (!seasonId) return;
+
+            const count = standingsMap[`${seasonId}-${h.team_id}`] || 0;
+            mTrades[h.manager_id] = (mTrades[h.manager_id] || 0) + count;
+        });
+        setManagerTrades(mTrades);
     };
 
     useEffect(() => {
@@ -99,181 +106,99 @@ export const ManagersSection: React.FC<ManagersSectionProps> = ({ isDarkMode }) 
         }
     };
 
-    const activeManagers = managers.filter(m => m.is_active !== false);
-    const historicManagers = managers.filter(m => m.is_active === false);
-
-    // Pagination Logic
-    const totalPages = Math.ceil(activeManagers.length / ITEMS_PER_PAGE);
-    const paginatedManagers = activeManagers.slice(
-        (currentPage - 1) * ITEMS_PER_PAGE,
-        currentPage * ITEMS_PER_PAGE
-    );
-
-    const ManagerCard = ({ manager }: { manager: Manager }) => {
-        // Resolve Teams
-        const linkedTeams = (manager.teams_managed_ids || [])
-            .map(id => teamsMap[id])
-            .filter(Boolean);
-
-        // Resolve Titles & Runner-ups
-        const titleCount = championCounts[manager.id] || 0;
-        const runnerUpCount = runnerUpCounts[manager.id] || 0;
-
-        const isHoF = hofIds.has(manager.id);
-
-        const parts = [];
-        if (titleCount > 0) parts.push(`${titleCount}x Campeão`);
-        // if (runnerUpCount > 0) parts.push(`${runnerUpCount}x Vice`); // Simplify summary
-
-        const titleText = parts.join(' • ');
-
-        return (
-            <div
-                className={`relative rounded-3xl overflow-hidden shadow-lg group cursor-pointer transition-transform hover:scale-[1.01] ${isDarkMode ? 'bg-[#1a2c42]' : 'bg-white'} `}
-                onClick={() => setSelectedManager(manager)} // Open for everyone
-            >
-                {/* Background Gradient */}
-                <div className={`absolute inset-0 opacity-10 ${isDarkMode ? 'bg-white' : 'bg-black'} `} />
-
-                <div className="relative p-6 flex flex-col sm:flex-row gap-6 items-center sm:items-start text-center sm:text-left">
-                    {/* Manager Image */}
-                    <div className="relative">
-                        <div className={`w-24 h-24 rounded-full border-4 overflow-hidden shadow-xl flex-shrink-0 bg-gray-300 ${manager.is_active !== false ? 'border-yellow-400' : 'border-gray-500 grayscale'} `}>
-                            {manager.image_url ? (
-                                <img src={manager.image_url} alt={manager.name} className="w-full h-full object-cover" />
-                            ) : (
-                                <div className="w-full h-full flex items-center justify-center text-gray-500">
-                                    <Users size={32} />
-                                </div>
-                            )}
-                        </div>
-                        {isHoF && (
-                            <div className="absolute -bottom-1 -right-1 w-8 h-8 bg-black rounded-full flex items-center justify-center text-yellow-400 border-2 border-yellow-400 shadow-lg z-10" title="Hall of Fame">
-                                <Crown size={14} fill="currentColor" />
-                            </div>
-                        )}
-                    </div>
-
-                    {/* Info */}
-                    <div className="flex-1 space-y-2">
-                        <div>
-                            <div className="flex items-center justify-center sm:justify-start gap-2">
-                                <h3 className={`text-2xl font-black uppercase leading-none mb-1 ${isDarkMode ? 'text-white' : 'text-[#0B1D33]'} `}>
-                                    {manager.name}
-                                </h3>
-                            </div>
-                            {/* Summary Bio (Truncated) */}
-                            {manager.bio ? (
-                                <p className="text-xs text-gray-500 font-bold uppercase tracking-widest line-clamp-1">
-                                    {manager.bio}
-                                </p>
-                            ) : isHoF ? (
-                                <p className="text-xs text-yellow-500 font-bold uppercase tracking-widest">
-                                    Hall of Fame Member
-                                </p>
-                            ) : null}
-                        </div>
-
-                        <div className="flex flex-col gap-1 text-xs">
-                            {/* Teams Logic */}
-                            {(linkedTeams.length > 0) ? (
-                                <div className="flex flex-wrap items-center gap-2 justify-center sm:justify-start text-gray-400">
-                                    <Briefcase size={12} className="text-yellow-400" />
-                                    {linkedTeams.slice(0, 2).map((t, idx) => ( // Show only first 2 teams in summary
-                                        <span key={t.id} className="uppercase">{t.name}{idx < linkedTeams.length - 1 || linkedTeams.length > 2 ? ', ' : ''}</span>
-                                    ))}
-                                    {linkedTeams.length > 2 && <span>+{linkedTeams.length - 2}</span>}
-                                </div>
-                            ) : (manager.teams_managed && (
-                                <div className="flex items-center gap-2 justify-center sm:justify-start text-gray-400">
-                                    <Briefcase size={12} className="text-yellow-400" />
-                                    <span>{manager.teams_managed}</span>
-                                </div>
-                            ))}
-
-                            {/* Titles Logic: Only major titles in summary */}
-                            {titleText && (
-                                <div className="flex items-center gap-2 justify-center sm:justify-start">
-                                    <AwardIcon size={12} className="text-yellow-400" />
-                                    <span className="font-bold text-yellow-500 uppercase">{titleText}</span>
-                                </div>
-                            )}
-                        </div>
-                    </div>
-
-                    {/* Chevron Hint */}
-                    <div className="absolute right-6 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-50 transition-opacity hidden sm:block">
-                        <ChevronRight size={24} className={isDarkMode ? 'text-white' : 'text-gray-400'} />
-                    </div>
-                </div>
-
-                {isEditing && (
-                    <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button
-                            onClick={(e) => handleDelete(manager.id, e)}
-                            className="p-2 bg-red-500 text-white rounded-full shadow-lg hover:bg-red-600 transition"
-                        >
-                            <Trash2 size={14} />
-                        </button>
-                    </div>
-                )}
-            </div>
-        );
-    };
+    const activeManagersCount = managers.filter(m => m.is_active !== false).length;
+    const historicManagersCount = managers.filter(m => m.is_active === false).length;
 
     return (
         <div className="px-6 pb-20 space-y-12">
 
-            {/* Active Managers */}
-            <div className="space-y-6">
-                <div className="flex justify-between items-center">
-                    <div className="text-xs font-black uppercase tracking-widest text-yellow-500">Gestores em Atividade</div>
-                    {isEditing && <EditTrigger type="add" onClick={() => setSelectedManager({})} />}
-                </div>
+            {/* Entry Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-4xl mx-auto">
 
-                <div className="grid gap-6">
-                    {paginatedManagers.map(manager => (
-                        <ManagerCard key={manager.id} manager={manager} />
-                    ))}
-                    {activeManagers.length === 0 && (
-                        <div className="text-gray-500 text-sm italic">Nenhum gestor ativo.</div>
-                    )}
-                </div>
-
-                {/* Pagination Controls */}
-                {totalPages > 1 && (
-                    <div className="flex justify-center items-center gap-4 mt-8">
-                        <button
-                            disabled={currentPage === 1}
-                            onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                            className={`p-2 rounded-full transition-colors ${currentPage === 1 ? 'text-gray-600 cursor-not-allowed' : 'bg-yellow-400 text-black hover:bg-yellow-300'}`}
-                        >
-                            <ChevronLeft size={20} />
-                        </button>
-                        <span className={`text-sm font-bold ${isDarkMode ? 'text-white' : 'text-black'}`}>
-                            {currentPage} / {totalPages}
-                        </span>
-                        <button
-                            disabled={currentPage === totalPages}
-                            onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                            className={`p-2 rounded-full transition-colors ${currentPage === totalPages ? 'text-gray-600 cursor-not-allowed' : 'bg-yellow-400 text-black hover:bg-yellow-300'}`}
-                        >
-                            <ChevronRight size={20} />
-                        </button>
+                {/* ACTIVE MANAGERS CARD */}
+                <div
+                    onClick={() => setViewingList('ACTIVE')}
+                    className={`relative overflow-hidden p-8 rounded-[32px] border transition-all duration-300 group cursor-pointer ${isDarkMode ? 'bg-[#1a2c42] border-white/5 hover:border-yellow-500/50 hover:bg-[#23354d]' : 'bg-white border-gray-100 hover:border-yellow-400 hover:shadow-xl'
+                        }`}
+                >
+                    <div className="absolute top-0 right-0 p-8 opacity-10 group-hover:opacity-20 transition-opacity">
+                        <Users size={120} className={isDarkMode ? 'text-white' : 'text-black'} />
                     </div>
-                )}
+
+                    <div className="relative z-10 flex flex-col items-start h-full justify-between gap-8">
+                        <div className={`p-4 rounded-2xl ${isDarkMode ? 'bg-black/30' : 'bg-yellow-50'}`}>
+                            <Users size={32} className="text-yellow-500" />
+                        </div>
+                        <div>
+                            <div className="text-xs font-black uppercase tracking-widest text-gray-500 mb-1">
+                                {activeManagersCount} Gestores
+                            </div>
+                            <h3 className={`text-2xl font-black uppercase tracking-tighter leading-none ${isDarkMode ? 'text-white' : 'text-[#0B1D33]'}`}>
+                                Gestores em Atividade
+                            </h3>
+                        </div>
+                        <div className={`flex items-center gap-2 font-bold text-xs uppercase tracking-widest ${isDarkMode ? 'text-yellow-400' : 'text-yellow-600'} group-hover:gap-4 transition-all`}>
+                            Ver Todos <ArrowRight size={16} />
+                        </div>
+                    </div>
+                </div>
+
+                {/* LEGENDARY MANAGERS CARD */}
+                <div
+                    onClick={() => setViewingList('LEGEND')}
+                    className={`relative overflow-hidden p-8 rounded-[32px] border transition-all duration-300 group cursor-pointer ${isDarkMode ? 'bg-[#1a2c42] border-white/5 hover:border-gray-400/50 hover:bg-[#23354d]' : 'bg-white border-gray-100 hover:border-gray-400 hover:shadow-xl'
+                        }`}
+                >
+                    <div className="absolute top-0 right-0 p-8 opacity-10 group-hover:opacity-20 transition-opacity">
+                        <Crown size={120} className={isDarkMode ? 'text-white' : 'text-black'} />
+                    </div>
+
+                    <div className="relative z-10 flex flex-col items-start h-full justify-between gap-8">
+                        <div className={`p-4 rounded-2xl ${isDarkMode ? 'bg-black/30' : 'bg-gray-50'}`}>
+                            <Crown size={32} className="text-gray-400" />
+                        </div>
+                        <div>
+                            <div className="text-xs font-black uppercase tracking-widest text-gray-500 mb-1">
+                                {historicManagersCount} Gestores
+                            </div>
+                            <h3 className={`text-2xl font-black uppercase tracking-tighter leading-none ${isDarkMode ? 'text-white' : 'text-[#0B1D33]'}`}>
+                                Lendas & Históricos
+                            </h3>
+                        </div>
+                        <div className={`flex items-center gap-2 font-bold text-xs uppercase tracking-widest ${isDarkMode ? 'text-gray-400' : 'text-gray-600'} group-hover:gap-4 transition-all`}>
+                            Ver Todos <ArrowRight size={16} />
+                        </div>
+                    </div>
+                </div>
             </div>
 
-            {/* Historic Managers */}
-            {historicManagers.length > 0 && (
-                <div className="space-y-6 pt-6 border-t border-gray-800">
-                    <div className="text-xs font-black uppercase tracking-widest text-gray-500">Lendas & Históricos</div>
-                    <div className="grid gap-6 opacity-80">
-                        {historicManagers.map(manager => (
-                            <ManagerCard key={manager.id} manager={manager} />
-                        ))}
-                    </div>
+            {isEditing && (
+                <div className="flex justify-center mt-8">
+                    <button
+                        onClick={() => setSelectedManager({})}
+                        className="px-6 py-3 bg-yellow-400 text-black text-xs font-black uppercase tracking-widest rounded-full shadow-lg hover:scale-105 transition-transform flex items-center gap-2"
+                    >
+                        <EditTrigger type="add" onClick={(e) => { e.stopPropagation(); setSelectedManager({}); }} />
+                        Adicionar Novo Gestor
+                    </button>
                 </div>
+            )}
+
+
+            {/* Modals */}
+            {viewingList && (
+                <ManagersListModal
+                    managers={managers}
+                    initialTab={viewingList}
+                    isDarkMode={isDarkMode}
+                    onClose={() => setViewingList(null)}
+                    onSelectManager={setSelectedManager}
+                    onDeleteManager={handleDelete}
+                    teamsMap={teamsMap}
+                    championCounts={championCounts}
+                    hofIds={hofIds}
+                    managerTrades={managerTrades}
+                />
             )}
 
             {selectedManager && (

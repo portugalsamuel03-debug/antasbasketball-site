@@ -161,16 +161,46 @@ const ArticleCard: React.FC<Props> = ({ article, onClick, onShare, isDarkMode, i
             {article.title}
           </div>
 
-          {article.category === 'PODCAST' && article.content.includes('spotify.com') ? (
+          {article.category === 'PODCAST' && (article.video_url || article.content.includes('spotify.com')) ? (
             <div className="mt-4 rounded-2xl overflow-hidden border border-white/10 bg-black/20">
-              <iframe
-                src={article.content.includes('/embed/') ? article.content.match(/https:\/\/open\.spotify\.com\/embed\/[^\s"]+/)?.[0] : article.content.match(/https:\/\/open\.spotify\.com\/[^\s"]+/)?.[0].replace('spotify.com/', 'spotify.com/embed/')}
-                width="100%"
-                height="152"
-                frameBorder="0"
-                allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
-                loading="lazy"
-              ></iframe>
+              {(() => {
+                const url = article.video_url || (article.content.match(/https:\/\/open\.spotify\.com\/[^\s"]+/) ? article.content.match(/https:\/\/open\.spotify\.com\/[^\s"]+/)?.[0] : '');
+
+                if (url?.includes('spotify.com')) {
+                  const embedUrl = url.includes('/embed/') ? url : url.replace('spotify.com/', 'spotify.com/embed/');
+                  return (
+                    <iframe
+                      src={embedUrl}
+                      width="100%"
+                      height="152"
+                      frameBorder="0"
+                      allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
+                      loading="lazy"
+                    ></iframe>
+                  );
+                } else if (url?.includes('youtube.com') || url?.includes('youtu.be')) {
+                  let embedUrl = url;
+                  if (url.includes('watch?v=')) {
+                    const videoId = url.split('watch?v=')[1]?.split('&')[0];
+                    embedUrl = `https://www.youtube.com/embed/${videoId}`;
+                  } else if (url.includes('youtu.be/')) {
+                    const videoId = url.split('youtu.be/')[1]?.split('?')[0];
+                    embedUrl = `https://www.youtube.com/embed/${videoId}`;
+                  }
+                  return (
+                    <iframe
+                      width="100%"
+                      height="200"
+                      src={embedUrl}
+                      title="YouTube video player"
+                      frameBorder="0"
+                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                      allowFullScreen
+                    ></iframe>
+                  );
+                }
+                return null;
+              })()}
             </div>
           ) : article.description ? (
             <div className={`mt-2 text-[12px] font-medium ${isDarkMode ? "text-gray-300" : "text-gray-600"}`}>

@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { X, Save, Plus, Trash2, Edit2, Trophy, Award as AwardIcon, Star } from 'lucide-react';
+import { X, Save, Plus, Trash2, Edit2, Trophy, Award as AwardIcon, Star, User, Users, ChevronDown, ChevronUp } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { Season, Team, SeasonStanding, Champion, Award, TeamRow, RecordItem } from '../../types';
-import { listChampions, listAwards, listTeams, listRecords } from '../../cms';
+import { listChampions, listAwards, listTeams, listRecords, listAwardCategories } from '../../cms';
 import { SEASON_OPTIONS } from '../../utils/seasons';
 
 interface SeasonDetailsModalProps {
@@ -14,6 +14,30 @@ interface SeasonDetailsModalProps {
     onSave: () => void;
 }
 
+// Collapsible Section Helper
+const CollapsibleSection = ({ title, icon, children, isDarkMode, defaultOpen = false }: any) => {
+    const [isOpen, setIsOpen] = useState(defaultOpen);
+    return (
+        <div className={`rounded-[24px] overflow-hidden ${isDarkMode ? 'bg-white/5' : 'bg-gray-50'}`}>
+            <button
+                onClick={() => setIsOpen(!isOpen)}
+                className="w-full flex items-center justify-between p-5 hover:bg-black/5 transition-colors"
+            >
+                <div className="flex items-center gap-2">
+                    {icon}
+                    <div className="text-[10px] font-black text-gray-500 uppercase tracking-widest">{title}</div>
+                </div>
+                {isOpen ? <ChevronUp size={16} className="text-gray-500" /> : <ChevronDown size={16} className="text-gray-500" />}
+            </button>
+            {isOpen && (
+                <div className="px-5 pb-5">
+                    {children}
+                </div>
+            )}
+        </div>
+    );
+};
+
 export const SeasonDetailsModal: React.FC<SeasonDetailsModalProps> = ({ season, isCreating, isDarkMode, canEdit, onClose, onSave }) => {
     const [formData, setFormData] = useState<Partial<Season>>({ year: '', summary: '' });
     const [standings, setStandings] = useState<SeasonStanding[]>([]);
@@ -23,7 +47,9 @@ export const SeasonDetailsModal: React.FC<SeasonDetailsModalProps> = ({ season, 
     // Auto-fetched data
     const [yearChampion, setYearChampion] = useState<Champion | null>(null);
     const [yearAwards, setYearAwards] = useState<Award[]>([]);
+    const [groupedAwards, setGroupedAwards] = useState<{ individual: any[], team: any[] }>({ individual: [], team: [] });
     const [yearRecords, setYearRecords] = useState<RecordItem[]>([]);
+    const [awardCategories, setAwardCategories] = useState<Record<string, 'INDIVIDUAL' | 'TEAM'>>({});
 
     // For adding/editing standing row
     const [editingStanding, setEditingStanding] = useState<Partial<SeasonStanding> | null>(null);
@@ -35,11 +61,21 @@ export const SeasonDetailsModal: React.FC<SeasonDetailsModalProps> = ({ season, 
             fetchSeasonData(season.year);
         }
         fetchTeams();
+        fetchCategories();
     }, [season]);
 
     const fetchTeams = async () => {
         const { data } = await listTeams();
         if (data) setTeams(data as TeamRow[]);
+    }
+
+    const fetchCategories = async () => {
+        const { data } = await listAwardCategories();
+        if (data) {
+            const map: Record<string, 'INDIVIDUAL' | 'TEAM'> = {};
+            data.forEach((c: any) => map[c.name] = c.type);
+            setAwardCategories(map);
+        }
     }
 
     const fetchStandings = async (seasonId: string) => {
@@ -72,6 +108,64 @@ export const SeasonDetailsModal: React.FC<SeasonDetailsModalProps> = ({ season, 
         }
     }
 
+    // Process Awards when data is ready
+    useEffect(() => {
+        if (yearAwards.length > 0 && Object.keys(awardCategories).length > 0) {
+            processAwards();
+        }
+    }, [yearAwards, awardCategories]);
+
+    const processAwards = () => {
+        const individual: any[] = [];
+        const team: any[] = [];
+        const groups: Record<string, { award: Award, count: number }> = {};
+
+        yearAwards.forEach(aw => {
+            const type = awardCategories[aw.category] || 'INDIVIDUAL';
+            const key = type === 'TEAM'
+                ? `${aw.category}-${aw.winner_name}` // Group by Team Name for Team Awards
+                : `${aw.category}-${aw.winner_name}`; // Group by Winner Name (Individual) too
+
+            if (groups[key]) {
+                groups[key].count++;
+            } else {
+                groups[key] = { award: aw, count: 1 };
+            }
+        });
+
+        Object.values(groups).forEach(item => {
+            const type = awardCategories[item.award.category] || 'INDIVIDUAL';
+            const displayAward = { ...item.award, count: item.count };
+            if (type === 'TEAM') team.push(displayAward);
+            else individual.push(displayAward);
+        });
+
+        setGroupedAwards({ individual, team });
+    };
+
+    // Helper to calculate achievements dynamically
+    const getDynamicAchievements = (teamId: string) => {
+        const teamAwards = yearAwards.filter(a => a.team_id === teamId && awardCategories[a.category] === 'TEAM');
+        const isChampion = yearChampion?.team_id === teamId;
+        const isRunnerUp = yearChampion?.runner_up_team_id === teamId;
+
+        const achievementsParts = [];
+        if (isChampion) achievementsParts.push('Campeão');
+        if (isRunnerUp) achievementsParts.push('Vice-Campeão');
+
+        // Group team awards for the string
+        const awardCounts: Record<string, number> = {};
+        teamAwards.forEach(a => {
+            awardCounts[a.category] = (awardCounts[a.category] || 0) + 1;
+        });
+        Object.entries(awardCounts).forEach(([cat, count]) => {
+            if (count > 1) achievementsParts.push(`${count}x ${cat}`);
+            else achievementsParts.push(cat);
+        });
+
+        return achievementsParts.join(', ');
+    };
+
     const handleSaveSeason = async () => {
         if (!formData.year) return alert('O ano é obrigatório');
         try {
@@ -96,6 +190,9 @@ export const SeasonDetailsModal: React.FC<SeasonDetailsModalProps> = ({ season, 
         if (!season?.id) return alert('Salve a temporada primeiro.');
         if (!editingStanding?.team_id) return alert('Selecione um time.');
 
+        // Generate string for DB (fallback/indexing)
+        const autoAchievements = getDynamicAchievements(editingStanding.team_id);
+
         const payload = {
             season_id: season.id,
             team_id: editingStanding.team_id,
@@ -105,7 +202,7 @@ export const SeasonDetailsModal: React.FC<SeasonDetailsModalProps> = ({ season, 
             trades_count: Number(editingStanding.trades_count || 0),
             position: Number(editingStanding.position || 0),
             highlight_players: editingStanding.highlight_players,
-            team_achievements: editingStanding.team_achievements
+            team_achievements: autoAchievements // Still saving to DB, but UI will prefer dynamic
         };
 
         const { error } = await supabase
@@ -133,7 +230,6 @@ export const SeasonDetailsModal: React.FC<SeasonDetailsModalProps> = ({ season, 
         }`;
 
     const standingsByRank = [...standings].sort((a, b) => (a.position - b.position));
-    const standingsByTrades = [...standings].sort((a, b) => (b.trades_count - a.trades_count));
 
     return (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
@@ -162,42 +258,118 @@ export const SeasonDetailsModal: React.FC<SeasonDetailsModalProps> = ({ season, 
                         <div className="space-y-8">
                             {/* Auto Summary Section */}
                             {!isCreating && (yearChampion || yearAwards.length > 0) && (
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                    {/* Champion Card */}
+                                <div className="space-y-6">
+                                    {/* Champion Card - Compact & Horizontal */}
                                     {yearChampion && (
-                                        <div className={`p-4 rounded-3xl relative overflow-hidden ${isDarkMode ? 'bg-gradient-to-br from-yellow-400/20 to-black' : 'bg-gradient-to-br from-yellow-100 to-white'} border border-yellow-400/30`}>
-                                            <div className="absolute top-2 right-3 text-[10px] font-black text-yellow-500 uppercase tracking-widest">Campeão</div>
-                                            <div className="flex items-center gap-4 mt-2">
-                                                {yearChampion.logo_url ? (
-                                                    <img src={yearChampion.logo_url} className="w-16 h-16 object-contain drop-shadow-lg" />
-                                                ) : <Trophy size={32} className="text-yellow-400" />}
-                                                <div>
-                                                    <div className={`text-xl font-black uppercase leading-none ${isDarkMode ? 'text-white' : 'text-black'}`}>{yearChampion.team}</div>
-                                                    {yearChampion.runner_up_team && (
-                                                        <div className="text-[10px] font-bold text-gray-500 mt-1 uppercase">Vice: {yearChampion.runner_up_team.name}</div>
-                                                    )}
-                                                </div>
+                                        <div className={`relative rounded-3xl overflow-hidden group ${isDarkMode ? 'bg-[#1a1a1a] border-white/5' : 'bg-white border-black/5'} border shadow-lg`}>
+                                            {/* Stats Grid Background */}
+                                            <div className="absolute inset-0 opacity-[0.03]"
+                                                style={{ backgroundImage: 'radial-gradient(circle at 2px 2px, gray 1px, transparent 0)', backgroundSize: '16px 16px' }}>
                                             </div>
+
+                                            <div className="relative p-5 flex items-center justify-between gap-6">
+                                                {/* Left: Logo & Title */}
+                                                <div className="flex items-center gap-5">
+                                                    <div className="w-16 h-16 drop-shadow-xl transform group-hover:scale-105 transition-transform duration-300">
+                                                        {yearChampion.logo_url ? (
+                                                            <img src={yearChampion.logo_url} className="w-full h-full object-contain" />
+                                                        ) : <Trophy size={40} className="text-yellow-400" />}
+                                                    </div>
+                                                    <div>
+                                                        <div className="flex items-center gap-2 mb-1">
+                                                            <Trophy size={14} className="text-yellow-500" />
+                                                            <span className="text-[10px] font-black text-yellow-500 uppercase tracking-widest">Campeão</span>
+                                                        </div>
+                                                        <div className={`text-2xl font-black uppercase tracking-tighter leading-none ${isDarkMode ? 'text-white' : 'text-[#0B1D33]'}`}>
+                                                            {yearChampion.team}
+                                                        </div>
+                                                        {yearChampion.manager && (
+                                                            <div className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mt-1">
+                                                                GM: {yearChampion.manager.name}
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                </div>
+
+                                                {/* Right: Runner Up (Compact) */}
+                                                {yearChampion.runner_up_team && (
+                                                    <div className={`hidden md:flex flex-col items-end pl-6 border-l ${isDarkMode ? 'border-white/10' : 'border-black/5'}`}>
+                                                        <div className="text-[9px] font-bold text-gray-500 uppercase tracking-widest mb-1">Vice-Campeão</div>
+                                                        <div className="flex items-center gap-2">
+                                                            <div className={`text-sm font-black uppercase ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                                                                {yearChampion.runner_up_team.name}
+                                                            </div>
+                                                            {yearChampion.runner_up_team.logo_url && (
+                                                                <img src={yearChampion.runner_up_team.logo_url} className="w-8 h-8 object-contain opacity-80" />
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </div>
+
+                                            {/* Mobile Runner Up (if needed) */}
+                                            {yearChampion.runner_up_team && (
+                                                <div className="md:hidden p-3 bg-black/5 border-t border-black/5 flex justify-between items-center">
+                                                    <span className="text-[9px] font-bold text-gray-500 uppercase tracking-widest">Vice</span>
+                                                    <div className="flex items-center gap-2">
+                                                        <span className={`text-xs font-bold uppercase ${isDarkMode ? 'text-gray-600' : 'text-gray-600'}`}>{yearChampion.runner_up_team.name}</span>
+                                                        <img src={yearChampion.runner_up_team.logo_url || ''} className="w-5 h-5 object-contain opacity-60" />
+                                                    </div>
+                                                </div>
+                                            )}
                                         </div>
                                     )}
 
-                                    {/* Awards List */}
-                                    {yearAwards.length > 0 && (
-                                        <div className={`p-4 rounded-3xl ${isDarkMode ? 'bg-white/5' : 'bg-gray-50'}`}>
-                                            <div className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-3">Premiações</div>
-                                            <div className="space-y-2">
-                                                {yearAwards.map(aw => (
-                                                    <div key={aw.id} className="flex items-center gap-2">
-                                                        <AwardIcon size={12} className="text-yellow-400 flex-shrink-0" />
-                                                        <div className="text-xs">
-                                                            <span className={`font-bold ${isDarkMode ? 'text-white' : 'text-black'}`}>{aw.category}: </span>
-                                                            <span className="opacity-70">{aw.winner_name}</span>
+                                    {/* Awards Grid - Collapsible */}
+                                    <div className="space-y-3">
+                                        {/* Team Awards */}
+                                        {groupedAwards.team.length > 0 && (
+                                            <CollapsibleSection
+                                                title={`Prêmios de Time (${groupedAwards.team.length})`}
+                                                icon={<Users size={14} className="text-yellow-500" />}
+                                                isDarkMode={isDarkMode}
+                                                defaultOpen={false}
+                                            >
+                                                <div className="space-y-3 pt-2">
+                                                    {groupedAwards.team.map((item: any, idx) => (
+                                                        <div key={idx} className="flex items-start gap-3 group">
+                                                            <div className="w-1 h-full min-h-[24px] rounded-full bg-yellow-500/20 group-hover:bg-yellow-500 transition-colors"></div>
+                                                            <div>
+                                                                <div className={`text-sm font-bold leading-tight ${isDarkMode ? 'text-white' : 'text-[#0B1D33]'}`}>
+                                                                    {item.count > 1 ? `${item.count}x ` : ''}{item.category}
+                                                                </div>
+                                                                <div className="text-[10px] font-medium text-gray-500 uppercase mt-0.5">{item.winner_name}</div>
+                                                            </div>
                                                         </div>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        </div>
-                                    )}
+                                                    ))}
+                                                </div>
+                                            </CollapsibleSection>
+                                        )}
+
+                                        {/* Individual Awards */}
+                                        {groupedAwards.individual.length > 0 && (
+                                            <CollapsibleSection
+                                                title={`Prêmios Individuais (${groupedAwards.individual.length})`}
+                                                icon={<User size={14} className="text-blue-400" />}
+                                                isDarkMode={isDarkMode}
+                                                defaultOpen={false}
+                                            >
+                                                <div className="pt-2 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                                    {groupedAwards.individual.map((item: any, idx) => (
+                                                        <div key={idx} className={`flex items-center gap-3 p-2 rounded-xl transition-colors ${isDarkMode ? 'hover:bg-white/5' : 'hover:bg-gray-50'}`}>
+                                                            <div className="w-8 h-8 rounded-full bg-black/5 flex items-center justify-center text-xs font-black border border-black/5 shrink-0">
+                                                                {item.category.charAt(0)}
+                                                            </div>
+                                                            <div className="min-w-0">
+                                                                <div className={`text-xs font-black uppercase truncate ${isDarkMode ? 'text-white' : 'text-[#0B1D33]'}`}>{item.category}</div>
+                                                                <div className="text-[10px] font-bold text-gray-500 uppercase truncate">{item.winner_name}</div>
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </CollapsibleSection>
+                                        )}
+                                    </div>
                                 </div>
                             )}
 
@@ -269,118 +441,124 @@ export const SeasonDetailsModal: React.FC<SeasonDetailsModalProps> = ({ season, 
                     {/* STANDINGS TAB */}
                     {!isCreating && activeTab === 'STANDINGS' && (
                         <div className="space-y-8">
-                            {/* Editor Area */}
-                            <div className={`p-6 rounded-3xl border ${isDarkMode ? 'bg-black/20 border-white/5' : 'bg-gray-50 border-black/5'}`}>
-                                <h3 className="text-xs font-black uppercase tracking-widest mb-4 opacity-50 flex items-center gap-2">
-                                    <Plus size={14} />
-                                    {editingStanding?.id ? 'Editar Registro' : 'Adicionar Registro'}
-                                </h3>
-                                <div className="space-y-4">
-                                    <select
-                                        className={inputClass}
-                                        value={editingStanding?.team_id || ''}
-                                        onChange={e => setEditingStanding(prev => ({ ...prev, team_id: e.target.value }))}
-                                    >
-                                        <option value="">Selecione um time...</option>
-                                        {teams.map(t => <option key={t.id} value={t.id} className="text-black">{t.name}</option>)}
-                                    </select>
+                            {/* Editor Area - RESTRICTED TO ADMIN */}
+                            {canEdit && (
+                                <div className={`p-6 rounded-3xl border ${isDarkMode ? 'bg-black/20 border-white/5' : 'bg-gray-50 border-black/5'}`}>
+                                    <h3 className="text-xs font-black uppercase tracking-widest mb-4 opacity-50 flex items-center gap-2">
+                                        <Plus size={14} />
+                                        {editingStanding?.id ? 'Editar Registro' : 'Adicionar Registro'}
+                                    </h3>
+                                    <div className="space-y-4">
+                                        <select
+                                            className={inputClass}
+                                            value={editingStanding?.team_id || ''}
+                                            onChange={e => setEditingStanding(prev => ({ ...prev, team_id: e.target.value }))}
+                                        >
+                                            <option value="">Selecione um time...</option>
+                                            {teams.map(t => <option key={t.id} value={t.id} className="text-black">{t.name}</option>)}
+                                        </select>
 
-                                    <div className="grid grid-cols-4 gap-4">
-                                        <div>
-                                            <label className="text-[9px] font-black text-gray-400 uppercase">Pos</label>
-                                            <input type="number" className={inputClass} value={editingStanding?.position || ''} onChange={e => setEditingStanding(prev => ({ ...prev, position: Number(e.target.value) }))} />
+                                        <div className="grid grid-cols-4 gap-4">
+                                            <div>
+                                                <label className="text-[9px] font-black text-gray-400 uppercase">Pos</label>
+                                                <input type="number" className={inputClass} value={editingStanding?.position || ''} onChange={e => setEditingStanding(prev => ({ ...prev, position: Number(e.target.value) }))} />
+                                            </div>
+                                            <div>
+                                                <label className="text-[9px] font-black text-gray-400 uppercase">W</label>
+                                                <input type="number" className={inputClass} value={editingStanding?.wins || ''} onChange={e => setEditingStanding(prev => ({ ...prev, wins: Number(e.target.value) }))} />
+                                            </div>
+                                            <div>
+                                                <label className="text-[9px] font-black text-gray-400 uppercase">L</label>
+                                                <input type="number" className={inputClass} value={editingStanding?.losses || ''} onChange={e => setEditingStanding(prev => ({ ...prev, losses: Number(e.target.value) }))} />
+                                            </div>
+                                            <div>
+                                                <label className="text-[9px] font-black text-gray-400 uppercase">Trades</label>
+                                                <input type="number" className={inputClass} value={editingStanding?.trades_count || ''} onChange={e => setEditingStanding(prev => ({ ...prev, trades_count: Number(e.target.value) }))} />
+                                            </div>
                                         </div>
-                                        <div>
-                                            <label className="text-[9px] font-black text-gray-400 uppercase">W</label>
-                                            <input type="number" className={inputClass} value={editingStanding?.wins || ''} onChange={e => setEditingStanding(prev => ({ ...prev, wins: Number(e.target.value) }))} />
-                                        </div>
-                                        <div>
-                                            <label className="text-[9px] font-black text-gray-400 uppercase">L</label>
-                                            <input type="number" className={inputClass} value={editingStanding?.losses || ''} onChange={e => setEditingStanding(prev => ({ ...prev, losses: Number(e.target.value) }))} />
-                                        </div>
-                                        <div>
-                                            <label className="text-[9px] font-black text-gray-400 uppercase">Trades</label>
-                                            <input type="number" className={inputClass} value={editingStanding?.trades_count || ''} onChange={e => setEditingStanding(prev => ({ ...prev, trades_count: Number(e.target.value) }))} />
-                                        </div>
-                                    </div>
 
-                                    {/* Rich Fields */}
-                                    <div>
-                                        <label className="text-[9px] font-black text-gray-400 uppercase block mb-1">Destaques (Jogadores)</label>
-                                        <input
-                                            className={`${inputClass} text-xs`}
-                                            placeholder="Ex: MVP, Cestinha..."
-                                            value={editingStanding?.highlight_players || ''}
-                                            onChange={e => setEditingStanding(prev => ({ ...prev, highlight_players: e.target.value }))}
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="text-[9px] font-black text-gray-400 uppercase block mb-1">Feitos / Recordes</label>
-                                        <input
-                                            className={`${inputClass} text-xs`}
-                                            placeholder="Ex: Melhor ataque da história..."
-                                            value={editingStanding?.team_achievements || ''}
-                                            onChange={e => setEditingStanding(prev => ({ ...prev, team_achievements: e.target.value }))}
-                                        />
-                                    </div>
+                                        {/* Rich Fields */}
+                                        <div>
+                                            <label className="text-[9px] font-black text-gray-400 uppercase block mb-1">Destaques (Jogadores)</label>
+                                            <input
+                                                className={`${inputClass} text-xs`}
+                                                placeholder="Ex: MVP, Cestinha..."
+                                                value={editingStanding?.highlight_players || ''}
+                                                onChange={e => setEditingStanding(prev => ({ ...prev, highlight_players: e.target.value }))}
+                                            />
+                                        </div>
 
-                                    <div className="flex gap-2 pt-2">
-                                        <button onClick={handleUpsertStanding} className="flex-1 py-3 bg-yellow-400 text-black rounded-xl text-xs font-black uppercase tracking-widest hover:bg-yellow-300">
-                                            {editingStanding?.id ? 'Atualizar' : 'Adicionar'}
-                                        </button>
-                                        {editingStanding?.id && (
-                                            <button onClick={() => setEditingStanding(null)} className="px-4 py-3 bg-white/10 text-gray-400 rounded-xl font-bold hover:bg-white/20">
-                                                Cancelar
+                                        {/* REMOVED MANUAL INPUT FOR TEAM ACHIEVEMENTS - NOW AUTO GENERATED */}
+                                        <div className="p-3 rounded-xl bg-yellow-500/10 border border-yellow-500/20">
+                                            <p className="text-[10px] text-yellow-500 font-bold">
+                                                * Os feitos (Títulos, Prêmios) serão gerados automaticamente ao salvar.
+                                            </p>
+                                        </div>
+
+                                        <div className="flex gap-2 pt-2">
+                                            <button onClick={handleUpsertStanding} className="flex-1 py-3 bg-yellow-400 text-black rounded-xl text-xs font-black uppercase tracking-widest hover:bg-yellow-300">
+                                                {editingStanding?.id ? 'Atualizar' : 'Adicionar'}
                                             </button>
-                                        )}
+                                            {editingStanding?.id && (
+                                                <button onClick={() => setEditingStanding(null)} className="px-4 py-3 bg-white/10 text-gray-400 rounded-xl font-bold hover:bg-white/20">
+                                                    Cancelar
+                                                </button>
+                                            )}
+                                        </div>
                                     </div>
                                 </div>
-                            </div>
+                            )}
 
                             {/* Tables View */}
                             <div>
                                 <h3 className="text-[10px] font-black uppercase tracking-widest text-gray-500 mb-3">Classificação</h3>
                                 <div className="space-y-2">
-                                    {standingsByRank.map((st) => (
-                                        <div key={st.id} className={`p-4 rounded-2xl ${isDarkMode ? 'bg-white/5' : 'bg-gray-50'}`}>
-                                            <div className="flex items-center justify-between">
-                                                <div className="flex items-center gap-4">
-                                                    <span className={`font-black w-6 text-center text-lg ${st.position <= 4 ? 'text-yellow-400' : 'text-gray-500'}`}>{st.position}º</span>
-                                                    <div className="flex items-center gap-3">
-                                                        <img src={st.team?.logo_url || ''} className="w-8 h-8 object-contain" />
-                                                        <div>
-                                                            <div className={`font-bold leading-none ${isDarkMode ? 'text-white' : 'text-[#0B1D33]'}`}>{st.team?.name}</div>
-                                                            <div className="text-[10px] text-gray-500 font-bold uppercase mt-1">{st.wins}V - {st.losses}D - {st.ties}E</div>
+                                    {standingsByRank.map((st) => {
+                                        // Calculate team achievements dynamically
+                                        const dynamicAchievements = getDynamicAchievements(st.team_id);
+                                        const displayAchievements = dynamicAchievements || st.team_achievements;
+
+                                        return (
+                                            <div key={st.id} className={`p-4 rounded-2xl ${isDarkMode ? 'bg-white/5' : 'bg-gray-50'}`}>
+                                                <div className="flex items-center justify-between">
+                                                    <div className="flex items-center gap-4">
+                                                        <span className={`font-black w-6 text-center text-lg ${st.position <= 4 ? 'text-yellow-400' : 'text-gray-500'}`}>{st.position}º</span>
+                                                        <div className="flex items-center gap-3">
+                                                            <img src={st.team?.logo_url || ''} className="w-8 h-8 object-contain" />
+                                                            <div>
+                                                                <div className={`font-bold leading-none ${isDarkMode ? 'text-white' : 'text-[#0B1D33]'}`}>{st.team?.name}</div>
+                                                                <div className="text-[10px] text-gray-500 font-bold uppercase mt-1">{st.wins}V - {st.losses}D - {st.trades_count > 0 ? `• ${st.trades_count} Trades` : ''}</div>
+                                                            </div>
                                                         </div>
                                                     </div>
+                                                    {canEdit && (
+                                                        <div className="flex items-center gap-2">
+                                                            <button onClick={() => setEditingStanding(st)} className="p-2 text-blue-400 hover:bg-blue-400/10 rounded-full"><Edit2 size={14} /></button>
+                                                            <button onClick={() => handleDeleteStanding(st.id)} className="p-2 text-red-400 hover:bg-red-400/10 rounded-full"><Trash2 size={14} /></button>
+                                                        </div>
+                                                    )}
                                                 </div>
-                                                {canEdit && (
-                                                    <div className="flex items-center gap-2">
-                                                        <button onClick={() => setEditingStanding(st)} className="p-2 text-blue-400 hover:bg-blue-400/10 rounded-full"><Edit2 size={14} /></button>
-                                                        <button onClick={() => handleDeleteStanding(st.id)} className="p-2 text-red-400 hover:bg-red-400/10 rounded-full"><Trash2 size={14} /></button>
+
+                                                {/* RICH DATA DISPLAY */}
+                                                {(st.highlight_players || displayAchievements) && (
+                                                    <div className="mt-3 pt-3 border-t border-dashed border-gray-500/20 text-xs space-y-1">
+                                                        {st.highlight_players && (
+                                                            <div className="flex gap-2">
+                                                                <span className="text-gray-500 font-bold uppercase text-[9px]">Destaques:</span>
+                                                                <span className={isDarkMode ? 'text-gray-300' : 'text-gray-700'}>{st.highlight_players}</span>
+                                                            </div>
+                                                        )}
+                                                        {displayAchievements && (
+                                                            <div className="flex gap-2">
+                                                                <span className="text-yellow-500 font-bold uppercase text-[9px]">Feitos:</span>
+                                                                <span className={isDarkMode ? 'text-gray-300' : 'text-gray-700'}>{displayAchievements}</span>
+                                                            </div>
+                                                        )}
                                                     </div>
                                                 )}
                                             </div>
-
-                                            {/* RICH DATA DISPLAY */}
-                                            {(st.highlight_players || st.team_achievements) && (
-                                                <div className="mt-3 pt-3 border-t border-dashed border-gray-500/20 text-xs space-y-1">
-                                                    {st.highlight_players && (
-                                                        <div className="flex gap-2">
-                                                            <span className="text-gray-500 font-bold uppercase text-[9px]">Destaques:</span>
-                                                            <span className={isDarkMode ? 'text-gray-300' : 'text-gray-700'}>{st.highlight_players}</span>
-                                                        </div>
-                                                    )}
-                                                    {st.team_achievements && (
-                                                        <div className="flex gap-2">
-                                                            <span className="text-yellow-500 font-bold uppercase text-[9px]">Feitos:</span>
-                                                            <span className={isDarkMode ? 'text-gray-300' : 'text-gray-700'}>{st.team_achievements}</span>
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            )}
-                                        </div>
-                                    ))}
+                                        )
+                                    })}
                                 </div>
                             </div>
                         </div>

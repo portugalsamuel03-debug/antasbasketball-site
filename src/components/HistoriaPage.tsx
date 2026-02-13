@@ -5,7 +5,7 @@ import ArticleCard from './ArticleCard';
 import SectionTitle from './SectionTitle';
 import { EditTrigger } from './admin/EditTrigger';
 import { useAdmin } from '../context/AdminContext';
-import { Trophy, Crown, BookOpen } from 'lucide-react';
+import { Trophy, Crown, BookOpen, FileText, Medal, Calendar, Award, Shield, Briefcase, Zap, Search } from 'lucide-react';
 import { HallOfFameDetailsModal } from './admin/HallOfFameDetailsModal';
 import { AwardsSection } from './admin/AwardsSection';
 import { TradesSection } from './admin/TradesSection';
@@ -227,6 +227,38 @@ const HistoriaPage: React.FC<HistoriaPageProps> = ({ articles, isDarkMode, onArt
     const { isEditing } = useAdmin();
     const [subTab, setSubTab] = useState<SubTab>('ARTIGOS');
     const [showStory, setShowStory] = useState(false);
+    const [searchQuery, setSearchQuery] = useState('');
+
+    const filteredArticles = articles.filter(article => {
+        if (!searchQuery) return true;
+        const q = searchQuery.toLowerCase();
+        return (
+            article.title?.toLowerCase().includes(q) ||
+            article.description?.toLowerCase().includes(q) ||
+            article.author?.toLowerCase().includes(q)
+        );
+    });
+
+    const getTabIcon = (tab: SubTab) => {
+        switch (tab) {
+            case 'ARTIGOS': return <FileText size={18} />;
+            case 'CAMPEOES': return <Trophy size={18} />;
+            case 'RECORDES': return <Zap size={18} />;
+            case 'TEMPORADAS': return <Calendar size={18} />;
+            case 'HALL_OF_FAME': return <Crown size={18} />;
+            case 'AWARDS': return <Award size={18} />;
+            case 'TIMES': return <Shield size={18} />;
+            case 'GESTORES': return <Briefcase size={18} />;
+            default: return <BookOpen size={18} />;
+        }
+    };
+
+    const getTabLabel = (tab: SubTab) => {
+        switch (tab) {
+            case 'HALL_OF_FAME': return 'Lendas';
+            default: return tab.replace(/_/g, ' ');
+        }
+    }
 
     return (
         <>
@@ -247,39 +279,63 @@ const HistoriaPage: React.FC<HistoriaPageProps> = ({ articles, isDarkMode, onArt
                 </SectionTitle>
             </div>
 
-            <div className={`sticky top-[52px] z-30 py-3 border-b border-white/5 ${isDarkMode ? 'bg-black/95 backdrop-blur-md' : 'bg-[#FDFBF4]/95 backdrop-blur-md'}`}>
-                <div className="w-full max-w-7xl mx-auto px-4">
-                    <div className="flex items-center gap-2 overflow-x-auto pb-1 md:pb-0 no-scrollbar md:flex-wrap md:justify-center">
-                        {(['ARTIGOS', 'CAMPEOES', 'RECORDES', 'TEMPORADAS', 'HALL_OF_FAME', 'AWARDS', 'TIMES', 'GESTORES'] as SubTab[]).map(tab => (
-                            <button
-                                key={tab}
-                                onClick={() => setSubTab(tab)}
-                                className={`shrink-0 px-4 py-2 rounded-full text-[10px] font-black uppercase tracking-widest transition-all ${subTab === tab
-                                    ? 'bg-yellow-400 text-black shadow-lg shadow-yellow-400/20 scale-105'
-                                    : isDarkMode
-                                        ? 'bg-white/5 text-gray-400 hover:bg-white/10'
-                                        : 'bg-[#0B1D33]/5 text-gray-500 hover:bg-[#0B1D33]/10'
-                                    }`}
-                            >
-                                {tab.replace(/_/g, ' ')}
-                            </button>
-                        ))}
+            {/* Menu Grid */}
+            <div className={`py-6 border-b border-white/5 ${isDarkMode ? 'bg-black/95' : 'bg-[#FDFBF4]/95'}`}>
+                <div className="w-full max-w-7xl mx-auto px-6">
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                        {(['ARTIGOS', 'CAMPEOES', 'RECORDES', 'TEMPORADAS', 'HALL_OF_FAME', 'AWARDS', 'TIMES', 'GESTORES'] as SubTab[]).map(tab => {
+                            const isActive = subTab === tab;
+                            return (
+                                <button
+                                    key={tab}
+                                    onClick={() => setSubTab(tab)}
+                                    className={`relative p-4 rounded-2xl border flex flex-col items-center justify-center gap-2 transition-all duration-300 ${isActive
+                                        ? 'bg-yellow-400 text-black border-yellow-400 shadow-lg shadow-yellow-400/20 scale-[1.02]'
+                                        : isDarkMode
+                                            ? 'bg-white/5 border-white/5 text-gray-400 hover:bg-white/10 hover:border-white/10'
+                                            : 'bg-white border-gray-100 text-gray-500 hover:border-yellow-400/50 hover:text-[#0B1D33]'
+                                        }`}
+                                >
+                                    <div className={`p-2 rounded-full ${isActive ? 'bg-black/10' : isDarkMode ? 'bg-black/20' : 'bg-gray-50'}`}>
+                                        {getTabIcon(tab)}
+                                    </div>
+                                    <span className="text-[10px] font-black uppercase tracking-widest text-center leading-tight">
+                                        {getTabLabel(tab)}
+                                    </span>
+                                </button>
+                            );
+                        })}
                     </div>
                 </div>
             </div>
 
             {subTab === 'ARTIGOS' && (
                 <div className="px-6 space-y-4 pb-20">
+                    {/* Search Bar for Articles */}
+                    <div className={`flex items-center gap-2 p-3 rounded-2xl border ${isDarkMode ? 'bg-white/5 border-white/10' : 'bg-gray-50 border-gray-200'}`}>
+                        <Search size={18} className="text-gray-400" />
+                        <input
+                            type="text"
+                            placeholder="Buscar artigos..."
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            className="bg-transparent border-none outline-none w-full text-sm font-medium placeholder-gray-500"
+                            style={{ color: isDarkMode ? 'white' : 'black' }}
+                        />
+                    </div>
+
                     {isEditing && (
                         <div className="flex justify-between items-center mb-2">
                             <div className="text-[10px] font-black uppercase tracking-widest text-gray-500">Admin: Historia</div>
                             <EditTrigger type="add" onClick={() => onEditArticle('', 'HISTORIA')} />
                         </div>
                     )}
-                    {articles.length === 0 ? (
-                        <div className="text-sm text-gray-400">Nenhum artigo de história ainda.</div>
+                    {filteredArticles.length === 0 ? (
+                        <div className="text-sm text-gray-400 text-center py-8">
+                            {searchQuery ? "Nenhum artigo encontrado." : "Nenhum artigo de história ainda."}
+                        </div>
                     ) : (
-                        articles.map(a => (
+                        filteredArticles.map(a => (
                             <ArticleCard
                                 key={a.id}
                                 article={a}

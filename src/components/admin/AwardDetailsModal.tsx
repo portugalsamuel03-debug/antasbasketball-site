@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Award, Team } from '../../types';
-import { upsertAward, listTeams, listManagers, listAwardCategories, insertAwardCategory, deleteAwardCategory, updateAwardCategory } from '../../cms';
+import { upsertAward, listTeams, listManagers, listAwardCategories, insertAwardCategory, deleteAwardCategory, updateAwardCategory, listTeamHistory } from '../../cms';
 import { SEASON_OPTIONS } from '../../utils/seasons';
 import { X, Plus, Trash2, Settings, Edit2 } from 'lucide-react';
 
@@ -40,6 +40,29 @@ export const AwardDetailsModal: React.FC<AwardDetailsModalProps> = ({ award, isD
     async function fetchCategories() {
         const { data } = await listAwardCategories();
         if (data) setCategories(data);
+    }
+
+    // Helper to check category type
+    const selectedCategoryObj = categories.find(c => c.name === editing.category);
+    const isTeamAward = selectedCategoryObj?.type === 'TEAM';
+
+    // Auto-link Manager from History
+    useEffect(() => {
+        if (isTeamAward && editing.team_id && editing.year) {
+            checkHistoryManager();
+        }
+    }, [editing.team_id, editing.year, isTeamAward]);
+
+    async function checkHistoryManager() {
+        if (!editing.team_id || !editing.year) return;
+        const { data } = await listTeamHistory(editing.team_id);
+        if (data) {
+            const match = data.find((h: any) => h.year === editing.year);
+            if (match && match.manager_id) {
+                // Auto-set manager if found in history
+                setEditing(prev => ({ ...prev, manager_id: match.manager_id }));
+            }
+        }
     }
 
     async function handleSaveCategory() {
@@ -92,6 +115,10 @@ export const AwardDetailsModal: React.FC<AwardDetailsModalProps> = ({ award, isD
         delete payload.team;
         delete payload.manager;
 
+        // Remove frontend-only grouping fields
+        delete payload.count;
+        delete payload.allAwards;
+
         // SANITIZATION: Remove id if empty string to avoid UUID error on insert
         if (!payload.id) delete payload.id;
 
@@ -112,10 +139,6 @@ export const AwardDetailsModal: React.FC<AwardDetailsModalProps> = ({ award, isD
             setMsg('Erro ao salvar.');
         }
     }
-
-    // Helper to check category type
-    const selectedCategoryObj = categories.find(c => c.name === editing.category);
-    const isTeamAward = selectedCategoryObj?.type === 'TEAM';
 
     const inputClass = `w-full px-4 py-3 rounded-2xl text-sm font-medium ${isDarkMode ? 'bg-white/10 text-white placeholder-gray-400' : 'bg-gray-100 text-[#0B1D33] placeholder-gray-500'
         } focus:outline-none focus:ring-2 focus:ring-yellow-400 border border-transparent`;
@@ -239,28 +262,46 @@ export const AwardDetailsModal: React.FC<AwardDetailsModalProps> = ({ award, isD
 
                             {/* DYNAMIC FIELDS BASED ON TYPE */}
                             {isTeamAward ? (
-                                <div>
-                                    <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-2">Time Vencedor</label>
-                                    <select
-                                        className={`${inputClass} appearance-none ${isDarkMode ? 'bg-[#1a2c42]' : 'bg-white'}`}
-                                        value={editing.team_id || ''}
-                                        onChange={e => {
-                                            const t = teams.find(team => team.id === e.target.value);
-                                            setEditing({
-                                                ...editing,
-                                                team_id: e.target.value,
-                                                winner_name: t ? t.name : ''
-                                            });
-                                        }}
-                                    >
-                                        <option value="" className="text-black">Selecione o Time...</option>
-                                        {teams.map(team => (
-                                            <option key={team.id} value={team.id} className="text-black">
-                                                {team.name}
-                                            </option>
-                                        ))}
-                                    </select>
-                                </div>
+                                <>
+                                    <div>
+                                        <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-2">Time Vencedor</label>
+                                        <select
+                                            className={`${inputClass} appearance-none ${isDarkMode ? 'bg-[#1a2c42]' : 'bg-white'}`}
+                                            value={editing.team_id || ''}
+                                            onChange={e => {
+                                                const t = teams.find(team => team.id === e.target.value);
+                                                setEditing({
+                                                    ...editing,
+                                                    team_id: e.target.value,
+                                                    winner_name: t ? t.name : ''
+                                                });
+                                            }}
+                                        >
+                                            <option value="" className="text-black">Selecione o Time...</option>
+                                            {teams.map(team => (
+                                                <option key={team.id} value={team.id} className="text-black">
+                                                    {team.name}
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </div>
+
+                                    <div>
+                                        <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-2">Gestor (Auto/Opcional)</label>
+                                        <select
+                                            className={`${inputClass} appearance-none ${isDarkMode ? 'bg-[#1a2c42]' : 'bg-white'}`}
+                                            value={editing.manager_id || ''}
+                                            onChange={e => setEditing({ ...editing, manager_id: e.target.value })}
+                                        >
+                                            <option value="" className="text-black">Sem Gestor Vínculado</option>
+                                            {managers.map(m => (
+                                                <option key={m.id} value={m.id} className="text-black">
+                                                    {m.name}
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                </>
                             ) : (
                                 <>
                                     <div>

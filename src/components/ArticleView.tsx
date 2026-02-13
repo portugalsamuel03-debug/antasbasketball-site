@@ -440,8 +440,33 @@ const ArticleView: React.FC<ArticleViewProps> = ({ article, onBack, onShare, isD
           <div className="max-w-md mx-auto">
 
             {article.video_url && (
-              <div className="mb-12">
+              <div className="mb-12 flex flex-col items-center gap-4">
                 <PodcastPreview url={article.video_url} isDarkMode={isDarkMode} />
+                <a
+                  href={article.video_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={`flex items-center gap-2 px-6 py-3 rounded-full font-black uppercase tracking-widest text-[11px] transition-all active:scale-95 shadow-lg ${article.video_url.includes('spotify')
+                      ? 'bg-[#1DB954] text-black hover:bg-[#1ed760] shadow-[#1DB954]/20'
+                      : article.video_url.includes('youtu')
+                        ? 'bg-[#FF0000] text-white hover:bg-[#ff1a1a] shadow-[#FF0000]/20'
+                        : isDarkMode ? 'bg-white/10 text-white hover:bg-white/20' : 'bg-black/5 text-black hover:bg-black/10'
+                    }`}
+                >
+                  {article.video_url.includes('spotify') ? (
+                    <>
+                      <span className="text-xl">🎧</span> Ouvir no Spotify
+                    </>
+                  ) : article.video_url.includes('youtu') ? (
+                    <>
+                      <span className="text-xl">▶️</span> Ver no YouTube
+                    </>
+                  ) : (
+                    <>
+                      🔗 Abrir Link Original
+                    </>
+                  )}
+                </a>
               </div>
             )}
 

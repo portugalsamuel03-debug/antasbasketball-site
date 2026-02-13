@@ -5,7 +5,6 @@ import { supabase } from "./lib/supabase";
 // UI components
 import Header from "./components/Header";
 import BottomNav from "./components/BottomNav";
-import SearchBar from "./components/SearchBar";
 import SectionTitle from "./components/SectionTitle";
 import ArticleCard from "./components/ArticleCard";
 import ArticleView from "./components/ArticleView";
@@ -27,7 +26,7 @@ import FeaturedAuthors from "./components/FeaturedAuthors";
 import HistoriaPage from "./components/HistoriaPage";
 import { FeaturedPost } from "./components/FeaturedPost";
 import { CategoryManager } from "./components/admin/CategoryManager";
-import { List } from 'lucide-react';
+import { List, Search } from 'lucide-react';
 
 // Data
 import { fetchPublishedArticlesJoined } from "./services/articles";
@@ -45,9 +44,8 @@ export default function App() {
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [sortOption, setSortOption] = useState<SortOption>("RECENTES");
   const [searchQuery, setSearchQuery] = useState("");
-  const [isAIProcessing, setIsAIProcessing] = useState(false);
 
-  // Articles state
+  // Article State
   const [articles, setArticles] = useState<Article[]>([]);
   const [loadingArticles, setLoadingArticles] = useState(false);
   const [articlesError, setArticlesError] = useState<string | null>(null);
@@ -120,12 +118,6 @@ export default function App() {
   }, [sessionUserId, isAuthLoading]);
 
   // Handlers
-  const onSearch = (q: string) => {
-    setSearchQuery(q);
-    setIsAIProcessing(true);
-    setTimeout(() => { if (mountedRef.current) setIsAIProcessing(false); }, 450);
-  };
-
   const onShare = (a: Article) => {
     setShareArticle(a);
     setShareOpen(true);
@@ -152,14 +144,14 @@ export default function App() {
   };
 
   const filteredArticles = useMemo(() => {
-    const q = searchQuery.trim().toLowerCase();
     let list = articles;
 
     if (activeTab && activeTab !== Category.INICIO) {
       list = list.filter((a) => a.category === activeTab);
     }
 
-    if (q) {
+    if (searchQuery) {
+      const q = searchQuery.toLowerCase();
       list = list.filter((a) => {
         const hay = [a.title, a.description, a.content, a.author, ...(a.tags ?? [])].join(" ").toLowerCase();
         return hay.includes(q);
@@ -176,7 +168,7 @@ export default function App() {
     });
 
     return sorted;
-  }, [articles, activeTab, searchQuery, sortOption]);
+  }, [articles, activeTab, sortOption, searchQuery]);
 
   // Pagination Logic
   const ITEMS_PER_PAGE = 3;
@@ -185,8 +177,13 @@ export default function App() {
   // Reset page when tab or search changes
   useEffect(() => {
     setCurrentPage(1);
+    setSearchQuery("");
     window.scrollTo({ top: 0, behavior: 'smooth' });
-  }, [activeTab, searchQuery, sortOption]);
+  }, [activeTab]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [sortOption, searchQuery]);
 
   const totalPages = Math.ceil(filteredArticles.length / ITEMS_PER_PAGE);
   const paginatedArticles = useMemo(() => {
@@ -239,7 +236,6 @@ export default function App() {
         <Header isDarkMode={isDarkMode} onToggleTheme={() => setIsDarkMode(v => !v)} onOpenNotifications={() => setNotificationsOpen(true)} onOpenAuth={() => sessionUserId ? setProfileOpen(true) : setAuthOpen(true)} />
 
         <main className="pb-28">
-          <SearchBar onSearch={onSearch} isAIProcessing={isAIProcessing} isDarkMode={isDarkMode} />
 
           {articlesError && (
             <div className="px-6 mt-4">
@@ -287,6 +283,22 @@ export default function App() {
           {activeTab !== Category.INICIO && activeTab !== Category.HISTORIA && (
             <>
               <SectionTitle title={String(activeTab)} sortOption={sortOption} onSortChange={setSortOption} isDarkMode={isDarkMode} />
+
+              {/* Search Bar for Categories */}
+              <div className="px-6 mb-4">
+                <div className={`flex items-center gap-2 p-3 rounded-2xl border ${isDarkMode ? 'bg-white/5 border-white/10' : 'bg-gray-50 border-gray-200'}`}>
+                  <Search size={18} className="text-gray-400" />
+                  <input
+                    type="text"
+                    placeholder={`Buscar em ${activeTab}...`}
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="bg-transparent border-none outline-none w-full text-sm font-medium placeholder-gray-500"
+                    style={{ color: isDarkMode ? 'white' : 'black' }}
+                  />
+                </div>
+              </div>
+
               <div className="px-6 mb-4 flex justify-between items-center group/admin">
                 <div className="text-[10px] font-black uppercase tracking-widest text-gray-500">Admin Mode ({activeTab})</div>
                 <div className="flex gap-2">
@@ -306,7 +318,7 @@ export default function App() {
               {/* LIST */}
               <div className="px-6 space-y-8 min-h-[400px]">
                 {paginatedArticles.length === 0 ? (
-                  <EmptyState isDarkMode={isDarkMode} message={searchQuery ? "Nenhum resultado encontrado." : "Nada por aqui ainda..."} />
+                  <EmptyState isDarkMode={isDarkMode} message="Nada por aqui ainda..." />
                 ) : (
                   paginatedArticles.map((a) => (
                     <ArticleCard

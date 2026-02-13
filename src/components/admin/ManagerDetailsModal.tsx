@@ -2,9 +2,15 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { listTeams, listChampions, listAwards, listManagerHistory, upsertManagerHistory, deleteManagerHistory, listHallOfFame } from '../../cms';
 import { TeamRow, Champion, Award, ManagerHistory, HallOfFame } from '../../types';
-import { Plus, Trash2, Calendar, Briefcase, Trophy, ChevronRight, Crown } from 'lucide-react';
+import { Plus, Trash2, Calendar, Briefcase, Trophy, ChevronRight, Crown, ArrowRightLeft, Award as AwardIcon } from 'lucide-react';
 import { Manager } from './ManagersSection';
 import { useAdmin } from '../../context/AdminContext';
+
+// Import New Modals
+import { ManagerSeasonsModal } from './ManagerSeasonsModal';
+import { ManagerTitlesModal } from './ManagerTitlesModal';
+import { ManagerTradesModal } from './ManagerTradesModal';
+import { ManagerAwardsModal } from './ManagerAwardsModal';
 
 interface ManagerDetailsModalProps {
     manager: Partial<Manager>;
@@ -24,14 +30,23 @@ export const ManagerDetailsModal: React.FC<ManagerDetailsModalProps> = ({ manage
 
     // Data filtering state
     const [allTeams, setAllTeams] = useState<TeamRow[]>([]);
-    const [calculatedTitles, setCalculatedTitles] = useState<string[]>([]);
-    const [calculatedAwards, setCalculatedAwards] = useState<string[]>([]);
+    const [titlesCount, setTitlesCount] = useState(0);
+    const [awardsCount, setAwardsCount] = useState(0);
     const [isHoF, setIsHoF] = useState(false);
 
     // History State
     const [history, setHistory] = useState<ManagerHistory[]>([]);
     const [newHistoryYear, setNewHistoryYear] = useState('');
     const [newHistoryTeam, setNewHistoryTeam] = useState('');
+
+    // Trades Data
+    const [totalTrades, setTotalTrades] = useState(0);
+
+    // Popups State
+    const [showSeasons, setShowSeasons] = useState(false);
+    const [showTitles, setShowTitles] = useState(false);
+    const [showTrades, setShowTrades] = useState(false);
+    const [showAwards, setShowAwards] = useState(false);
 
     useEffect(() => {
         // Fetch Teams for dropdown
@@ -47,21 +62,16 @@ export const ManagerDetailsModal: React.FC<ManagerDetailsModalProps> = ({ manage
             // Champions
             listChampions().then(({ data }) => {
                 const champions = data as Champion[] || [];
-                const wins = champions.filter(c => c.manager_id === manager.id);
-                const runnerUps = champions.filter(c => c.runner_up_manager_id === manager.id);
-
-                const winTitles = wins.map(w => `🏆 ${w.year} (${w.team})`);
-                const viceTitles = runnerUps.map(r => `🥈 ${r.year} (Vice - ${r.runner_up_team?.name || 'Time'})`);
-
-                setCalculatedTitles([...winTitles, ...viceTitles]);
+                // Only Count Wins for the Button Count
+                const wins = champions.filter(c => c.manager_id === manager.id).length;
+                setTitlesCount(wins);
             });
 
             // Awards
             listAwards().then(({ data }) => {
                 const awards = data as Award[] || [];
-                const myAwards = awards.filter(a => a.manager_id === manager.id);
-                const awardStrings = myAwards.map(a => `${a.year}: ${a.category}`);
-                setCalculatedAwards(awardStrings);
+                const count = awards.filter(a => a.manager_id === manager.id).length;
+                setAwardsCount(count);
             });
 
             // Check Hall of Fame
@@ -75,7 +85,33 @@ export const ManagerDetailsModal: React.FC<ManagerDetailsModalProps> = ({ manage
     const fetchHistory = async () => {
         if (!manager.id) return;
         const { data } = await listManagerHistory(manager.id);
-        if (data) setHistory(data);
+        if (data) {
+            setHistory(data);
+
+            // Calculate Trades for this history
+            const { data: seasonsData } = await supabase.from('seasons').select('id, year');
+            const { data: standingsData } = await supabase.from('season_standings').select('season_id, team_id, trades_count');
+
+            const seasonYearIdMap: Record<string, string> = {};
+            seasonsData?.forEach((s: any) => seasonYearIdMap[s.year] = s.id);
+
+            const standingsMap: Record<string, number> = {};
+            standingsData?.forEach((st: any) => {
+                standingsMap[`${st.season_id}-${st.team_id}`] = st.trades_count || 0;
+            });
+
+            let total = 0;
+            data.forEach(h => {
+                if (h.team_id && h.year) {
+                    const sId = seasonYearIdMap[h.year];
+                    if (sId) {
+                        const count = standingsMap[`${sId}-${h.team_id}`] || 0;
+                        if (count > 0) total += count;
+                    }
+                }
+            });
+            setTotalTrades(total);
+        }
     };
 
     const handleAddHistory = async () => {
@@ -105,7 +141,6 @@ export const ManagerDetailsModal: React.FC<ManagerDetailsModalProps> = ({ manage
 
         try {
             const payload = { ...formData };
-            // If new (no ID), delete ID 
             if (!payload.id) delete (payload as any).id;
 
             const { data, error } = await supabase.from('managers').upsert(payload).select().single();
@@ -113,9 +148,6 @@ export const ManagerDetailsModal: React.FC<ManagerDetailsModalProps> = ({ manage
             if (error) throw error;
 
             setMsg("Salvo com sucesso!");
-
-            // If it was a new manager, we might want to stay open to add history?
-            // For now, close as per original logic, but notify update.
             onUpdate();
             setTimeout(onClose, 800);
         } catch (e: any) {
@@ -124,8 +156,6 @@ export const ManagerDetailsModal: React.FC<ManagerDetailsModalProps> = ({ manage
             setMsg("Erro ao salvar.");
         }
     };
-
-    const inputClass = `w-full bg-transparent border-b px-2 py-2 text-sm focus:outline-none focus:border-yellow-400 transition-colors ${isDarkMode ? 'border-white/20 text-white' : 'border-black/20 text-black'}`;
 
     return (
         <div className="fixed inset-0 z-[160] flex items-center justify-center p-4">
@@ -138,7 +168,7 @@ export const ManagerDetailsModal: React.FC<ManagerDetailsModalProps> = ({ manage
                         ✕
                     </button>
                     {isEditing && (
-                        <div className="absolute bottom-2 right-4 flex items-center gap-2">
+                        <div className="absolute bottom-2 right-4 flex items-center gap-2 z-50">
                             <span className="text-[10px] font-bold uppercase text-gray-400">Ativo?</span>
                             <button
                                 onClick={() => setFormData({ ...formData, is_active: !formData.is_active })}
@@ -163,7 +193,6 @@ export const ManagerDetailsModal: React.FC<ManagerDetailsModalProps> = ({ manage
                                 </div>
                             )}
 
-                            {/* Crown Icon if HoF */}
                             {isHoF && (
                                 <div className="absolute bottom-0 right-0 p-1 bg-black rounded-full border-2 border-yellow-400 shadow-lg z-20" title="Hall of Fame">
                                     <Crown size={12} className="text-yellow-400" fill="currentColor" />
@@ -194,12 +223,9 @@ export const ManagerDetailsModal: React.FC<ManagerDetailsModalProps> = ({ manage
                                 </h2>
 
                                 <div className="flex items-center gap-2 mt-2">
-                                    {/* Active Badge */}
                                     <div className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-[10px] uppercase font-black tracking-widest ${formData.is_active !== false ? 'bg-yellow-400 text-black' : 'bg-gray-500 text-white'}`}>
                                         {formData.is_active !== false ? 'Em Atividade' : 'Inativo'}
                                     </div>
-
-                                    {/* Hall of Fame Badge */}
                                     {isHoF && (
                                         <div className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-[10px] uppercase font-black tracking-widest bg-black text-yellow-400 border border-yellow-400/30">
                                             <Crown size={10} fill="currentColor" />
@@ -210,69 +236,83 @@ export const ManagerDetailsModal: React.FC<ManagerDetailsModalProps> = ({ manage
                             </div>
                         )}
 
-                        {/* Bio / Observation */}
+                        {/* Bio */}
                         <div className="w-full mt-6">
-                            <h3 className="text-xs font-black uppercase tracking-widest text-gray-400 mb-2 flex items-center justify-center gap-2">
-                                <Briefcase size={14} /> Observação / Bio
-                            </h3>
                             {isEditing ? (
-                                <textarea
-                                    value={formData.bio || ''}
-                                    onChange={e => setFormData({ ...formData, bio: e.target.value })}
-                                    className={`w-full bg-transparent border rounded-xl p-3 text-sm focus:outline-none focus:border-yellow-400 transition-colors ${isDarkMode ? 'border-white/20 text-white' : 'border-gray-200 text-black'}`}
-                                    placeholder="Escreva um resumo sobre a carreira do gestor..."
-                                    rows={3}
-                                />
+                                <>
+                                    <h3 className="text-xs font-black uppercase tracking-widest text-gray-400 mb-2 flex items-center justify-center gap-2">
+                                        <Briefcase size={14} /> Observação / Bio
+                                    </h3>
+                                    <textarea
+                                        value={formData.bio || ''}
+                                        onChange={e => setFormData({ ...formData, bio: e.target.value })}
+                                        className={`w-full bg-transparent border rounded-xl p-3 text-sm focus:outline-none focus:border-yellow-400 transition-colors ${isDarkMode ? 'border-white/20 text-white' : 'border-gray-200 text-black'}`}
+                                        placeholder="Escreva um resumo sobre a carreira do gestor..."
+                                        rows={3}
+                                    />
+                                </>
                             ) : (
-                                <p className={`text-sm leading-relaxed text-center ${isDarkMode ? 'text-gray-300' : 'text-gray-600'}`}>
-                                    {formData.bio || 'Sem observações registradas.'}
-                                </p>
+                                formData.bio && (
+                                    <p className={`text-sm leading-relaxed text-center ${isDarkMode ? 'text-gray-300' : 'text-gray-600'}`}>
+                                        {formData.bio}
+                                    </p>
+                                )
                             )}
                         </div>
 
-                        {/* Stats Summary - View Only */}
-                        {!isEditing && (
-                            <div className="grid grid-cols-2 w-full gap-4 mt-6">
-                                <div className={`p-4 rounded-2xl text-center ${isDarkMode ? 'bg-white/5' : 'bg-gray-50'}`}>
-                                    <div className="text-2xl font-black text-yellow-500">{history.length}</div>
-                                    <div className="text-[10px] font-bold uppercase text-gray-500">Temporadas</div>
-                                </div>
-                                <div className={`p-4 rounded-2xl text-center ${isDarkMode ? 'bg-white/5' : 'bg-gray-50'}`}>
-                                    <div className="text-2xl font-black text-yellow-500">{calculatedTitles.filter(t => t.includes('🏆')).length}</div>
-                                    <div className="text-[10px] font-bold uppercase text-gray-500">Títulos</div>
-                                </div>
+                        {/* ACTION BUTTONS (STATS) - View Only */}
+                        {!isEditing ? (
+                            <div className="grid grid-cols-2 gap-3 w-full mt-6">
+                                <button
+                                    onClick={() => setShowSeasons(true)}
+                                    className={`p-4 rounded-2xl flex flex-col items-center justify-center gap-1 transition-all active:scale-95 ${isDarkMode ? 'bg-white/5 hover:bg-white/10' : 'bg-gray-50 hover:bg-gray-100'}`}
+                                >
+                                    <div className="text-2xl font-black text-white">{history.length}</div>
+                                    <div className="text-[9px] font-bold uppercase text-gray-500">Temporadas</div>
+                                </button>
+
+                                <button
+                                    onClick={() => setShowTitles(true)}
+                                    className={`p-4 rounded-2xl flex flex-col items-center justify-center gap-1 transition-all active:scale-95 ${isDarkMode ? 'bg-white/5 hover:bg-white/10' : 'bg-gray-50 hover:bg-gray-100'}`}
+                                >
+                                    <div className="text-2xl font-black text-yellow-500">{titlesCount}</div>
+                                    <div className="text-[9px] font-bold uppercase text-gray-500">Títulos</div>
+                                </button>
+
+                                <button
+                                    onClick={() => setShowTrades(true)}
+                                    className={`p-4 rounded-2xl flex flex-col items-center justify-center gap-1 transition-all active:scale-95 ${isDarkMode ? 'bg-white/5 hover:bg-white/10' : 'bg-gray-50 hover:bg-gray-100'}`}
+                                >
+                                    <div className="text-2xl font-black text-green-500">{totalTrades}</div>
+                                    <div className="text-[9px] font-bold uppercase text-gray-500">Trades</div>
+                                </button>
+
+                                <button
+                                    onClick={() => setShowAwards(true)}
+                                    className={`p-4 rounded-2xl flex flex-col items-center justify-center gap-1 transition-all active:scale-95 ${isDarkMode ? 'bg-white/5 hover:bg-white/10' : 'bg-gray-50 hover:bg-gray-100'}`}
+                                >
+                                    <div className="text-2xl font-black text-yellow-500">{awardsCount}</div>
+                                    <div className="text-[9px] font-bold uppercase text-gray-500">Conquistas</div>
+                                </button>
                             </div>
-                        )}
-
-                        {/* History Section */}
-                        <div className="w-full mt-8">
-                            <h3 className="text-xs font-black uppercase tracking-widest text-gray-400 mb-3 flex items-center justify-center gap-2">
-                                <Calendar size={14} /> Histórico de Temporadas
-                            </h3>
-
-                            <div className="space-y-2">
-                                {history.map(h => (
-                                    <div key={h.id} className={`flex items-center justify-between p-3 rounded-xl border ${isDarkMode ? 'border-white/10 bg-white/5' : 'border-gray-200 bg-gray-50'}`}>
-                                        <div className="flex items-center gap-3">
-                                            <span className="font-mono font-bold text-yellow-500">{h.year}</span>
-                                            {h.team ? (
-                                                <div className="flex items-center gap-2">
-                                                    <div className="w-1 h-1 rounded-full bg-gray-500"></div>
-                                                    <span className={`text-sm font-bold uppercase ${isDarkMode ? 'text-white' : 'text-gray-800'}`}>{h.team.name}</span>
-                                                </div>
-                                            ) : (
-                                                <span className="text-xs text-gray-500 italic ml-2">Sem time vinculado</span>
-                                            )}
-                                        </div>
-                                        {isEditing && (
+                        ) : (
+                            /* EDIT MODE HISTORY */
+                            <div className="w-full mt-8">
+                                <h3 className="text-xs font-black uppercase tracking-widest text-gray-400 mb-3 flex items-center justify-center gap-2">
+                                    <Calendar size={14} /> Editar Histórico
+                                </h3>
+                                <div className="space-y-2">
+                                    {history.map(h => (
+                                        <div key={h.id} className={`p-3 rounded-xl border flex justify-between items-center ${isDarkMode ? 'border-white/10 bg-white/5' : 'border-gray-200 bg-gray-50'}`}>
+                                            <div className="flex items-center gap-3">
+                                                <span className="font-mono font-bold text-yellow-500">{h.year}</span>
+                                                <span className={`text-sm font-bold uppercase ${isDarkMode ? 'text-white' : 'text-gray-800'}`}>{h.team?.name || 'Sem Time'}</span>
+                                            </div>
                                             <button onClick={() => handleDeleteHistory(h.id)} className="text-red-400 hover:text-red-300 p-2">
                                                 <Trash2 size={14} />
                                             </button>
-                                        )}
-                                    </div>
-                                ))}
-
-                                {isEditing && manager.id && (
+                                        </div>
+                                    ))}
                                     <div className={`mt-2 p-2 rounded-xl border border-dashed ${isDarkMode ? 'border-white/20' : 'border-gray-300'} flex items-center gap-2`}>
                                         <select
                                             value={newHistoryYear}
@@ -286,7 +326,6 @@ export const ManagerDetailsModal: React.FC<ManagerDetailsModalProps> = ({ manage
                                                 return <option key={label} value={label} className="text-black">{label}</option>;
                                             })}
                                         </select>
-
                                         <select
                                             value={newHistoryTeam}
                                             onChange={e => setNewHistoryTeam(e.target.value)}
@@ -305,42 +344,9 @@ export const ManagerDetailsModal: React.FC<ManagerDetailsModalProps> = ({ manage
                                             <Plus size={16} />
                                         </button>
                                     </div>
-                                )}
-                            </div>
-                        </div>
-
-                        {/* Achievements */}
-                        {(calculatedTitles.length > 0 || calculatedAwards.length > 0 || formData.individual_titles) && (
-                            <div className="w-full mt-8">
-                                <h3 className="text-xs font-black uppercase tracking-widest text-gray-400 mb-3 flex items-center justify-center gap-2">
-                                    <Trophy size={14} /> Conquistas
-                                </h3>
-                                <div className="space-y-2">
-                                    {calculatedTitles.map((t, i) => (
-                                        <div key={`t-${i}`} className={`p-3 rounded-xl flex items-center gap-3 ${isDarkMode ? 'bg-yellow-500/10 text-yellow-500' : 'bg-yellow-50 text-yellow-600'}`}>
-                                            <Trophy size={14} />
-                                            <span className="text-sm font-bold uppercase">{t}</span>
-                                        </div>
-                                    ))}
-
-                                    {calculatedAwards.map((t, i) => (
-                                        <div key={`a-${i}`} className={`p-3 rounded-xl flex items-center gap-3 ${isDarkMode ? 'bg-white/5 text-gray-300' : 'bg-gray-100 text-gray-600'}`}>
-                                            <AwardIcon size={14} />
-                                            <span className="text-sm font-medium uppercase">{t}</span>
-                                        </div>
-                                    ))}
-
-                                    {/* Manual Bio/Titles is handled in Bio now, but if we have legacy manual titles we can show them */}
-                                    {formData.individual_titles && (
-                                        <div className={`p-3 rounded-xl flex flex-col gap-1 ${isDarkMode ? 'bg-white/5 text-gray-300' : 'bg-gray-100 text-gray-600'}`}>
-                                            <span className="text-[10px] font-bold uppercase text-gray-400">Outros (Manual)</span>
-                                            <span className="text-sm">{formData.individual_titles}</span>
-                                        </div>
-                                    )}
                                 </div>
                             </div>
                         )}
-
                     </div>
                 </div>
 
@@ -354,14 +360,41 @@ export const ManagerDetailsModal: React.FC<ManagerDetailsModalProps> = ({ manage
                     </div>
                 )}
             </div>
+
+            {/* POPUPS */}
+            {showSeasons && manager.id && (
+                <ManagerSeasonsModal
+                    managerId={manager.id}
+                    managerName={manager.name || ''}
+                    isDarkMode={isDarkMode}
+                    onClose={() => setShowSeasons(false)}
+                />
+            )}
+            {showTitles && manager.id && (
+                <ManagerTitlesModal
+                    managerId={manager.id}
+                    managerName={manager.name || ''}
+                    isDarkMode={isDarkMode}
+                    onClose={() => setShowTitles(false)}
+                />
+            )}
+            {showTrades && manager.id && (
+                <ManagerTradesModal
+                    managerId={manager.id}
+                    managerName={manager.name || ''}
+                    isDarkMode={isDarkMode}
+                    onClose={() => setShowTrades(false)}
+                />
+            )}
+            {showAwards && manager.id && (
+                <ManagerAwardsModal
+                    managerId={manager.id}
+                    managerName={manager.name || ''}
+                    isDarkMode={isDarkMode}
+                    onClose={() => setShowAwards(false)}
+                />
+            )}
         </div>
     );
 };
 
-// Helper Icon
-const AwardIcon = ({ size, className }: { size: number, className?: string }) => (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
-        <circle cx="12" cy="8" r="7" />
-        <polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88" />
-    </svg>
-);
