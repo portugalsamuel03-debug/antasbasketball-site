@@ -3,7 +3,7 @@ import { Award } from '../../types';
 import { listAwards, deleteAward } from '../../cms';
 import { useAdmin } from '../../context/AdminContext';
 import { EditTrigger } from './EditTrigger';
-import { Trophy, ChevronRight, X, Calendar } from 'lucide-react';
+import { Trophy, ChevronRight, ChevronLeft, X } from 'lucide-react';
 import { AwardDetailsModal } from './AwardDetailsModal';
 import { AwardPopup } from './AwardPopup';
 
@@ -30,6 +30,35 @@ export const AwardsSection: React.FC<AwardsSectionProps> = ({ isDarkMode }) => {
         setAwards(data || []);
     }
 
+    // Group awards by year
+    const awardsByYear = awards.reduce((acc, award) => {
+        if (!acc[award.year]) acc[award.year] = [];
+        acc[award.year].push(award);
+        return acc;
+    }, {} as Record<string, Award[]>);
+
+    const seasons = Object.keys(awardsByYear).sort((a, b) => b.localeCompare(a));
+
+    // Navigation Handlers
+    function handlePrevSeason() {
+        if (!selectedSeason) return;
+        const index = seasons.indexOf(selectedSeason);
+        // "Previous" in time means going to an older season (higher index in descending array)
+        // "Left" arrow usually implies "Back" or "Older".
+        // Let's implement Left = Older (Next Index), Right = Newer (Prev Index)
+        if (index < seasons.length - 1) {
+            setSelectedSeason(seasons[index + 1]);
+        }
+    }
+
+    function handleNextSeason() {
+        if (!selectedSeason) return;
+        const index = seasons.indexOf(selectedSeason);
+        if (index > 0) {
+            setSelectedSeason(seasons[index - 1]);
+        }
+    }
+
     async function handleDelete(id: string, e: React.MouseEvent) {
         e.stopPropagation();
         if (!confirm('Deletar este prêmio?')) return;
@@ -52,15 +81,6 @@ export const AwardsSection: React.FC<AwardsSectionProps> = ({ isDarkMode }) => {
         setEditingAward(null);
         fetchAwards();
     }
-
-    // Group awards by year
-    const awardsByYear = awards.reduce((acc, award) => {
-        if (!acc[award.year]) acc[award.year] = [];
-        acc[award.year].push(award);
-        return acc;
-    }, {} as Record<string, Award[]>);
-
-    const seasons = Object.keys(awardsByYear).sort((a, b) => b.localeCompare(a));
 
     return (
         <div className="px-6 pb-20">
@@ -86,7 +106,7 @@ export const AwardsSection: React.FC<AwardsSectionProps> = ({ isDarkMode }) => {
                                     <Trophy size={24} className="text-yellow-400" />
                                 </div>
                                 <div className="flex-1 min-w-0">
-                                    <h3 className={`text-xl font-black truncate ${isDarkMode ? 'text-white' : 'text-[#0B1D33]'}`}>
+                                    <h3 className={`text-xl font-black whitespace-nowrap ${isDarkMode ? 'text-white' : 'text-[#0B1D33]'}`}>
                                         {year}
                                     </h3>
                                     <p className="text-xs text-gray-400 font-bold uppercase tracking-wider truncate">
@@ -112,16 +132,43 @@ export const AwardsSection: React.FC<AwardsSectionProps> = ({ isDarkMode }) => {
                     <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={() => setSelectedSeason(null)} />
                     <div className={`relative w-full max-w-lg rounded-[32px] overflow-hidden flex flex-col max-h-[85vh] animate-in zoom-in-95 duration-200 ${isDarkMode ? 'bg-[#0B1D33]' : 'bg-white'}`}>
 
-                        {/* Header */}
+                        {/* Header with Navigation */}
                         <div className={`p-6 pb-4 flex justify-between items-center ${isDarkMode ? 'bg-white/5' : 'bg-gray-100'}`}>
-                            <div>
-                                <h2 className={`text-2xl font-black ${isDarkMode ? 'text-white' : 'text-[#0B1D33]'}`}>
-                                    Temporada {selectedSeason}
-                                </h2>
-                                <p className="text-xs text-yellow-500 font-bold uppercase tracking-widest">
-                                    Lista de Vencedores
-                                </p>
+                            <div className="flex items-center gap-4">
+                                {/* Prev Button (Older) */}
+                                <button
+                                    onClick={handlePrevSeason}
+                                    disabled={seasons.indexOf(selectedSeason) >= seasons.length - 1}
+                                    className={`p-2 rounded-full transition ${seasons.indexOf(selectedSeason) >= seasons.length - 1
+                                            ? 'opacity-20 cursor-not-allowed'
+                                            : 'hover:bg-black/10'
+                                        } ${isDarkMode ? 'text-white' : 'text-black'}`}
+                                >
+                                    <ChevronLeft size={20} />
+                                </button>
+
+                                <div>
+                                    <h2 className={`text-2xl font-black ${isDarkMode ? 'text-white' : 'text-[#0B1D33]'}`}>
+                                        {selectedSeason}
+                                    </h2>
+                                    <p className="text-xs text-yellow-500 font-bold uppercase tracking-widest leading-none">
+                                        Lista de Vencedores
+                                    </p>
+                                </div>
+
+                                {/* Next Button (Newer) */}
+                                <button
+                                    onClick={handleNextSeason}
+                                    disabled={seasons.indexOf(selectedSeason) <= 0}
+                                    className={`p-2 rounded-full transition ${seasons.indexOf(selectedSeason) <= 0
+                                            ? 'opacity-20 cursor-not-allowed'
+                                            : 'hover:bg-black/10'
+                                        } ${isDarkMode ? 'text-white' : 'text-black'}`}
+                                >
+                                    <ChevronRight size={20} />
+                                </button>
                             </div>
+
                             <button onClick={() => setSelectedSeason(null)} className={`p-2 rounded-full hover:bg-black/10 transition ${isDarkMode ? 'text-white' : 'text-black'}`}>
                                 <X size={24} />
                             </button>
