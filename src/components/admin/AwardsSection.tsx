@@ -3,7 +3,7 @@ import { Award } from '../../types';
 import { listAwards, deleteAward } from '../../cms';
 import { useAdmin } from '../../context/AdminContext';
 import { EditTrigger } from './EditTrigger';
-import { Trophy } from 'lucide-react';
+import { Trophy, ChevronRight, X, Calendar } from 'lucide-react';
 import { AwardDetailsModal } from './AwardDetailsModal';
 import { AwardPopup } from './AwardPopup';
 
@@ -14,22 +14,16 @@ interface AwardsSectionProps {
 export const AwardsSection: React.FC<AwardsSectionProps> = ({ isDarkMode }) => {
     const { isEditing } = useAdmin();
     const [awards, setAwards] = useState<Award[]>([]);
-    const [editingAward, setEditingAward] = useState<Award | null>(null);
-    const [viewingAward, setViewingAward] = useState<Award | null>(null);
-    const [showModal, setShowModal] = useState(false);
+
+    // UI State
+    const [selectedSeason, setSelectedSeason] = useState<string | null>(null);
+    const [viewingAward, setViewingAward] = useState<Award | null>(null); // For single award view (visitor)
+    const [editingAward, setEditingAward] = useState<Award | null>(null); // For edit modal (admin)
+    const [showEditModal, setShowEditModal] = useState(false);
 
     useEffect(() => {
         fetchAwards();
     }, []);
-
-    function handleEdit(award: Award) {
-        setEditingAward(award);
-        setShowModal(true);
-    }
-
-    // ... handleDelete, handleCreate ...
-    // Note: I need to preserve functions I don't replace or use exact replacement.
-    // Let's replace the top part where state is defined.
 
     async function fetchAwards() {
         const { data } = await listAwards();
@@ -43,26 +37,21 @@ export const AwardsSection: React.FC<AwardsSectionProps> = ({ isDarkMode }) => {
         fetchAwards();
     }
 
-    function handleCreate() {
-        setEditingAward({ id: '', year: '', category: '', winner_name: '', team_id: '' } as Award);
-        setShowModal(true);
+    function handleCreate(initialYear?: string) {
+        setEditingAward({ id: '', year: initialYear || '', category: '', winner_name: '', team_id: '' } as Award);
+        setShowEditModal(true);
     }
 
-    function handleClose() {
-        setShowModal(false);
+    function handleEdit(award: Award) {
+        setEditingAward(award);
+        setShowEditModal(true);
+    }
+
+    function handleCloseEditModal() {
+        setShowEditModal(false);
         setEditingAward(null);
         fetchAwards();
     }
-
-    // ...
-
-    // RENDER PART
-    // I will use replace_file_content on smaller chunk later if I cannot cover everything.
-    // The chunk above is risky.
-    // I'll assume state update is needed.
-
-    // Let's do a smaller edit for just the State.
-
 
     // Group awards by year
     const awardsByYear = awards.reduce((acc, award) => {
@@ -71,68 +60,134 @@ export const AwardsSection: React.FC<AwardsSectionProps> = ({ isDarkMode }) => {
         return acc;
     }, {} as Record<string, Award[]>);
 
+    const seasons = Object.keys(awardsByYear).sort((a, b) => b.localeCompare(a));
+
     return (
         <div className="px-6 pb-20">
             {isEditing && (
                 <div className="flex justify-between items-center mb-4">
                     <div className="text-[10px] font-black uppercase tracking-widest text-gray-500">Admin: Awards</div>
-                    <EditTrigger type="add" onClick={handleCreate} />
+                    <EditTrigger type="add" onClick={() => handleCreate()} />
                 </div>
             )}
 
-            <div className="space-y-8">
-                {Object.keys(awardsByYear).sort((a, b) => b.localeCompare(a)).map(year => (
-                    <div key={year} className={`rounded-3xl p-6 ${isDarkMode ? 'bg-white/5' : 'bg-[#0B1D33]/5'}`}>
-                        <h3 className={`text-xl font-black mb-4 ${isDarkMode ? 'text-white' : 'text-[#0B1D33]'}`}>
-                            Temporada {year}
-                        </h3>
-                        <div className="space-y-3">
-                            {awardsByYear[year].map(award => (
+            {/* SEASONS GRID */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {seasons.map(year => (
+                    <div
+                        key={year}
+                        onClick={() => setSelectedSeason(year)}
+                        className={`relative p-6 rounded-3xl cursor-pointer group transition-all hover:scale-[1.02] ${isDarkMode ? 'bg-[#1a2c42] hover:bg-[#1f354d]' : 'bg-white hover:bg-gray-50'
+                            } shadow-lg`}
+                    >
+                        <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-4">
+                                <div className={`p-3 rounded-2xl ${isDarkMode ? 'bg-black/30' : 'bg-gray-100'}`}>
+                                    <Trophy size={24} className="text-yellow-400" />
+                                </div>
+                                <div>
+                                    <h3 className={`text-xl font-black ${isDarkMode ? 'text-white' : 'text-[#0B1D33]'}`}>
+                                        {year}
+                                    </h3>
+                                    <p className="text-xs text-gray-400 font-bold uppercase tracking-wider">
+                                        {awardsByYear[year].length} Prêmios
+                                    </p>
+                                </div>
+                            </div>
+                            <ChevronRight className={`opacity-0 group-hover:opacity-100 transition-opacity ${isDarkMode ? 'text-white' : 'text-black'}`} />
+                        </div>
+                    </div>
+                ))}
+            </div>
+
+            {awards.length === 0 && (
+                <div className="text-center text-gray-400 py-12">
+                    Nenhum prêmio cadastrado ainda.
+                </div>
+            )}
+
+            {/* SEASON DETAILS MODAL (List of Awards) */}
+            {selectedSeason && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+                    <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={() => setSelectedSeason(null)} />
+                    <div className={`relative w-full max-w-lg rounded-[32px] overflow-hidden flex flex-col max-h-[85vh] animate-in zoom-in-95 duration-200 ${isDarkMode ? 'bg-[#0B1D33]' : 'bg-white'}`}>
+
+                        {/* Header */}
+                        <div className={`p-6 pb-4 flex justify-between items-center ${isDarkMode ? 'bg-white/5' : 'bg-gray-100'}`}>
+                            <div>
+                                <h2 className={`text-2xl font-black ${isDarkMode ? 'text-white' : 'text-[#0B1D33]'}`}>
+                                    Temporada {selectedSeason}
+                                </h2>
+                                <p className="text-xs text-yellow-500 font-bold uppercase tracking-widest">
+                                    Lista de Vencedores
+                                </p>
+                            </div>
+                            <button onClick={() => setSelectedSeason(null)} className={`p-2 rounded-full hover:bg-black/10 transition ${isDarkMode ? 'text-white' : 'text-black'}`}>
+                                <X size={24} />
+                            </button>
+                        </div>
+
+                        {/* List */}
+                        <div className="flex-1 overflow-y-auto p-6 space-y-3 custom-scrollbar">
+                            {awardsByYear[selectedSeason].map(award => (
                                 <div
                                     key={award.id}
-                                    className={`flex items-center justify-between p-4 rounded-2xl ${isDarkMode ? 'bg-white/5' : 'bg-white'
-                                        } group cursor-pointer hover:scale-[1.02] transition-transform`}
+                                    className={`flex items-center justify-between p-4 rounded-2xl ${isDarkMode ? 'bg-white/5 hover:bg-white/10' : 'bg-gray-50 hover:bg-gray-100'
+                                        } group cursor-pointer transition-colors`}
                                     onClick={() => isEditing ? handleEdit(award) : setViewingAward(award)}
                                 >
-                                    <div className="flex items-center gap-3">
-                                        <Trophy className="w-5 h-5 text-yellow-400" />
+                                    <div className="flex items-center gap-4">
+                                        <div className="p-2 bg-yellow-400/10 rounded-xl">
+                                            <Trophy size={18} className="text-yellow-400" />
+                                        </div>
                                         <div>
                                             <div className={`font-bold text-sm ${isDarkMode ? 'text-white' : 'text-[#0B1D33]'}`}>
                                                 {award.category}
                                             </div>
-                                            <div className="text-xs text-gray-400">
+                                            <div className="text-xs text-gray-400 font-medium">
                                                 {award.winner_name}
-                                                {award.team && ` - ${award.team.name}`}
+                                                {award.team && <span className="opacity-70"> • {award.team.name}</span>}
                                             </div>
                                         </div>
                                     </div>
-                                    {isEditing && (
-                                        <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+
+                                    {isEditing ? (
+                                        <div className="flex gap-2">
                                             <EditTrigger type="edit" onClick={(e) => { e.stopPropagation(); handleEdit(award); }} />
                                             <EditTrigger type="delete" onClick={(e) => handleDelete(award.id, e)} />
                                         </div>
+                                    ) : (
+                                        <ChevronRight size={16} className="text-gray-500 opacity-50" />
                                     )}
                                 </div>
                             ))}
                         </div>
-                    </div>
-                ))}
 
-                {awards.length === 0 && (
-                    <div className="text-center text-gray-400 py-12">
-                        Nenhum prêmio cadastrado ainda.
+                        {/* Footer Action (Admin Only) */}
+                        {isEditing && (
+                            <div className={`p-4 border-t ${isDarkMode ? 'border-white/10' : 'border-gray-200'}`}>
+                                <button
+                                    onClick={() => handleCreate(selectedSeason)}
+                                    className="w-full py-3 bg-yellow-400 hover:bg-yellow-300 text-black font-black rounded-xl text-sm uppercase tracking-widest transition-colors"
+                                >
+                                    Adicionar Prêmio em {selectedSeason}
+                                </button>
+                            </div>
+                        )}
                     </div>
-                )}
-            </div>
+                </div>
+            )}
 
-            {showModal && editingAward && (
+            {/* EDIT/CREATE MODAL */}
+            {showEditModal && editingAward && (
                 <AwardDetailsModal
                     award={editingAward}
                     isDarkMode={isDarkMode}
-                    onClose={handleClose}
+                    onClose={handleCloseEditModal}
                 />
             )}
 
+            {/* VIEW SINGLE AWARD DETAIL (Visitor) */}
             {viewingAward && (
                 <AwardPopup
                     award={viewingAward}

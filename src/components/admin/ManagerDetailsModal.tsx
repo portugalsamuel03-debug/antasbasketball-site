@@ -16,9 +16,9 @@ interface ManagerDetailsModalProps {
 export const ManagerDetailsModal: React.FC<ManagerDetailsModalProps> = ({ manager, onClose, isDarkMode, onUpdate }) => {
     const { isEditing } = useAdmin();
     const [formData, setFormData] = useState<Partial<Manager>>({
-        is_active: true,
         teams_managed_ids: [],
-        ...manager
+        ...manager,
+        is_active: manager.is_active ?? true
     });
     const [msg, setMsg] = useState<string | null>(null);
 
