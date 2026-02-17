@@ -69,7 +69,7 @@ export interface TeamRow {
   gm_name: string;
   logo_url?: string;
   description?: string;
-  manager_id?: string;
+  manager_id?: string | null;
   manager?: { id: string; name: string; image_url: string };
   is_active?: boolean;
 }
@@ -140,7 +140,7 @@ export interface Team {
   name: string;
   gm_name: string;
   logo_url?: string;
-  manager_id?: string;
+  manager_id?: string | null;
   is_active?: boolean;
 }
 
@@ -195,6 +195,12 @@ export interface RecordItem {
   title: string;
   description: string;
   order: number;
+  year?: string;
+  value?: string | number;
+  holder?: string;
+  type?: 'TEAM' | 'INDIVIDUAL' | 'AUTOMATIC';
+  team_id?: string | null;
+  manager_id?: string | null;
 }
 
 export interface Season {

@@ -4,6 +4,8 @@ import { supabase } from '../../lib/supabase';
 import { Season, Team, SeasonStanding, Champion, Award, TeamRow, RecordItem } from '../../types';
 import { listChampions, listAwards, listTeams, listRecords, listAwardCategories } from '../../cms';
 import { SEASON_OPTIONS } from '../../utils/seasons';
+import { useGlobalData } from '../../hooks/useGlobalData';
+import { calculateAutomaticRecords } from '../../utils/records';
 
 interface SeasonDetailsModalProps {
     season: Season | null;
@@ -39,6 +41,9 @@ const CollapsibleSection = ({ title, icon, children, isDarkMode, defaultOpen = f
 };
 
 export const SeasonDetailsModal: React.FC<SeasonDetailsModalProps> = ({ season, isCreating, isDarkMode, canEdit, onClose, onSave }) => {
+    // Global Data for Records
+    const { standings: gStandings, history: gHistory, teams: gTeams, managers: gManagers, seasons: gSeasons, champions: gChampions, awards: gAwards, trades: gTrades, loading: gLoading } = useGlobalData();
+
     const [formData, setFormData] = useState<Partial<Season>>({ year: '', summary: '' });
     const [standings, setStandings] = useState<SeasonStanding[]>([]);
     const [teams, setTeams] = useState<TeamRow[]>([]);
@@ -54,19 +59,113 @@ export const SeasonDetailsModal: React.FC<SeasonDetailsModalProps> = ({ season, 
     // For adding/editing standing row
     const [editingStanding, setEditingStanding] = useState<Partial<SeasonStanding> | null>(null);
 
+    // Records State
+    const [manualRecords, setManualRecords] = useState<RecordItem[]>([]);
+    const [autoRecordsState, setAutoRecordsState] = useState<RecordItem[]>([]);
+
     useEffect(() => {
         if (season) {
             setFormData(season);
-            fetchStandings(season.id);
+            // Standings are fetched via global hook now
             fetchSeasonData(season.year);
         }
-        fetchTeams();
+        // fetchTeams(); // Removed
         fetchCategories();
     }, [season]);
 
-    const fetchTeams = async () => {
-        const { data } = await listTeams();
-        if (data) setTeams(data as TeamRow[]);
+    // Re-calculate records when Global Data loads or Season changes
+    useEffect(() => {
+        if (!gLoading && season?.year) {
+            const autoRecords = calculateAutomaticRecords(gStandings, gHistory, gTeams, gManagers, gSeasons, gChampions, gAwards, gTrades);
+
+            // Filter records relevant to this season
+            const relevantAutoRecords = autoRecords.filter((rec: any) => {
+                // 1. Text match (Year)
+                if (rec.holder && typeof rec.holder === 'string' && rec.holder.includes(season.year)) return true;
+                if (rec.description && rec.description.includes(season.year)) return true;
+
+                // 2. Date match (Trades in a Day)
+                if (rec.id === 'most-trades-day' && rec.date) {
+                    // Check if date is within season range?
+                    // Simpler: Check if date's year matches? Or just let it pass if string matched above.
+                    // If date is "23/02/2025" and season is "2024/2025", it matches "2025".
+                    // But "2025" is in "2024/2025".
+                    // Let's rely on strong text match first.
+                    // If "Mais Trades em um Dia" holder is "23/02/2025", does it match "2024/2025"? No.
+                    // We need to check if the date falls in the season.
+                    // Season Years are like "2024/2025".
+                    // Dates are dd/mm/yyyy.
+                    // Heuristic: If date ends with second year (2025) or starts with first (2024) late in year?
+                    // Actually, let's just assume if it happened THIS season, the text check might fail.
+                    // Let's check Rec.date against Season Year.
+                    // If season.year = "2024/2025"
+                    // Date "23/02/2025" -> Parts [23, 02, 2025]. 2025 is in season.year.
+                    // Date "15/11/2024" -> 2024 is in season.year.
+                    const [d, m, y] = rec.date.split('/');
+                    if (season.year.includes(y)) return true;
+                }
+                return false;
+            });
+
+            // Map to RecordItem type
+            const mappedAutoRecords: RecordItem[] = relevantAutoRecords.map((r: any) => ({
+                id: r.id,
+                title: r.title,
+                description: r.description,
+                value: String(r.value),
+                holder: r.holder,
+                year: season.year, // Assign this season
+                type: 'AUTOMATIC', // Tag it
+                order: 999 // Default order for auto records
+            }));
+
+            setAutoRecordsState(mappedAutoRecords);
+        }
+    }, [gLoading, season?.year]);
+
+    // Sync Standings from Global Data
+    useEffect(() => {
+        if (season?.id && gStandings.length > 0) {
+            const s = gStandings
+                .filter((st: any) => st.season_id === season.id)
+                .map((st: any) => ({
+                    ...st,
+                    team: gTeams.find((t: any) => t.id === st.team_id)
+                }));
+            setStandings(s);
+        }
+    }, [gStandings, gTeams, season?.id]);
+
+    // Sync Champion and Awards from Global Data
+    useEffect(() => {
+        if (season?.year && !gLoading) {
+            // Champion
+            if (gChampions) {
+                const champ = gChampions.find((c: any) => c.year === season.year);
+                setYearChampion(champ || null);
+            }
+            // Awards
+            if (gAwards) {
+                const aw = gAwards.filter((a: any) => a.year === season.year);
+                setYearAwards(aw);
+            }
+        }
+    }, [gChampions, gAwards, season?.year, gLoading]);
+
+    // Combined records for display
+    useEffect(() => {
+        setYearRecords([...manualRecords, ...autoRecordsState]);
+    }, [manualRecords, autoRecordsState]);
+
+    // ... (fetchTeams, fetchCategories same)
+
+    const fetchSeasonData = async (year: string) => {
+        // Fetch Manual Records
+        const { data: records } = await listRecords();
+        if (records) {
+            const r = (records as RecordItem[]).filter(rec => rec.year === year || (rec.year && rec.year.includes(year)));
+            setManualRecords(r); // Set MANUAL records
+        }
     }
 
     const fetchCategories = async () => {
@@ -76,37 +175,7 @@ export const SeasonDetailsModal: React.FC<SeasonDetailsModalProps> = ({ season, 
             data.forEach((c: any) => map[c.name] = c.type);
             setAwardCategories(map);
         }
-    }
-
-    const fetchStandings = async (seasonId: string) => {
-        const { data } = await supabase
-            .from('season_standings')
-            .select('*, team:teams(*)')
-            .eq('season_id', seasonId)
-            .order('position', { ascending: true });
-        if (data) setStandings(data as any[]);
     };
-
-    const fetchSeasonData = async (year: string) => {
-        // Fetch Champion
-        const { data: champs } = await listChampions();
-        if (champs) {
-            const c = (champs as Champion[]).find(ch => ch.year === year);
-            setYearChampion(c || null);
-        }
-        // Fetch Awards
-        const { data: awards } = await listAwards();
-        if (awards) {
-            const a = (awards as Award[]).filter(aw => aw.year.includes(year) || aw.year === year);
-            setYearAwards(a);
-        }
-        // Fetch Records
-        const { data: records } = await listRecords();
-        if (records) {
-            const r = (records as RecordItem[]).filter(rec => rec.year === year || (rec.year && rec.year.includes(year)));
-            setYearRecords(r);
-        }
-    }
 
     // Process Awards when data is ready
     useEffect(() => {
@@ -139,6 +208,10 @@ export const SeasonDetailsModal: React.FC<SeasonDetailsModalProps> = ({ season, 
             if (type === 'TEAM') team.push(displayAward);
             else individual.push(displayAward);
         });
+
+        // Sort by count descending
+        team.sort((a, b) => b.count - a.count);
+        individual.sort((a, b) => b.count - a.count); // Optional, but consistent
 
         setGroupedAwards({ individual, team });
     };
@@ -214,14 +287,15 @@ export const SeasonDetailsModal: React.FC<SeasonDetailsModalProps> = ({ season, 
             alert('Erro ao salvar classificação.');
         } else {
             setEditingStanding(null);
-            fetchStandings(season.id);
+            setEditingStanding(null);
+            window.location.reload();
         }
     };
 
     const handleDeleteStanding = async (id: string) => {
         if (!confirm('Remover time da tabela?')) return;
         await supabase.from('season_standings').delete().eq('id', id);
-        if (season) fetchStandings(season.id);
+        if (season) window.location.reload();
     }
 
     const inputClass = `w-full bg-transparent border-b p-3 text-sm font-bold focus:outline-none transition-colors ${isDarkMode
@@ -373,6 +447,24 @@ export const SeasonDetailsModal: React.FC<SeasonDetailsModalProps> = ({ season, 
                                 </div>
                             )}
 
+                            {/* Statistics Collapsible */}
+                            {!isCreating && (
+                                <CollapsibleSection
+                                    title="Estatísticas (Trades)"
+                                    icon={<AwardIcon size={14} className="text-green-500" />}
+                                    isDarkMode={isDarkMode}
+                                    defaultOpen={false}
+                                >
+                                    <div className="pt-4 flex items-center justify-between">
+                                        <div className="text-xs font-bold uppercase text-gray-500">Total de Trades na Temporada</div>
+                                        <div className={`text-xl font-black ${isDarkMode ? 'text-white' : 'text-black'}`}>
+                                            {Math.floor(standings.reduce((acc, s) => acc + (s.trades_count || 0), 0) / 2)}
+                                        </div>
+                                    </div>
+
+                                </CollapsibleSection>
+                            )}
+
 
                             {/* Records Section */}
                             {yearRecords.length > 0 && (
@@ -410,30 +502,33 @@ export const SeasonDetailsModal: React.FC<SeasonDetailsModalProps> = ({ season, 
                             ) : null}
 
                             {/* Manual Summary */}
-                            <div>
-                                <label className="text-[10px] font-bold uppercase text-gray-500 mb-1 block">Resumo Manual</label>
-                                {canEdit ? (
-                                    <textarea
-                                        value={formData.summary || ''}
-                                        onChange={e => setFormData({ ...formData, summary: e.target.value })}
-                                        className={`${inputClass} min-h-[100px] resize-none`}
-                                        placeholder="Escreva um resumo adicional..."
-                                    />
-                                ) : (
-                                    <p className={`text-sm leading-relaxed ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
-                                        {formData.summary || 'Nenhum resumo disponível.'}
-                                    </p>
-                                )}
-                            </div>
-
-                            {canEdit && (
-                                <button
-                                    onClick={handleSaveSeason}
-                                    className="w-full py-4 rounded-2xl bg-yellow-400 text-black font-black uppercase tracking-widest hover:bg-yellow-300 active:scale-95 transition-all flex items-center justify-center gap-2"
-                                >
-                                    <Save size={18} />
-                                    {isCreating ? 'Criar Temporada' : 'Salvar Resumo'}
-                                </button>
+                            {(!formData.summary && !canEdit) ? null : (
+                                <div>
+                                    <h3 className="text-[10px] font-black uppercase tracking-widest text-gray-500 mb-3">
+                                        {canEdit ? 'Resumo Manual' : (formData.summary ? 'Resumo da Temporada' : '')}
+                                    </h3>
+                                    {canEdit ? (
+                                        <div className="space-y-4">
+                                            <textarea
+                                                value={formData.summary || ''}
+                                                onChange={e => setFormData({ ...formData, summary: e.target.value })}
+                                                className={`${inputClass} min-h-[100px] resize-none`}
+                                                placeholder="Escreva um resumo adicional..."
+                                            />
+                                            <button
+                                                onClick={handleSaveSeason}
+                                                className="w-full py-4 rounded-2xl bg-yellow-400 text-black font-black uppercase tracking-widest hover:bg-yellow-300 active:scale-95 transition-all flex items-center justify-center gap-2"
+                                            >
+                                                <Save size={18} />
+                                                {isCreating ? 'Criar Temporada' : 'Salvar Resumo'}
+                                            </button>
+                                        </div>
+                                    ) : (
+                                        <p className={`text-sm leading-relaxed ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                                            {formData.summary}
+                                        </p>
+                                    )}
+                                </div>
                             )}
                         </div>
                     )}
@@ -458,7 +553,7 @@ export const SeasonDetailsModal: React.FC<SeasonDetailsModalProps> = ({ season, 
                                             {teams.map(t => <option key={t.id} value={t.id} className="text-black">{t.name}</option>)}
                                         </select>
 
-                                        <div className="grid grid-cols-4 gap-4">
+                                        <div className="grid grid-cols-5 gap-3">
                                             <div>
                                                 <label className="text-[9px] font-black text-gray-400 uppercase">Pos</label>
                                                 <input type="number" className={inputClass} value={editingStanding?.position || ''} onChange={e => setEditingStanding(prev => ({ ...prev, position: Number(e.target.value) }))} />
@@ -473,7 +568,11 @@ export const SeasonDetailsModal: React.FC<SeasonDetailsModalProps> = ({ season, 
                                             </div>
                                             <div>
                                                 <label className="text-[9px] font-black text-gray-400 uppercase">Trades</label>
-                                                <input type="number" className={inputClass} value={editingStanding?.trades_count || ''} onChange={e => setEditingStanding(prev => ({ ...prev, trades_count: Number(e.target.value) }))} />
+                                                <input type="number" className={inputClass} value={editingStanding?.trades_count ?? ''} onChange={e => setEditingStanding(prev => ({ ...prev, trades_count: Number(e.target.value) }))} />
+                                            </div>
+                                            <div>
+                                                <label className="text-[9px] font-black text-gray-400 uppercase">Empate</label>
+                                                <input type="number" className={inputClass} value={editingStanding?.ties ?? ''} onChange={e => setEditingStanding(prev => ({ ...prev, ties: Number(e.target.value) }))} />
                                             </div>
                                         </div>
 
@@ -527,7 +626,9 @@ export const SeasonDetailsModal: React.FC<SeasonDetailsModalProps> = ({ season, 
                                                             <img src={st.team?.logo_url || ''} className="w-8 h-8 object-contain" />
                                                             <div>
                                                                 <div className={`font-bold leading-none ${isDarkMode ? 'text-white' : 'text-[#0B1D33]'}`}>{st.team?.name}</div>
-                                                                <div className="text-[10px] text-gray-500 font-bold uppercase mt-1">{st.wins}V - {st.losses}D - {st.trades_count > 0 ? `• ${st.trades_count} Trades` : ''}</div>
+                                                                <div className="text-[10px] text-gray-500 font-bold uppercase mt-1">
+                                                                    {st.wins}V - {st.losses}D - {st.ties}E {st.trades_count > 0 ? `• ${st.trades_count} Trades` : ''}
+                                                                </div>
                                                             </div>
                                                         </div>
                                                     </div>

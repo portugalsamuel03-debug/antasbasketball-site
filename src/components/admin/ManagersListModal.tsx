@@ -10,10 +10,12 @@ interface ManagersListModalProps {
     onClose: () => void;
     onSelectManager: (manager: Manager) => void;
     onDeleteManager: (id: string, e: React.MouseEvent) => void;
+    onToggleActive: (manager: Manager, e: React.MouseEvent) => void;
     teamsMap: Record<string, any>;
     championCounts: Record<string, number>;
     hofIds: Set<string>;
     managerTrades: Record<string, number>;
+    managerRecords: Record<string, { wins: number, losses: number }>;
 }
 
 const ITEMS_PER_PAGE = 10;
@@ -25,10 +27,12 @@ export const ManagersListModal: React.FC<ManagersListModalProps> = ({
     onClose,
     onSelectManager,
     onDeleteManager,
+    onToggleActive,
     teamsMap,
     championCounts,
     hofIds,
-    managerTrades
+    managerTrades,
+    managerRecords
 }) => {
     const { isEditing } = useAdmin();
     const [activeTab, setActiveTab] = useState<'ACTIVE' | 'LEGEND'>(initialTab);
@@ -94,6 +98,25 @@ export const ManagersListModal: React.FC<ManagersListModalProps> = ({
                             </h3>
                             {isHoF && <Crown size={12} className="text-yellow-500 flex-shrink-0" fill="currentColor" />}
                         </div>
+                        {/* Mobile: Current Team below name */}
+                        <div className="sm:hidden mt-0.5">
+                            {currentTeam ? (
+                                <div className="flex items-center gap-1">
+                                    <Briefcase size={10} className="text-yellow-400" />
+                                    <span className="uppercase text-[9px] font-bold tracking-wider text-gray-500">{currentTeam.name}</span>
+                                </div>
+                            ) : (
+                                <div className="text-[9px] text-gray-400 italic">Sem clube</div>
+                            )}
+                        </div>
+                        {/* Desktop: Current Team Badge */}
+                        <div className="hidden sm:block">
+                            {currentTeam && (
+                                <span className="px-2 py-0.5 rounded bg-yellow-400 text-black text-[9px] font-bold uppercase tracking-wider">
+                                    {currentTeam.name}
+                                </span>
+                            )}
+                        </div>
                         {manager.bio ? (
                             <p className="text-[9px] text-gray-500 font-bold uppercase tracking-wide truncate">
                                 {manager.bio}
@@ -102,13 +125,14 @@ export const ManagersListModal: React.FC<ManagersListModalProps> = ({
                     </div>
 
                     {/* Stats - Compact */}
-                    <div className="hidden sm:flex items-center gap-3 text-[9px] text-gray-400">
-                        {/* Current Team */}
-                        {currentTeam && (
-                            <div className="flex items-center gap-1">
-                                <Briefcase size={10} className="text-yellow-400" />
-                                <span className="uppercase text-white font-bold tracking-wider">{currentTeam.name}</span>
-                            </div>
+                    <div className="flex flex-wrap sm:flex-nowrap items-center gap-3 text-[9px] text-gray-400 mt-2 sm:mt-0">
+                        {isEditing && (
+                            <button
+                                onClick={(e) => onToggleActive(manager, e)}
+                                className={`px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-wider border ${manager.is_active !== false ? 'border-green-500 text-green-500 hover:bg-green-500/10' : 'border-red-500 text-red-500 hover:bg-red-500/10'}`}
+                            >
+                                {manager.is_active !== false ? 'ATIVO' : 'INATIVO'}
+                            </button>
                         )}
 
                         {/* Titles */}
@@ -116,6 +140,15 @@ export const ManagersListModal: React.FC<ManagersListModalProps> = ({
                             <div className="flex items-center gap-1">
                                 <AwardIcon size={10} className="text-yellow-400" />
                                 <span className="font-bold text-yellow-500">{titleCount} Títulos</span>
+                            </div>
+                        )}
+
+                        {/* Total Record */}
+                        {managerRecords[manager.id] && (
+                            <div className="flex items-center gap-1">
+                                <span className="font-bold text-gray-500">
+                                    {managerRecords[manager.id].wins}V - {managerRecords[manager.id].losses}D
+                                </span>
                             </div>
                         )}
                     </div>

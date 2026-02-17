@@ -12,7 +12,7 @@ interface TeamHistoryModalProps {
 }
 
 export const TeamHistoryModal: React.FC<TeamHistoryModalProps> = ({ teamId, isEditable, isDarkMode, onClose }) => {
-    const [history, setHistory] = useState<ManagerHistory[]>([]);
+    const [history, setHistory] = useState<(ManagerHistory & { stats?: any })[]>([]);
     const [managers, setManagers] = useState<{ id: string, name: string }[]>([]);
     const [tradesByYear, setTradesByYear] = useState<Record<string, number>>({});
 
@@ -27,8 +27,32 @@ export const TeamHistoryModal: React.FC<TeamHistoryModalProps> = ({ teamId, isEd
     }, [teamId]);
 
     const fetchHistory = async () => {
-        const { data } = await listTeamHistory(teamId);
-        if (data) setHistory(data);
+        const { data: hist } = await listTeamHistory(teamId);
+        if (hist) {
+            // Fetch Standings
+            const { data: standings } = await supabase.from('season_standings')
+                .select('season_id, team_id, position, wins, losses, ties')
+                .eq('team_id', teamId);
+
+            const statsMap: Record<string, any> = {};
+
+            // Fetch seasons to map year -> id
+            const { data: seasons } = await supabase.from('seasons').select('id, year');
+            const yearIdMap: Record<string, string> = {};
+            seasons?.forEach((s: any) => yearIdMap[s.year] = s.id);
+
+            standings?.forEach((st: any) => {
+                statsMap[`${st.season_id}`] = st;
+            });
+
+            const enriched = hist.map(h => {
+                const sId = yearIdMap[h.year];
+                const stats = sId ? statsMap[sId] : null;
+                return { ...h, stats };
+            });
+
+            setHistory(enriched);
+        }
     };
 
     const fetchTrades = async () => {
@@ -125,6 +149,17 @@ export const TeamHistoryModal: React.FC<TeamHistoryModalProps> = ({ teamId, isEd
                                             )}
                                         </div>
                                     </div>
+                                    {/* Stats - Vertical Stack on Mobile, Row on Desktop if space */}
+                                    {h.stats && (
+                                        <div className="flex flex-col items-end min-w-[80px]">
+                                            <div className={`text-xs font-black uppercase ${isDarkMode ? 'text-yellow-400' : 'text-yellow-600'}`}>
+                                                {h.stats.position}º Lugar
+                                            </div>
+                                            <div className="text-[10px] font-bold text-gray-500 whitespace-nowrap">
+                                                {h.stats.wins}V - {h.stats.losses}D - {h.stats.ties}E
+                                            </div>
+                                        </div>
+                                    )}
 
                                     {/* Stats / Actions */}
                                     <div className="flex items-center gap-3">

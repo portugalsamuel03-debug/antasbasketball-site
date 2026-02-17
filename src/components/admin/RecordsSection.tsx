@@ -1,80 +1,218 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
-import { RecordItem } from '../../types';
-import { useAdmin } from '../../context/AdminContext';
-import { Trash2, Edit2, Plus, Trophy } from 'lucide-react';
+import { RefreshCw, Trophy, Eye, EyeOff } from 'lucide-react';
 import { RecordDetailsModal } from './RecordDetailsModal';
+import { useAdmin } from '../../context/AdminContext';
+import { useGlobalData } from '../../hooks/useGlobalData';
+import { calculateAutomaticRecords } from '../../utils/records';
+import { listRecords } from '../../cms';
+import { RecordItem } from '../../types';
 
-export const RecordsSection: React.FC<{ isDarkMode: boolean }> = ({ isDarkMode }) => {
-    const { isEditing } = useAdmin();
-    const [records, setRecords] = useState<RecordItem[]>([]);
-    const [isModalOpen, setIsModalOpen] = useState(false);
-    const [editingRecord, setEditingRecord] = useState<Partial<RecordItem> | null>(null);
+interface RecordsSectionProps {
+    isDarkMode: boolean;
+}
 
-    const fetchRecords = async () => {
-        const { data } = await supabase.from('records').select('*').order('created_at', { ascending: true });
-        if (data) setRecords(data);
-    };
+export const RecordsSection: React.FC<RecordsSectionProps> = ({ isDarkMode }) => {
+    const { isAdmin, isEditing } = useAdmin();
+    // Use the global data hook
+    const { standings, history, teams, managers, seasons, champions, awards, trades, loading: dataLoading } = useGlobalData();
+
+    const [stats, setStats] = useState<any[]>([]);
+    const [hiddenRecordIds, setHiddenRecordIds] = useState<string[]>([]);
+    const [loadingHidden, setLoadingHidden] = useState(true);
+    const [selectedRecord, setSelectedRecord] = useState<any | null>(null);
+
+    const ITEMS_PER_PAGE = 5;
+    const [currentPage, setCurrentPage] = useState(1);
+
+    const loading = dataLoading || loadingHidden;
 
     useEffect(() => {
-        fetchRecords();
-    }, []);
+        fetchHiddenAndCalculate();
+    }, [dataLoading, standings]); // Recalculate when data loads
 
-    const handleDelete = async (id: string) => {
-        if (!confirm('Tem certeza que deseja apagar este recorde?')) return;
-        await supabase.from('records').delete().eq('id', id);
-        fetchRecords();
+    const fetchHiddenAndCalculate = async () => {
+        setLoadingHidden(true); // Set loading for hidden records
+        try {
+            // Fetch hidden records
+            const { data: hiddenData } = await supabase.from('hidden_records').select('record_id');
+            if (hiddenData) {
+                setHiddenRecordIds((hiddenData as any[]).map(r => r.record_id));
+            }
+            setLoadingHidden(false);
+
+            if (!dataLoading) {
+                const autoRecords = calculateAutomaticRecords(
+                    standings, history, teams, managers, seasons, champions, awards, trades
+                );
+
+                // Fetch Manual Records
+                const { data: manualData } = await listRecords();
+                const manualRecords = manualData ? (manualData as RecordItem[]) : [];
+
+                // Combine: Manual records first, then Automatic
+                // Or maybe distinct?
+                // For now, just concat. Manual records usually have UUIDs. Auto have string IDs.
+                setStats([...manualRecords, ...autoRecords]);
+            }
+
+        } catch (error) {
+            console.error('Error fetching hidden records:', error);
+            setLoadingHidden(false);
+        }
     };
 
+    // Manual Refresh button handler
+    const handleRefresh = () => {
+        window.location.reload(); // Simple refresh for now as hook fetches on mount
+    };
+
+    const toggleRecordVisibility = async (e: React.MouseEvent, recordId: string) => {
+        e.stopPropagation();
+        if (!isEditing) return;
+
+        try {
+            if (hiddenRecordIds.includes(recordId)) {
+                // Unhide
+                await supabase.from('hidden_records').delete().eq('record_id', recordId);
+                setHiddenRecordIds(prev => prev.filter(id => id !== recordId));
+            } else {
+                // Hide
+                await supabase.from('hidden_records').insert({ record_id: recordId });
+                setHiddenRecordIds(prev => [...prev, recordId]);
+            }
+        } catch (error) {
+            console.error('Error toggling visibility:', error);
+            alert('Erro ao alterar visibilidade. Verifique se a tabela hidden_records existe.');
+        }
+    };
+
+    // Filter records: Show if NOT hidden, OR if user is Admin (but dimmed)
+    const displayedRecords = stats.filter(r => !hiddenRecordIds.includes(r.id) || isEditing);
+
+    // Pagination
+    const totalPages = Math.ceil(displayedRecords.length / ITEMS_PER_PAGE);
+    const paginatedRecords = displayedRecords.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
+
     return (
-        <div className="px-6 pb-24">
-            <div className="flex justify-between items-center mb-6">
-                <h2 className={`text-xs font-black uppercase tracking-widest ${isDarkMode ? 'text-gray-500' : 'text-gray-400'}`}>
-                    Recordes Históricos
+        <div className={`rounded-3xl border p-8 ${isDarkMode ? 'bg-[#121212] border-white/10' : 'bg-white border-gray-200'}`}>
+            <div className="flex items-center justify-between mb-8">
+                <h2 className={`text-2xl font-black uppercase tracking-tighter ${isDarkMode ? 'text-white' : 'text-[#0B1D33]'}`}>
+                    Recordes Históricos {isEditing && <span className="text-yellow-500 text-sm">(Automático + Manual)</span>}
                 </h2>
                 {isEditing && (
-                    <button
-                        onClick={() => { setEditingRecord(null); setIsModalOpen(true); }}
-                        className="w-8 h-8 rounded-full bg-yellow-400 text-black flex items-center justify-center shadow-lg active:scale-90 transition-transform"
-                    >
-                        <Plus size={16} strokeWidth={3} />
-                    </button>
-                )}
-            </div>
-
-            <div className="space-y-4">
-                {records.length === 0 ? (
-                    <div className="text-center py-12 opacity-50">
-                        <Trophy size={48} className={`mx-auto mb-4 ${isDarkMode ? 'text-gray-700' : 'text-gray-300'}`} />
-                        <p className="text-[10px] font-black uppercase tracking-widest">Nenhum recorde registrado</p>
+                    <div className="flex gap-2">
+                        <button
+                            onClick={() => setSelectedRecord({})}
+                            className="px-4 py-2 bg-yellow-500 text-black rounded-xl font-bold text-xs uppercase hover:bg-yellow-400 transition-colors"
+                        >
+                            Novo Recorde
+                        </button>
+                        <button
+                            onClick={handleRefresh}
+                            className={`p-3 rounded-xl transition-all active:scale-95 ${loading ? 'animate-spin bg-yellow-400 text-black' : isDarkMode ? 'bg-white/5 hover:bg-white/10 text-white' : 'bg-gray-100 hover:bg-gray-200 text-[#0B1D33]'}`}
+                        >
+                            <RefreshCw size={20} />
+                        </button>
                     </div>
-                ) : (
-                    records.map(record => (
-                        <div key={record.id} className={`p-5 rounded-3xl border relative group ${isDarkMode ? 'bg-[#121212] border-white/5' : 'bg-white border-[#0B1D33]/5'}`}>
-                            {isEditing && (
-                                <div className="absolute top-4 right-4 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                    <button onClick={() => { setEditingRecord(record); setIsModalOpen(true); }} className="p-2 hover:text-yellow-400 transition-colors"><Edit2 size={14} /></button>
-                                    <button onClick={() => handleDelete(record.id)} className="p-2 hover:text-red-500 transition-colors"><Trash2 size={14} /></button>
-                                </div>
-                            )}
-
-                            <h3 className={`text-sm font-black uppercase tracking-wide mb-2 ${isDarkMode ? 'text-white' : 'text-[#0B1D33]'}`}>
-                                {record.title}
-                            </h3>
-                            <p className={`text-xs font-medium leading-relaxed whitespace-pre-wrap ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-                                {record.description}
-                            </p>
-                        </div>
-                    ))
                 )}
             </div>
 
-            {isModalOpen && (
+            {loading ? (
+                <div className="flex justify-center py-12">
+                    <RefreshCw size={32} className="animate-spin text-yellow-500" />
+                </div>
+            ) : (
+                <>
+                    <div className="grid grid-cols-1 gap-4">
+                        {paginatedRecords.map((rec) => {
+                            const isHidden = hiddenRecordIds.includes(rec.id);
+                            return (
+                                <div
+                                    key={rec.id}
+                                    onClick={() => isEditing && setSelectedRecord(rec)}
+                                    className={`p-5 rounded-2xl border transition-all relative overflow-hidden group 
+                                    ${isDarkMode ? 'bg-white/5 border-white/5' : 'bg-gray-50 border-gray-100'}
+                                    ${isEditing ? 'cursor-pointer hover:bg-white/10 hover:border-white/10' : ''}
+                                    ${isHidden ? 'opacity-50 grayscale' : ''}
+                                `}
+                                >
+                                    <div className="flex justify-between items-start">
+                                        <div>
+                                            <h3 className={`font-black uppercase tracking-wide mb-1 pr-12 ${isDarkMode ? 'text-white' : 'text-[#0B1D33]'} flex items-center gap-2`}>
+                                                {rec.title}
+                                                {isHidden && <span className="text-[10px] bg-red-500 text-white px-1.5 py-0.5 rounded">OCULTO</span>}
+                                            </h3>
+                                            <p className={`text-xs font-bold uppercase mb-2 ${isDarkMode ? 'text-yellow-500' : 'text-blue-600'}`}>
+                                                {rec.holder}
+                                            </p>
+                                            <p className={`text-xs leading-relaxed ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                                                {rec.description}
+                                            </p>
+                                        </div>
+                                        <div className="flex flex-col items-end gap-2">
+                                            <div className={`flex items-center justify-center w-10 h-10 rounded-xl font-black text-xs ${isDarkMode ? 'bg-yellow-500 text-black' : 'bg-[#0B1D33] text-white'}`}>
+                                                {rec.value}
+                                            </div>
+                                            {isEditing && (
+                                                <button
+                                                    onClick={(e) => toggleRecordVisibility(e, rec.id)}
+                                                    className={`p-1.5 rounded-lg transition-colors ${isDarkMode ? 'bg-white/10 hover:bg-white/20 text-white' : 'bg-gray-200 hover:bg-gray-300 text-black'}`}
+                                                    title={isHidden ? "Mostrar Recorde" : "Ocultar Recorde"}
+                                                >
+                                                    {isHidden ? <Eye size={14} /> : <EyeOff size={14} />}
+                                                </button>
+                                            )}
+                                        </div>
+                                    </div>
+
+                                    <div className="absolute top-5 right-16 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+                                        <Trophy size={20} className="text-yellow-500/50" />
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+
+                    {/* Pagination */}
+                    {totalPages > 1 && (
+                        <div className="flex items-center justify-between mt-8 pt-4 border-t border-white/5">
+                            <button
+                                onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                                disabled={currentPage === 1}
+                                className={`px-6 py-3 rounded-full font-black text-xs uppercase tracking-widest transition-all
+                                ${isDarkMode
+                                        ? 'bg-white/5 text-white hover:bg-white/10 disabled:opacity-50 disabled:cursor-not-allowed'
+                                        : 'bg-gray-100 text-gray-900 hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed'}`}
+                            >
+                                Anterior
+                            </button>
+
+                            <span className={`text-[10px] font-black uppercase tracking-widest ${isDarkMode ? 'text-blue-400' : 'text-blue-600'}`}>
+                                Página {currentPage} de {totalPages}
+                            </span>
+
+                            <button
+                                onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                                disabled={currentPage === totalPages}
+                                className="px-6 py-3 rounded-full bg-yellow-400 text-black font-black text-xs uppercase tracking-widest hover:bg-yellow-300 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                Próxima
+                            </button>
+                        </div>
+                    )}
+                </>
+            )}
+
+            {selectedRecord && (
                 <RecordDetailsModal
-                    record={editingRecord}
+                    record={selectedRecord}
+                    onClose={() => setSelectedRecord(null)}
+                    onSave={() => {
+                        setSelectedRecord(null);
+                        window.location.reload();
+                    }}
                     isDarkMode={isDarkMode}
-                    onClose={() => setIsModalOpen(false)}
-                    onSave={fetchRecords}
                 />
             )}
         </div>

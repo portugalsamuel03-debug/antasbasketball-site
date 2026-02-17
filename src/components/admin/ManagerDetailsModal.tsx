@@ -2,9 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { listTeams, listChampions, listAwards, listManagerHistory, upsertManagerHistory, deleteManagerHistory, listHallOfFame } from '../../cms';
 import { TeamRow, Champion, Award, ManagerHistory, HallOfFame } from '../../types';
-import { Plus, Trash2, Calendar, Briefcase, Trophy, ChevronRight, Crown, ArrowRightLeft, Award as AwardIcon } from 'lucide-react';
+import { X, Save, Upload, Trophy, Book, Award as AwardIcon, Users, ChevronRight, Crown, ArrowRight, BarChart, Briefcase, Calendar, Trash2, Plus } from 'lucide-react';
 import { Manager } from './ManagersSection';
 import { useAdmin } from '../../context/AdminContext';
+import { HistoryChartModal } from './HistoryChartModal';
 
 // Import New Modals
 import { ManagerSeasonsModal } from './ManagerSeasonsModal';
@@ -41,9 +42,15 @@ export const ManagerDetailsModal: React.FC<ManagerDetailsModalProps> = ({ manage
 
     // Trades Data
     const [totalTrades, setTotalTrades] = useState(0);
+    const [totalRecord, setTotalRecord] = useState({ wins: 0, losses: 0, ties: 0 });
+
+    // Chart Data
+    const [chartData, setChartData] = useState<any[]>([]); // Relaxed type
+    const [showChart, setShowChart] = useState(false);
 
     // Popups State
     const [showSeasons, setShowSeasons] = useState(false);
+    const [showTradesChart, setShowTradesChart] = useState(false);
     const [showTitles, setShowTitles] = useState(false);
     const [showTrades, setShowTrades] = useState(false);
     const [showAwards, setShowAwards] = useState(false);
@@ -90,27 +97,63 @@ export const ManagerDetailsModal: React.FC<ManagerDetailsModalProps> = ({ manage
 
             // Calculate Trades for this history
             const { data: seasonsData } = await supabase.from('seasons').select('id, year');
-            const { data: standingsData } = await supabase.from('season_standings').select('season_id, team_id, trades_count');
+            const { data: standingsData } = await supabase.from('season_standings').select('season_id, team_id, trades_count, wins, losses, ties, position');
 
             const seasonYearIdMap: Record<string, string> = {};
             seasonsData?.forEach((s: any) => seasonYearIdMap[s.year] = s.id);
 
-            const standingsMap: Record<string, number> = {};
+            const standingsMap: Record<string, { trades: number, wins: number, losses: number, ties: number, position: number }> = {};
             standingsData?.forEach((st: any) => {
-                standingsMap[`${st.season_id}-${st.team_id}`] = st.trades_count || 0;
+                standingsMap[`${st.season_id}-${st.team_id}`] = {
+                    trades: st.trades_count || 0,
+                    wins: st.wins || 0,
+                    losses: st.losses || 0,
+                    ties: st.ties || 0,
+                    position: st.position || 0
+                };
             });
 
             let total = 0;
+            let wins = 0;
+            let losses = 0;
+            let ties = 0;
+            const cData: any[] = [];
+
             data.forEach(h => {
                 if (h.team_id && h.year) {
                     const sId = seasonYearIdMap[h.year];
                     if (sId) {
-                        const count = standingsMap[`${sId}-${h.team_id}`] || 0;
-                        if (count > 0) total += count;
+                        const stats = standingsMap[`${sId}-${h.team_id}`];
+                        if (stats) {
+                            total += stats.trades;
+                            wins += stats.wins;
+                            losses += stats.losses;
+                            ties += stats.ties;
+                            if (stats.position) {
+                                cData.push({
+                                    label: h.year,
+                                    value: stats.position,
+                                    meta: {
+                                        entityName: h.team?.name || allTeams.find(t => t.id === h.team_id)?.name || 'Sem Time',
+                                        wins: stats.wins,
+                                        losses: stats.losses,
+                                        ties: stats.ties,
+                                        trades: stats.trades
+                                    }
+                                });
+                            }
+                        }
                     }
                 }
             });
+            cData.reverse(); // Recent last
+            setChartData(cData);
             setTotalTrades(total);
+            setTotalRecord({ wins, losses, ties });
+
+            // Sort chart data
+            cData.sort((a, b) => a.label.localeCompare(b.label));
+            setChartData(cData);
         }
     };
 
@@ -262,39 +305,60 @@ export const ManagerDetailsModal: React.FC<ManagerDetailsModalProps> = ({ manage
 
                         {/* ACTION BUTTONS (STATS) - View Only */}
                         {!isEditing ? (
-                            <div className="grid grid-cols-2 gap-3 w-full mt-6">
-                                <button
-                                    onClick={() => setShowSeasons(true)}
-                                    className={`p-4 rounded-2xl flex flex-col items-center justify-center gap-1 transition-all active:scale-95 ${isDarkMode ? 'bg-white/5 hover:bg-white/10' : 'bg-gray-50 hover:bg-gray-100'}`}
-                                >
-                                    <div className="text-2xl font-black text-white">{history.length}</div>
-                                    <div className="text-[9px] font-bold uppercase text-gray-500">Temporadas</div>
-                                </button>
+                            <>
+                                <div className="grid grid-cols-2 gap-3 w-full mt-6">
+                                    <button
+                                        onClick={() => setShowChart(true)} // "Temoradas" (Times) -> Open Position Chart (Career)
+                                        className={`p-4 rounded-2xl flex flex-col items-center justify-center gap-1 transition-all active:scale-95 ${isDarkMode ? 'bg-white/5 hover:bg-white/10' : 'bg-gray-50 hover:bg-gray-100'}`}
+                                    >
+                                        <div className="text-2xl font-black text-white">{history.length}</div>
+                                        <div className="text-[9px] font-bold uppercase text-gray-500">Temporadas</div>
+                                    </button>
 
-                                <button
-                                    onClick={() => setShowTitles(true)}
-                                    className={`p-4 rounded-2xl flex flex-col items-center justify-center gap-1 transition-all active:scale-95 ${isDarkMode ? 'bg-white/5 hover:bg-white/10' : 'bg-gray-50 hover:bg-gray-100'}`}
-                                >
-                                    <div className="text-2xl font-black text-yellow-500">{titlesCount}</div>
-                                    <div className="text-[9px] font-bold uppercase text-gray-500">Títulos</div>
-                                </button>
+                                    <button
+                                        onClick={() => setShowTitles(true)}
+                                        className={`p-4 rounded-2xl flex flex-col items-center justify-center gap-1 transition-all active:scale-95 ${isDarkMode ? 'bg-white/5 hover:bg-white/10' : 'bg-gray-50 hover:bg-gray-100'}`}
+                                    >
+                                        <div className="text-2xl font-black text-yellow-500">{titlesCount}</div>
+                                        <div className="text-[9px] font-bold uppercase text-gray-500">Títulos</div>
+                                    </button>
 
-                                <button
-                                    onClick={() => setShowTrades(true)}
-                                    className={`p-4 rounded-2xl flex flex-col items-center justify-center gap-1 transition-all active:scale-95 ${isDarkMode ? 'bg-white/5 hover:bg-white/10' : 'bg-gray-50 hover:bg-gray-100'}`}
-                                >
-                                    <div className="text-2xl font-black text-green-500">{totalTrades}</div>
-                                    <div className="text-[9px] font-bold uppercase text-gray-500">Trades</div>
-                                </button>
+                                    <button
+                                        onClick={() => setShowTradesChart(true)}
+                                        className={`p-4 rounded-2xl flex flex-col items-center justify-center gap-1 transition-all active:scale-95 ${isDarkMode ? 'bg-white/5 hover:bg-white/10' : 'bg-gray-50 hover:bg-gray-100'}`}
+                                    >
+                                        <div className="text-2xl font-black text-green-500">{totalTrades}</div>
+                                        <div className="text-[9px] font-bold uppercase text-gray-500">Trades</div>
+                                    </button>
 
-                                <button
-                                    onClick={() => setShowAwards(true)}
-                                    className={`p-4 rounded-2xl flex flex-col items-center justify-center gap-1 transition-all active:scale-95 ${isDarkMode ? 'bg-white/5 hover:bg-white/10' : 'bg-gray-50 hover:bg-gray-100'}`}
+                                    <button
+                                        onClick={() => setShowAwards(true)}
+                                        className={`p-4 rounded-2xl flex flex-col items-center justify-center gap-1 transition-all active:scale-95 ${isDarkMode ? 'bg-white/5 hover:bg-white/10' : 'bg-gray-50 hover:bg-gray-100'}`}
+                                    >
+                                        <div className="text-2xl font-black text-purple-500">{awardsCount}</div>
+                                        <div className="text-[9px] font-bold uppercase text-gray-500">Conquistas</div>
+                                    </button>
+                                </div>
+
+
+                                <div
+                                    onClick={() => setShowChart(true)}
+                                    className={`mt-6 py-3 px-6 rounded-2xl flex items-center justify-between cursor-pointer transition-transform hover:scale-105 ${isDarkMode ? 'bg-white/5 hover:bg-white/10' : 'bg-gray-50 hover:bg-gray-100'}`}
                                 >
-                                    <div className="text-2xl font-black text-yellow-500">{awardsCount}</div>
-                                    <div className="text-[9px] font-bold uppercase text-gray-500">Conquistas</div>
-                                </button>
-                            </div>
+                                    <div className="flex items-center gap-3">
+                                        <div className="p-2 bg-yellow-400 rounded-lg text-black">
+                                            <AwardIcon size={18} />
+                                        </div>
+                                        <div>
+                                            <div className="text-[9px] font-bold uppercase text-gray-500 tracking-wider">Recorde Total</div>
+                                            <div className={`text-sm font-black ${isDarkMode ? 'text-white' : 'text-[#0B1D33]'}`}>
+                                                {totalRecord.wins}V - {totalRecord.losses}D - {totalRecord.ties}E
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <ChevronRight size={18} className="text-gray-500" />
+                                </div>
+                            </>
                         ) : (
                             /* EDIT MODE HISTORY */
                             <div className="w-full mt-8">
@@ -362,39 +426,73 @@ export const ManagerDetailsModal: React.FC<ManagerDetailsModalProps> = ({ manage
             </div>
 
             {/* POPUPS */}
-            {showSeasons && manager.id && (
-                <ManagerSeasonsModal
-                    managerId={manager.id}
-                    managerName={manager.name || ''}
+            {
+                showSeasons && manager.id && (
+                    <ManagerSeasonsModal
+                        managerId={manager.id}
+                        managerName={manager.name || ''}
+                        isDarkMode={isDarkMode}
+                        onClose={() => setShowSeasons(false)}
+                    />
+                )
+            }
+            {
+                showTitles && manager.id && (
+                    <ManagerTitlesModal
+                        managerId={manager.id}
+                        managerName={manager.name || ''}
+                        isDarkMode={isDarkMode}
+                        onClose={() => setShowTitles(false)}
+                    />
+                )
+            }
+            {
+                showTrades && manager.id && (
+                    <ManagerTradesModal
+                        managerId={manager.id}
+                        managerName={manager.name || ''}
+                        isDarkMode={isDarkMode}
+                        onClose={() => setShowTrades(false)}
+                    />
+                )
+            }
+            {
+                showAwards && manager.id && (
+                    <ManagerAwardsModal
+                        managerId={manager.id}
+                        managerName={manager.name || ''}
+                        isDarkMode={isDarkMode}
+                        onClose={() => setShowAwards(false)}
+                    />
+                )
+            }
+            {showChart && (
+                <HistoryChartModal
+                    title={formData.name || ''}
+                    data={chartData.map(h => ({
+                        label: h.label,
+                        value: h.value,
+                        meta: h.meta
+                    }))}
                     isDarkMode={isDarkMode}
-                    onClose={() => setShowSeasons(false)}
+                    onClose={() => setShowChart(false)}
+                    type="position"
                 />
             )}
-            {showTitles && manager.id && (
-                <ManagerTitlesModal
-                    managerId={manager.id}
-                    managerName={manager.name || ''}
+
+            {showTradesChart && (
+                <HistoryChartModal
+                    title={`${formData.name || ''} (Trades)`}
+                    data={chartData.map(d => ({
+                        label: d.label,
+                        value: d.meta.trades || 0,
+                        meta: d.meta
+                    }))}
                     isDarkMode={isDarkMode}
-                    onClose={() => setShowTitles(false)}
+                    onClose={() => setShowTradesChart(false)}
+                    type="trades"
                 />
             )}
-            {showTrades && manager.id && (
-                <ManagerTradesModal
-                    managerId={manager.id}
-                    managerName={manager.name || ''}
-                    isDarkMode={isDarkMode}
-                    onClose={() => setShowTrades(false)}
-                />
-            )}
-            {showAwards && manager.id && (
-                <ManagerAwardsModal
-                    managerId={manager.id}
-                    managerName={manager.name || ''}
-                    isDarkMode={isDarkMode}
-                    onClose={() => setShowAwards(false)}
-                />
-            )}
-        </div>
+        </div >
     );
 };
-

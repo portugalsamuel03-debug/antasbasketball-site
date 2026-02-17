@@ -10,7 +10,9 @@ interface TeamsListModalProps {
     onClose: () => void;
     onSelectTeam: (team: TeamRow) => void;
     onDeleteTeam: (id: string, e: React.MouseEvent) => void;
+    onToggleActive: (team: TeamRow, e: React.MouseEvent) => void;
     teamTrades: Record<string, number>;
+    teamRecords: Record<string, { wins: number, losses: number }>;
 }
 
 const ITEMS_PER_PAGE = 10;
@@ -22,7 +24,9 @@ export const TeamsListModal: React.FC<TeamsListModalProps> = ({
     onClose,
     onSelectTeam,
     onDeleteTeam,
-    teamTrades
+    onToggleActive,
+    teamTrades,
+    teamRecords
 }) => {
     const { isEditing } = useAdmin();
     const [activeTab, setActiveTab] = useState<'ACTIVE' | 'HISTORIC'>(initialTab);
@@ -80,13 +84,30 @@ export const TeamsListModal: React.FC<TeamsListModalProps> = ({
                         ) : null}
                     </div>
 
+
                     {/* Stats - Compact */}
-                    <div className="hidden sm:flex items-center gap-3 text-[9px] text-gray-400">
+                    <div className="flex flex-wrap sm:flex-nowrap items-center gap-3 text-[9px] text-gray-400 mt-2 sm:mt-0">
                         {trades > 0 && (
                             <div className="flex items-center gap-1">
                                 <Briefcase size={10} className="text-yellow-400" />
                                 <span>{trades} Trades</span>
                             </div>
+                        )}
+                        {teamRecords[team.id] && (
+                            <div className="flex items-center gap-1">
+                                <span className="font-bold text-gray-500">
+                                    {teamRecords[team.id].wins}V - {teamRecords[team.id].losses}D
+                                </span>
+                            </div>
+                        )}
+
+                        {isEditing && (
+                            <button
+                                onClick={(e) => onToggleActive(team, e)}
+                                className={`px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-wider border ${team.is_active !== false ? 'border-green-500 text-green-500 hover:bg-green-500/10' : 'border-red-500 text-red-500 hover:bg-red-500/10'}`}
+                            >
+                                {team.is_active !== false ? 'ATIVO' : 'INATIVO'}
+                            </button>
                         )}
                     </div>
 

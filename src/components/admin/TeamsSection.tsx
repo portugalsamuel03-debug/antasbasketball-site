@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
-import { listTeams, deleteTeam } from '../../cms';
+import { listTeams, deleteTeam, upsertTeam } from '../../cms';
 import { TeamRow } from '../../types';
 import { useAdmin } from '../../context/AdminContext';
 import { EditTrigger } from './EditTrigger';
@@ -14,20 +14,32 @@ export const TeamsSection: React.FC<{ isDarkMode: boolean }> = ({ isDarkMode }) 
     const [selectedTeam, setSelectedTeam] = useState<Partial<TeamRow> | null>(null);
     const [viewingList, setViewingList] = useState<'ACTIVE' | 'HISTORIC' | null>(null);
     const [teamTrades, setTeamTrades] = useState<Record<string, number>>({});
+    const [teamRecords, setTeamRecords] = useState<Record<string, { wins: number, losses: number }>>({});
 
     const fetchTeams = async () => {
         const { data } = await listTeams();
         if (data) setTeams(data as TeamRow[]);
 
         // Fetch Trades from Standings
-        const { data: standings } = await supabase.from('season_standings').select('team_id, trades_count');
+        // Fetch Trades from Standings & Calc W-L
+        const { data: standings } = await supabase.from('season_standings').select('team_id, trades_count, wins, losses');
         const counts: Record<string, number> = {};
+        const records: Record<string, { wins: number, losses: number }> = {};
+
         standings?.forEach((st: any) => {
-            if (st.team_id && st.trades_count) {
-                counts[st.team_id] = (counts[st.team_id] || 0) + st.trades_count;
+            if (st.team_id) {
+                // Trades
+                if (st.trades_count) {
+                    counts[st.team_id] = (counts[st.team_id] || 0) + st.trades_count;
+                }
+                // Records
+                if (!records[st.team_id]) records[st.team_id] = { wins: 0, losses: 0 };
+                records[st.team_id].wins += (st.wins || 0);
+                records[st.team_id].losses += (st.losses || 0);
             }
         });
         setTeamTrades(counts);
+        setTeamRecords(records);
     };
 
     useEffect(() => { fetchTeams(); }, []);
@@ -38,6 +50,13 @@ export const TeamsSection: React.FC<{ isDarkMode: boolean }> = ({ isDarkMode }) 
             await deleteTeam(id);
             fetchTeams();
         }
+    };
+
+    const handleToggleActive = async (team: TeamRow, e: React.MouseEvent) => {
+        e.stopPropagation();
+        // Optimistic update could be done here, but for safety lets wait
+        await supabase.from('teams').update({ is_active: team.is_active === false }).eq('id', team.id);
+        fetchTeams();
     };
 
     const activeTeamsCount = teams.filter(t => t.is_active !== false).length;
@@ -127,7 +146,9 @@ export const TeamsSection: React.FC<{ isDarkMode: boolean }> = ({ isDarkMode }) 
                     onClose={() => setViewingList(null)}
                     onSelectTeam={setSelectedTeam}
                     onDeleteTeam={handleDelete}
+                    onToggleActive={handleToggleActive}
                     teamTrades={teamTrades}
+                    teamRecords={teamRecords}
                 />
             )}
 

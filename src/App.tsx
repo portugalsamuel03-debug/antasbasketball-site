@@ -300,7 +300,9 @@ export default function App() {
               </div>
 
               <div className="px-6 mb-4 flex justify-between items-center group/admin">
-                <div className="text-[10px] font-black uppercase tracking-widest text-gray-500">Admin Mode ({activeTab})</div>
+                {isEditing && (
+                  <div className="text-[10px] font-black uppercase tracking-widest text-gray-500">Admin Mode ({activeTab})</div>
+                )}
                 <div className="flex gap-2">
                   {/* Open Category Manager */}
                   {isEditing && (

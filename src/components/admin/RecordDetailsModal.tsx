@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { X, Save } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { RecordItem } from '../../types';
+import { useAdmin } from '../../context/AdminContext';
 import { SEASON_OPTIONS } from '../../utils/seasons';
 import { listTeams, listManagers } from '../../cms';
 
@@ -13,6 +14,7 @@ interface RecordDetailsModalProps {
 }
 
 export const RecordDetailsModal: React.FC<RecordDetailsModalProps> = ({ record, isDarkMode, onClose, onSave }) => {
+    const { isAdmin } = useAdmin();
     const [formData, setFormData] = useState<Partial<RecordItem> & {
         type?: 'INDIVIDUAL' | 'TEAM',
         team_id?: string,
@@ -40,6 +42,7 @@ export const RecordDetailsModal: React.FC<RecordDetailsModalProps> = ({ record, 
     };
 
     const handleSave = async () => {
+        if (!isAdmin) return alert('Apenas administradores podem realizar esta ação.');
         if (!formData.title) return alert('O título é obrigatório');
 
         try {

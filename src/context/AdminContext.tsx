@@ -26,7 +26,7 @@ const AdminContext = createContext<AdminContextType>({
 
 export const useAdmin = () => useContext(AdminContext);
 
-const ADMIN_EMAIL = "portugalsamuel03@gmail.com";
+const ADMIN_EMAILS = ["portugalsamuel03@gmail.com", "hugost74@gmail.com"];
 
 export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const [role, setRole] = useState<Role | 'unknown'>('unknown');
@@ -85,7 +85,7 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
                 return;
             }
 
-            const isUserAdminByEmail = user?.email?.toLowerCase() === ADMIN_EMAIL.toLowerCase();
+            const isUserAdminByEmail = user?.email && ADMIN_EMAILS.includes(user.email.toLowerCase());
             const r = await getMyRole().catch((e) => {
                 const errStr = String(e?.message || e?.name || "");
                 if (!errStr.toLowerCase().includes('abort')) {

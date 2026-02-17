@@ -35,6 +35,7 @@ export const ManagersSection: React.FC<ManagersSectionProps> = ({ isDarkMode }) 
     const [championCounts, setChampionCounts] = useState<Record<string, number>>({});
     const [hofIds, setHofIds] = useState<Set<string>>(new Set());
     const [managerTrades, setManagerTrades] = useState<Record<string, number>>({});
+    const [managerRecords, setManagerRecords] = useState<Record<string, { wins: number, losses: number }>>({});
 
     const fetchData = async () => {
         // Fetch Managers
@@ -69,29 +70,45 @@ export const ManagersSection: React.FC<ManagersSectionProps> = ({ isDarkMode }) 
         // 1. Get all manager history
         const { data: historyData } = await supabase.from('manager_history').select('*');
         // 2. Get all season standings (where trades_count is stored)
-        const { data: standingsData } = await supabase.from('season_standings').select('season_id, team_id, trades_count');
+        // 2. Get all season standings (where trades_count is stored)
+        const { data: standingsData } = await supabase.from('season_standings').select('season_id, team_id, trades_count, wins, losses');
 
         // 3. Map standings by season_id + team_id
-        const standingsMap: Record<string, number> = {};
+
 
         const { data: seasonsData } = await supabase.from('seasons').select('id, year');
         const seasonYearIdMap: Record<string, string> = {}; // year -> id
         seasonsData?.forEach((s: any) => seasonYearIdMap[s.year] = s.id);
 
+        const standingsMap: Record<string, { trades: number, wins: number, losses: number }> = {};
+
         standingsData?.forEach((st: any) => {
-            standingsMap[`${st.season_id}-${st.team_id}`] = st.trades_count || 0;
+            standingsMap[`${st.season_id}-${st.team_id}`] = {
+                trades: st.trades_count || 0,
+                wins: st.wins || 0,
+                losses: st.losses || 0
+            };
         });
 
         const mTrades: Record<string, number> = {};
+        const mRecords: Record<string, { wins: number, losses: number }> = {};
+
         (historyData as ManagerHistory[])?.forEach(h => {
             if (!h.team_id || !h.manager_id) return;
             const seasonId = seasonYearIdMap[h.year];
             if (!seasonId) return;
 
-            const count = standingsMap[`${seasonId}-${h.team_id}`] || 0;
-            mTrades[h.manager_id] = (mTrades[h.manager_id] || 0) + count;
+            const stats = standingsMap[`${seasonId}-${h.team_id}`];
+            if (stats) {
+                mTrades[h.manager_id] = (mTrades[h.manager_id] || 0) + stats.trades;
+
+                if (!mRecords[h.manager_id]) mRecords[h.manager_id] = { wins: 0, losses: 0 };
+                mRecords[h.manager_id].wins += stats.wins;
+                mRecords[h.manager_id].losses += stats.losses;
+            }
         });
         setManagerTrades(mTrades);
+        setManagerRecords(mRecords);
     };
 
     useEffect(() => {
@@ -104,6 +121,12 @@ export const ManagersSection: React.FC<ManagersSectionProps> = ({ isDarkMode }) 
             await supabase.from('managers').delete().eq('id', id);
             fetchData();
         }
+    };
+
+    const handleToggleActive = async (manager: Manager, e: React.MouseEvent) => {
+        e.stopPropagation();
+        await supabase.from('managers').update({ is_active: manager.is_active === false }).eq('id', manager.id);
+        fetchData();
     };
 
     const activeManagersCount = managers.filter(m => m.is_active !== false).length;
@@ -194,10 +217,12 @@ export const ManagersSection: React.FC<ManagersSectionProps> = ({ isDarkMode }) 
                     onClose={() => setViewingList(null)}
                     onSelectManager={setSelectedManager}
                     onDeleteManager={handleDelete}
+                    onToggleActive={handleToggleActive}
                     teamsMap={teamsMap}
                     championCounts={championCounts}
                     hofIds={hofIds}
                     managerTrades={managerTrades}
+                    managerRecords={managerRecords}
                 />
             )}
 
