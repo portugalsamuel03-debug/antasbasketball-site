@@ -108,6 +108,7 @@ export interface Article {
   date: string;
   comments: Comment[];
   tags: string[];
+  subcategory?: string;
   video_url?: string;
   isFeatured?: boolean;
 }
@@ -201,6 +202,8 @@ export interface RecordItem {
   type?: 'TEAM' | 'INDIVIDUAL' | 'AUTOMATIC';
   team_id?: string | null;
   manager_id?: string | null;
+  team_ids?: string[];
+  manager_ids?: string[];
 }
 
 export interface Season {

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
-import { RefreshCw, Trophy, Eye, EyeOff } from 'lucide-react';
+import { RefreshCw, Eye, EyeOff, Crown } from 'lucide-react';
 import { RecordDetailsModal } from './RecordDetailsModal';
 import { useAdmin } from '../../context/AdminContext';
 import { useGlobalData } from '../../hooks/useGlobalData';
@@ -95,8 +95,8 @@ export const RecordsSection: React.FC<RecordsSectionProps> = ({ isDarkMode }) =>
     const paginatedRecords = displayedRecords.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
 
     return (
-        <div className={`rounded-3xl border p-8 ${isDarkMode ? 'bg-[#121212] border-white/10' : 'bg-white border-gray-200'}`}>
-            <div className="flex items-center justify-between mb-8">
+        <div className={`py-4`}>
+            <div className="flex items-center justify-between mb-6">
                 <h2 className={`text-2xl font-black uppercase tracking-tighter ${isDarkMode ? 'text-white' : 'text-[#0B1D33]'}`}>
                     Recordes Históricos {isEditing && <span className="text-yellow-500 text-sm">(Automático + Manual)</span>}
                 </h2>
@@ -131,43 +131,46 @@ export const RecordsSection: React.FC<RecordsSectionProps> = ({ isDarkMode }) =>
                                 <div
                                     key={rec.id}
                                     onClick={() => isEditing && setSelectedRecord(rec)}
-                                    className={`p-5 rounded-2xl border transition-all relative overflow-hidden group 
-                                    ${isDarkMode ? 'bg-white/5 border-white/5' : 'bg-gray-50 border-gray-100'}
-                                    ${isEditing ? 'cursor-pointer hover:bg-white/10 hover:border-white/10' : ''}
+                                    className={`flex gap-4 items-center p-4 md:p-6 rounded-3xl border-2 transition-all group
+                                    ${isDarkMode ? 'bg-[#121212] border-white/5 hover:border-yellow-500/30' : 'bg-white border-gray-100 hover:border-yellow-500/30'}
+                                    ${isEditing ? 'cursor-pointer' : ''}
                                     ${isHidden ? 'opacity-50 grayscale' : ''}
                                 `}
                                 >
-                                    <div className="flex justify-between items-start">
-                                        <div>
-                                            <h3 className={`font-black uppercase tracking-wide mb-1 pr-12 ${isDarkMode ? 'text-white' : 'text-[#0B1D33]'} flex items-center gap-2`}>
-                                                {rec.title}
-                                                {isHidden && <span className="text-[10px] bg-red-500 text-white px-1.5 py-0.5 rounded">OCULTO</span>}
-                                            </h3>
-                                            <p className={`text-xs font-bold uppercase mb-2 ${isDarkMode ? 'text-yellow-500' : 'text-blue-600'}`}>
-                                                {rec.holder}
-                                            </p>
-                                            <p className={`text-xs leading-relaxed ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-                                                {rec.description}
-                                            </p>
-                                        </div>
-                                        <div className="flex flex-col items-end gap-2">
-                                            <div className={`flex items-center justify-center w-10 h-10 rounded-xl font-black text-xs ${isDarkMode ? 'bg-yellow-500 text-black' : 'bg-[#0B1D33] text-white'}`}>
-                                                {rec.value}
-                                            </div>
-                                            {isEditing && (
-                                                <button
-                                                    onClick={(e) => toggleRecordVisibility(e, rec.id)}
-                                                    className={`p-1.5 rounded-lg transition-colors ${isDarkMode ? 'bg-white/10 hover:bg-white/20 text-white' : 'bg-gray-200 hover:bg-gray-300 text-black'}`}
-                                                    title={isHidden ? "Mostrar Recorde" : "Ocultar Recorde"}
-                                                >
-                                                    {isHidden ? <Eye size={14} /> : <EyeOff size={14} />}
-                                                </button>
-                                            )}
-                                        </div>
+                                    {/* Icon */}
+                                    <div className={`flex-shrink-0 w-12 h-12 md:w-14 md:h-14 rounded-full flex items-center justify-center border-4 ${isDarkMode ? 'bg-[#1a1a1a] border-[#222] text-yellow-500' : 'bg-gray-50 border-white text-yellow-500 shadow-sm'}`}>
+                                        <Crown size={24} className="opacity-90 drop-shadow-md" />
                                     </div>
 
-                                    <div className="absolute top-5 right-16 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
-                                        <Trophy size={20} className="text-yellow-500/50" />
+                                    {/* Content */}
+                                    <div className="flex-1">
+                                        <h3 className={`text-[13px] md:text-[15px] font-black uppercase tracking-wide mb-1 ${isDarkMode ? 'text-white' : 'text-[#0B1D33]'} flex items-center gap-2`}>
+                                            {rec.title}
+                                            {isHidden && <span className="text-[10px] bg-red-500 text-white px-1.5 py-0.5 rounded">OCULTO</span>}
+                                        </h3>
+                                        <p className={`text-[11px] md:text-xs font-bold uppercase mb-1 ${isDarkMode ? 'text-yellow-500' : 'text-blue-600'}`}>
+                                            {rec.holder}
+                                        </p>
+                                        <p className={`text-[10px] md:text-[11px] leading-relaxed ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                                            {rec.description}
+                                        </p>
+                                    </div>
+
+                                    <div className="flex flex-col items-end gap-2 ml-2">
+                                        {(rec.value != null && rec.value !== '') && (
+                                            <div className={`flex items-center justify-center min-w-[3rem] px-3 h-10 md:h-12 rounded-2xl font-black text-sm md:text-base border-2 ${isDarkMode ? 'bg-yellow-500 border-yellow-400 text-black' : 'bg-[#0B1D33] border-[#0a1829] text-white shadow-md'}`}>
+                                                {rec.value}
+                                            </div>
+                                        )}
+                                        {isEditing && (
+                                            <button
+                                                onClick={(e) => toggleRecordVisibility(e, rec.id)}
+                                                className={`p-1.5 md:p-2 rounded-xl transition-colors ${isDarkMode ? 'bg-white/10 hover:bg-white/20 text-white' : 'bg-gray-200 hover:bg-gray-300 text-black'}`}
+                                                title={isHidden ? "Mostrar Recorde" : "Ocultar Recorde"}
+                                            >
+                                                {isHidden ? <Eye size={14} /> : <EyeOff size={14} />}
+                                            </button>
+                                        )}
                                     </div>
                                 </div>
                             );

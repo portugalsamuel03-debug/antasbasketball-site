@@ -244,7 +244,12 @@ export const EditArticleModal: React.FC<EditArticleModalProps> = ({ article, onC
                             <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-2">Subcategoria</label>
                             <select className={inputClass} value={editing.subcategory || ''} onChange={e => setEditing({ ...editing, subcategory: e.target.value || null })}>
                                 <option value="">Sem subcategoria</option>
-                                {availableSubcategories.map(s => <option key={s.id} value={s.label}>{s.label}</option>)}
+                                {(editing.category === 'REGRAS' && availableSubcategories.length === 0 ? [
+                                    { id: '1', label: 'LIGA' },
+                                    { id: '2', label: 'PONTUAÇÃO' },
+                                    { id: '3', label: 'TRADES' },
+                                    { id: '4', label: 'DRAFT' }
+                                ] : availableSubcategories).map(s => <option key={s.id} value={s.label}>{s.label}</option>)}
                             </select>
                         </div>
                     )}

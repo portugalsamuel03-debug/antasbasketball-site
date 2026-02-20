@@ -246,7 +246,7 @@ export const TeamDetailsModal: React.FC<TeamDetailsModalProps> = ({ team, onClos
                 </div>
 
                 {/* Content */}
-                <div className="px-6 pt-10 pb-8 text-center">
+                <div className="px-6 pt-10 pb-8 text-center max-h-[80vh] overflow-y-auto custom-scrollbar">
 
                     {isEditMode ? (
                         <div className="space-y-4 text-left">
@@ -341,33 +341,33 @@ export const TeamDetailsModal: React.FC<TeamDetailsModalProps> = ({ team, onClos
                             <div className="w-full h-px bg-gray-500/10 mb-6" />
 
                             {/* Big Stats Grid (Harmonic 2x2) */}
-                            <div className="grid grid-cols-2 gap-4 mb-6">
+                            <div className="grid grid-cols-2 gap-3 mb-6">
                                 {/* Seasons */}
-                                <div className="flex flex-col items-center justify-center cursor-pointer bg-white/5 hover:bg-white/10 border border-white/10 rounded-2xl p-4 transition-all active:scale-95 aspect-square" onClick={() => setShowHistory(true)}>
-                                    <div className="text-5xl font-black text-yellow-500 leading-none mb-2">{stats.seasons}</div>
-                                    <div className="text-[10px] font-bold text-gray-500 uppercase tracking-widest text-center">Temporadas</div>
-                                    <div className="text-[9px] text-gray-600 mt-1 uppercase font-bold">(Ver Histórico)</div>
+                                <div className="flex flex-col items-center justify-center cursor-pointer bg-white/5 hover:bg-white/10 border border-white/10 rounded-2xl p-3 transition-all active:scale-95" onClick={() => setShowHistory(true)}>
+                                    <div className="text-3xl font-black text-yellow-500 leading-none mb-1">{stats.seasons}</div>
+                                    <div className="text-[9px] font-bold text-gray-500 uppercase tracking-widest text-center">Temporadas</div>
+                                    <div className="text-[8px] text-gray-600 mt-0.5 uppercase font-bold">(Ver Histórico)</div>
                                 </div>
 
                                 {/* Trades */}
-                                <div className="flex flex-col items-center justify-center cursor-pointer bg-white/5 hover:bg-white/10 border border-white/10 rounded-2xl p-4 transition-all active:scale-95 aspect-square" onClick={() => setShowTradesChart(true)}>
-                                    <div className="text-5xl font-black text-green-500 leading-none mb-2">{stats.trades}</div>
-                                    <div className="text-[10px] font-bold text-gray-500 uppercase tracking-widest text-center">Trades</div>
-                                    <div className="text-[9px] text-gray-600 mt-1 uppercase font-bold">(Ver Gráfico)</div>
+                                <div className="flex flex-col items-center justify-center cursor-pointer bg-white/5 hover:bg-white/10 border border-white/10 rounded-2xl p-3 transition-all active:scale-95" onClick={() => setShowTradesChart(true)}>
+                                    <div className="text-3xl font-black text-green-500 leading-none mb-1">{stats.trades}</div>
+                                    <div className="text-[9px] font-bold text-gray-500 uppercase tracking-widest text-center">Trades</div>
+                                    <div className="text-[8px] text-gray-600 mt-0.5 uppercase font-bold">(Ver Gráfico)</div>
                                 </div>
 
                                 {/* Titles (Clickable - "Títulos") */}
-                                <div className="flex flex-col items-center justify-center cursor-pointer bg-white/5 hover:bg-white/10 border border-white/10 rounded-2xl p-4 transition-all active:scale-95 aspect-square" onClick={() => { setAwardsMode('TITLES'); setShowAwards(true); }}>
-                                    <div className="text-5xl font-black text-white leading-none mb-2">{stats.titles}</div>
-                                    <div className="text-[10px] font-bold text-gray-500 uppercase tracking-widest text-center">Títulos</div>
-                                    <div className="text-[9px] text-gray-600 mt-1 uppercase font-bold">(Ver Troféus)</div>
+                                <div className="flex flex-col items-center justify-center cursor-pointer bg-white/5 hover:bg-white/10 border border-white/10 rounded-2xl p-3 transition-all active:scale-95" onClick={() => { setAwardsMode('TITLES'); setShowAwards(true); }}>
+                                    <div className="text-3xl font-black text-white leading-none mb-1">{stats.titles}</div>
+                                    <div className="text-[9px] font-bold text-gray-500 uppercase tracking-widest text-center">Títulos</div>
+                                    <div className="text-[8px] text-gray-600 mt-0.5 uppercase font-bold">(Ver Troféus)</div>
                                 </div>
 
                                 {/* Awards (Conquistas) */}
-                                <div className="flex flex-col items-center justify-center cursor-pointer bg-white/5 hover:bg-white/10 border border-white/10 rounded-2xl p-4 transition-all active:scale-95 aspect-square" onClick={() => { setAwardsMode('AWARDS'); setShowAwards(true); }}>
-                                    <div className="text-5xl font-black text-blue-400 leading-none mb-2">{stats.awards}</div>
-                                    <div className="text-[10px] font-bold text-gray-500 uppercase tracking-widest text-center">Conquistas</div>
-                                    <div className="text-[9px] text-gray-600 mt-1 uppercase font-bold">(Ver Prêmios)</div>
+                                <div className="flex flex-col items-center justify-center cursor-pointer bg-white/5 hover:bg-white/10 border border-white/10 rounded-2xl p-3 transition-all active:scale-95" onClick={() => { setAwardsMode('AWARDS'); setShowAwards(true); }}>
+                                    <div className="text-3xl font-black text-blue-400 leading-none mb-1">{stats.awards}</div>
+                                    <div className="text-[9px] font-bold text-gray-500 uppercase tracking-widest text-center">Conquistas</div>
+                                    <div className="text-[8px] text-gray-600 mt-0.5 uppercase font-bold">(Ver Prêmios)</div>
                                 </div>
                             </div>
 

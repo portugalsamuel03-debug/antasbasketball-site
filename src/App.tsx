@@ -24,6 +24,7 @@ import { EmptyState } from "./components/EmptyState";
 import FeaturedReaders from "./components/FeaturedReaders";
 import FeaturedAuthors from "./components/FeaturedAuthors";
 import HistoriaPage from "./components/HistoriaPage";
+import { RegrasPage } from "./components/RegrasPage";
 import { FeaturedPost } from "./components/FeaturedPost";
 import { CategoryManager } from "./components/admin/CategoryManager";
 import { List, Search } from 'lucide-react';
@@ -280,7 +281,11 @@ export default function App() {
             <HistoriaPage articles={filteredArticles} isDarkMode={isDarkMode} onArticleClick={setSelectedArticle} onShare={onShare} onEditArticle={handleEditFromCard} />
           )}
 
-          {activeTab !== Category.INICIO && activeTab !== Category.HISTORIA && (
+          {activeTab === Category.REGRAS && (
+            <RegrasPage articles={articles} isDarkMode={isDarkMode} isEditing={isEditing} onEdit={handleEditFromCard} />
+          )}
+
+          {activeTab !== Category.INICIO && activeTab !== Category.HISTORIA && activeTab !== Category.REGRAS && (
             <>
               <SectionTitle title={String(activeTab)} sortOption={sortOption} onSortChange={setSortOption} isDarkMode={isDarkMode} />
 
