@@ -133,6 +133,7 @@ export default function App() {
     if (!found) return;
     setEditingArticleDetails({
       id: found.id,
+      slug: found.slug, // Preserve slug
       title: found.title,
       category: String(found.category),
       content: found.content,
@@ -217,7 +218,6 @@ export default function App() {
           article={selectedArticle}
           onBack={() => setSelectedArticle(null)}
           onShare={onShare}
-          onAuthRequest={() => setAuthOpen(true)}
           isDarkMode={isDarkMode}
         />
         <ShareModal isOpen={shareOpen} onClose={() => setShareOpen(false)} article={shareArticle} isDarkMode={isDarkMode} />
@@ -256,10 +256,13 @@ export default function App() {
               <FeaturedAuthors isDarkMode={isDarkMode} />
 
               <div className="mt-8">
-                <SectionTitle title="Últimas do Antas" sortOption="RECENTES" isDarkMode={isDarkMode} />
+                <SectionTitle title="Últimas do Antas" sortOption="RECENTES" onSortChange={() => { }} isDarkMode={isDarkMode} />
                 <div className="px-6 space-y-4">
                   {articles
-                    .filter(a => !a.isFeatured)
+                    .filter(a => {
+                      const cat = String(a.category || "").toUpperCase();
+                      return (cat === 'NOTICIAS' || cat === 'NOTÍCIAS');
+                    })
                     .slice(0, 3)
                     .map(a => (
                       <ArticleCard

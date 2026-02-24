@@ -58,7 +58,7 @@ const ReactionPicker: React.FC<{
   return (
     <div
       ref={pickerRef}
-      className={`absolute bottom-full mb-2 left-0 border rounded-2xl px-3 py-2.5 flex gap-2.5 shadow-[0_10px_40px_rgba(0,0,0,0.8)] animate-in slide-in-from-bottom-2 zoom-in-95 duration-200 z-[70] backdrop-blur-xl ${isDarkMode ? "bg-[#1a1a1a] border-white/10" : "bg-white border-[#0B1D33]/10"
+      className={`absolute bottom-full mb-3 left-1/2 -translate-x-1/2 sm:left-0 sm:translate-x-0 border rounded-3xl px-4 py-3 w-max max-w-[280px] flex-wrap justify-center flex gap-3 shadow-[0_20px_60px_rgba(0,0,0,0.8)] animate-in slide-in-from-bottom-2 zoom-in-95 duration-200 z-[70] backdrop-blur-xl ${isDarkMode ? "bg-[#1a1a1a]/95 border-white/20" : "bg-white/95 border-[#0B1D33]/20"
         }`}
     >
       {emojis.map((e) => (
@@ -326,7 +326,7 @@ const ArticleView: React.FC<ArticleViewProps> = ({ article, onBack, onShare, isD
 
         {/* Floating Header Actions */}
         <div
-          className={`fixed top-4 right-6 z-[110] flex items-center gap-2 transition-all duration-300 ${isScrolled || !hasHero ? "bg-black/50 backdrop-blur-md p-1.5 rounded-full border border-white/10" : ""
+          className={`fixed bottom-6 left-1/2 -translate-x-1/2 sm:bottom-auto sm:left-auto sm:translate-x-0 sm:top-6 sm:right-6 z-[110] flex items-center gap-2 transition-all duration-300 ${isScrolled || !hasHero ? "bg-black/70 backdrop-blur-xl p-2 rounded-[24px] border border-white/20 shadow-2xl" : "bg-black/30 backdrop-blur-sm p-1.5 rounded-[24px] border border-white/10 shadow-lg"
             }`}
         >
           <button
@@ -447,10 +447,10 @@ const ArticleView: React.FC<ArticleViewProps> = ({ article, onBack, onShare, isD
                   target="_blank"
                   rel="noopener noreferrer"
                   className={`flex items-center gap-2 px-6 py-3 rounded-full font-black uppercase tracking-widest text-[11px] transition-all active:scale-95 shadow-lg ${article.video_url.includes('spotify')
-                      ? 'bg-[#1DB954] text-black hover:bg-[#1ed760] shadow-[#1DB954]/20'
-                      : article.video_url.includes('youtu')
-                        ? 'bg-[#FF0000] text-white hover:bg-[#ff1a1a] shadow-[#FF0000]/20'
-                        : isDarkMode ? 'bg-white/10 text-white hover:bg-white/20' : 'bg-black/5 text-black hover:bg-black/10'
+                    ? 'bg-[#1DB954] text-black hover:bg-[#1ed760] shadow-[#1DB954]/20'
+                    : article.video_url.includes('youtu')
+                      ? 'bg-[#FF0000] text-white hover:bg-[#ff1a1a] shadow-[#FF0000]/20'
+                      : isDarkMode ? 'bg-white/10 text-white hover:bg-white/20' : 'bg-black/5 text-black hover:bg-black/10'
                     }`}
                 >
                   {article.video_url.includes('spotify') ? (
@@ -471,7 +471,7 @@ const ArticleView: React.FC<ArticleViewProps> = ({ article, onBack, onShare, isD
             )}
 
             <article className={`prose prose-lg max-w-none ${isDarkMode ? 'prose-invert' : ''} mb-20`}>
-              <p className={`whitespace-pre-wrap leading-[2] text-[18px] sm:text-[20px] font-medium opacity-90 ${isDarkMode ? "text-gray-200" : "text-gray-800"}`}>
+              <p className={`whitespace-pre-wrap leading-[1.8] text-[17px] sm:text-[19px] font-medium opacity-90 ${isDarkMode ? "text-gray-200" : "text-gray-800"}`}>
                 {article.content}
               </p>
             </article>
@@ -490,25 +490,25 @@ const ArticleView: React.FC<ArticleViewProps> = ({ article, onBack, onShare, isD
               </div>
 
               {/* Comment Input */}
-              <div className="flex gap-4 mb-12 animate-in fade-in slide-in-from-bottom-4 duration-500">
-                <div className="w-10 h-10 rounded-full overflow-hidden border-2 border-white/10 shrink-0 shadow-lg">
+              <div className="flex gap-3 sm:gap-4 mb-12 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full overflow-hidden border-2 border-white/10 shrink-0 shadow-lg">
                   <img src={me?.avatar || FALLBACK_AVATAR} className="w-full h-full object-cover" />
                 </div>
-                <div className={`flex-1 rounded-2xl p-2 flex items-center border transition-all shadow-inner focus-within:shadow-md ${isDarkMode ? "bg-[#111] border-white/10 focus-within:border-yellow-500/50" : "bg-white border-black/10 focus-within:border-black/30"}`}>
+                <div className={`flex-1 rounded-[24px] p-2 flex items-center border transition-all shadow-inner focus-within:shadow-xl ${isDarkMode ? "bg-[#111] border-white/10 focus-within:border-yellow-500/50" : "bg-white border-black/10 focus-within:border-black/30"}`}>
                   <input
                     value={commentText}
                     onChange={(e) => setCommentText(e.target.value)}
                     onKeyDown={e => e.key === 'Enter' && sendComment()}
                     placeholder={me ? "Escreva sua opinião..." : "Entre para comentar..."}
-                    disabled={!me}
-                    className={`flex-1 bg-transparent px-4 py-2 outline-none text-[14px] font-medium ${isDarkMode ? "text-white placeholder:text-gray-600" : "text-black placeholder:text-gray-400"}`}
+                    disabled={!me || sent}
+                    className={`flex-1 bg-transparent px-4 py-2 sm:py-3 outline-none text-[14px] sm:text-[15px] font-medium ${isDarkMode ? "text-white placeholder:text-gray-600" : "text-black placeholder:text-gray-400"}`}
                   />
                   <button
                     onClick={sendComment}
-                    disabled={!me || !commentText.trim()}
-                    className={`p-2.5 rounded-xl transition-all ${commentText.trim() ? "bg-yellow-500 text-black hover:scale-105 shadow-lg shadow-yellow-500/20" : "bg-gray-500/10 text-gray-500"}`}
+                    disabled={!me || !commentText.trim() || sent}
+                    className={`p-3 rounded-full transition-transform active:scale-90 ${commentText.trim() ? "bg-yellow-500 text-black hover:scale-110 shadow-[0_0_15px_rgba(234,179,8,0.4)]" : "bg-gray-500/10 text-gray-500"}`}
                   >
-                    {sent ? <Check size={18} strokeWidth={3} /> : <Send size={18} strokeWidth={2.5} />}
+                    {sent ? <Check size={18} strokeWidth={3} /> : <Send size={18} strokeWidth={2.5} className="-ml-0.5 mt-0.5" />}
                   </button>
                 </div>
               </div>

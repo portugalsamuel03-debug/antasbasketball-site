@@ -107,6 +107,7 @@ export function toUiArticle(row: DbArticleRow): Article {
 
   return {
     id: row.id,
+    slug: row.slug,
     authorId: row.author?.id ?? row.author_id ?? "",
     category: dbCategoryToUi(row.category),
 

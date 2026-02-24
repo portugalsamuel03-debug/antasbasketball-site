@@ -1,8 +1,10 @@
 import React from 'react';
-import { X, Settings } from 'lucide-react';
+import { X, Settings, Plus } from 'lucide-react';
 import { Article } from '../types';
 import Markdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import { upsertArticle } from '../cms';
+import { useAdmin } from '../context/AdminContext';
 
 interface RulePopupModalProps {
     article: Article;
@@ -13,6 +15,36 @@ interface RulePopupModalProps {
 }
 
 export const RulePopupModal: React.FC<RulePopupModalProps> = ({ article, onClose, isDarkMode, isEditing, onEdit }) => {
+    const { userId } = useAdmin();
+    const [isQuickEditing, setIsQuickEditing] = React.useState(false);
+    const [title, setTitle] = React.useState(article.title);
+    const [content, setContent] = React.useState(article.content);
+    const [coverUrl, setCoverUrl] = React.useState(article.imageUrl || '');
+    const [subcategory, setSubcategory] = React.useState((article.subcategory || '').trim().toUpperCase());
+    const [saving, setSaving] = React.useState(false);
+
+    const handleQuickSave = async () => {
+        setSaving(true);
+        try {
+            const { error } = await upsertArticle({
+                id: article.id,
+                title,
+                content,
+                cover_url: coverUrl,
+                subcategory: subcategory || null,
+                author_id: userId,
+                category: 'REGRAS' // Ensure it stays as rule
+            });
+            if (error) throw error;
+            window.location.reload(); // Simple reload to refresh data
+        } catch (e) {
+            console.error(e);
+            alert("Erro ao salvar.");
+        } finally {
+            setSaving(false);
+        }
+    };
+
     return (
         <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
             <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={onClose}></div>
@@ -20,9 +52,18 @@ export const RulePopupModal: React.FC<RulePopupModalProps> = ({ article, onClose
 
                 {/* Header Actions */}
                 <div className="absolute top-4 right-4 flex gap-2 z-10">
-                    {isEditing && onEdit && (
-                        <button onClick={() => onEdit(article.id)} className={`p-2 rounded-full backdrop-blur-md ${isDarkMode ? 'bg-yellow-500/80 text-black hover:bg-yellow-500' : 'bg-yellow-400/80 text-black hover:bg-yellow-400'}`}>
+                    {isEditing && (
+                        <button
+                            onClick={() => setIsQuickEditing(!isQuickEditing)}
+                            className={`p-2 rounded-full backdrop-blur-md ${isDarkMode ? 'bg-blue-500/80 text-white hover:bg-blue-500' : 'bg-blue-400/80 text-white hover:bg-blue-400'}`}
+                            title={isQuickEditing ? "Visualizar" : "Edição Rápida"}
+                        >
                             <Settings size={20} />
+                        </button>
+                    )}
+                    {isEditing && onEdit && !isQuickEditing && (
+                        <button onClick={() => onEdit(article.id)} className={`p-2 rounded-full backdrop-blur-md ${isDarkMode ? 'bg-yellow-500/80 text-black hover:bg-yellow-500' : 'bg-yellow-400/80 text-black hover:bg-yellow-400'}`} title="Editor Completo">
+                            <Plus size={20} className="rotate-45" /> {/* Using Plus rotated as a settings alt if needed, but keeping Settings for quick edit */}
                         </button>
                     )}
                     <button onClick={onClose} className={`p-2 rounded-full backdrop-blur-md ${isDarkMode ? 'bg-black/50 text-white hover:bg-black/70' : 'bg-white/50 text-black hover:bg-white/70'}`}>
@@ -44,15 +85,67 @@ export const RulePopupModal: React.FC<RulePopupModalProps> = ({ article, onClose
 
                 {/* Content Area */}
                 <div className="px-6 pb-8 pt-2 overflow-y-auto custom-scrollbar flex-1">
-                    <h2 className={`text-2xl font-black uppercase tracking-tighter mb-4 ${isDarkMode ? 'text-white' : 'text-[#0B1D33]'}`}>
-                        {article.title}
-                    </h2>
+                    {isQuickEditing ? (
+                        <div className="space-y-4">
+                            <input
+                                className={`w-full text-xl font-black uppercase tracking-tighter p-2 rounded-xl border ${isDarkMode ? 'bg-white/5 border-white/10 text-white' : 'bg-gray-50 border-gray-200 text-[#0B1D33]'}`}
+                                value={title}
+                                onChange={e => setTitle(e.target.value)}
+                                placeholder="Título"
+                            />
+                            <div className="grid grid-cols-2 gap-3">
+                                <div className="space-y-1">
+                                    <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-2">Subcategoria</label>
+                                    <select
+                                        className={`w-full text-xs p-2 rounded-xl border appearance-none ${isDarkMode ? 'bg-[#1a1a1a] border-white/10 text-white' : 'bg-gray-50 border-gray-200 text-[#0B1D33]'}`}
+                                        value={subcategory}
+                                        onChange={e => setSubcategory(e.target.value)}
+                                        style={{ colorScheme: isDarkMode ? 'dark' : 'light' }}
+                                    >
+                                        <option value="" style={{ background: isDarkMode ? '#1a1a1a' : '#fff' }}>Sem subcategoria</option>
+                                        <option value="LIGA" style={{ background: isDarkMode ? '#1a1a1a' : '#fff' }}>LIGA</option>
+                                        <option value="PONTUAÇÃO" style={{ background: isDarkMode ? '#1a1a1a' : '#fff' }}>PONTUAÇÃO</option>
+                                        <option value="TRADES" style={{ background: isDarkMode ? '#1a1a1a' : '#fff' }}>TRADES</option>
+                                        <option value="DRAFT" style={{ background: isDarkMode ? '#1a1a1a' : '#fff' }}>DRAFT</option>
+                                    </select>
+                                </div>
+                                <div className="space-y-1">
+                                    <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-2">URL da Imagem</label>
+                                    <input
+                                        className={`w-full text-xs p-2 rounded-xl border ${isDarkMode ? 'bg-white/5 border-white/10 text-white' : 'bg-gray-50 border-gray-200 text-[#0B1D33]'}`}
+                                        value={coverUrl}
+                                        onChange={e => setCoverUrl(e.target.value)}
+                                        placeholder="https://..."
+                                    />
+                                </div>
+                            </div>
+                            <textarea
+                                className={`w-full min-h-[300px] text-sm font-mono p-3 rounded-xl border resize-none ${isDarkMode ? 'bg-white/5 border-white/10 text-gray-300' : 'bg-gray-50 border-gray-200 text-gray-700'}`}
+                                value={content}
+                                onChange={e => setContent(e.target.value)}
+                                placeholder="Conteúdo (Markdown)..."
+                            />
+                            <button
+                                onClick={handleQuickSave}
+                                disabled={saving}
+                                className={`w-full py-3 rounded-2xl font-black uppercase tracking-widest text-xs transition-all active:scale-95 ${saving ? 'opacity-50 cursor-wait' : 'bg-yellow-500 text-black hover:bg-yellow-400 shadow-lg shadow-yellow-500/20'}`}
+                            >
+                                {saving ? 'Salvando...' : 'Salvar Alterações'}
+                            </button>
+                        </div>
+                    ) : (
+                        <>
+                            <h2 className={`text-2xl font-black uppercase tracking-tighter mb-4 ${isDarkMode ? 'text-white' : 'text-[#0B1D33]'}`}>
+                                {article.title}
+                            </h2>
 
-                    <div className={`prose prose-sm max-w-none whitespace-pre-wrap ${isDarkMode ? 'prose-invert prose-p:text-gray-300 prose-headings:text-white prose-a:text-yellow-400' : 'prose-p:text-gray-700 prose-headings:text-[#0B1D33] prose-a:text-blue-600'}`}>
-                        <Markdown remarkPlugins={[remarkGfm]}>
-                            {article.content}
-                        </Markdown>
-                    </div>
+                            <div className={`prose prose-sm max-w-none whitespace-pre-wrap ${isDarkMode ? 'prose-invert prose-p:text-gray-300 prose-headings:text-white prose-a:text-yellow-400' : 'prose-p:text-gray-700 prose-headings:text-[#0B1D33] prose-a:text-blue-600'}`}>
+                                <Markdown remarkPlugins={[remarkGfm]}>
+                                    {article.content}
+                                </Markdown>
+                            </div>
+                        </>
+                    )}
                 </div>
 
             </div>

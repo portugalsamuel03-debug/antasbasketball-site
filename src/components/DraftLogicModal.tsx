@@ -40,6 +40,7 @@ export const DraftLogicModal: React.FC<DraftLogicModalProps> = ({ onClose, isDar
     const [showSimulation, setShowSimulation] = useState(false);
     const [editMode, setEditMode] = useState(false);
     const [localPositions, setLocalPositions] = useState<Record<string, number>>({});
+    const [localOdds, setLocalOdds] = useState<Record<string, number>>({});
     const [isSaving, setIsSaving] = useState(false);
 
     useEffect(() => {
@@ -80,7 +81,8 @@ export const DraftLogicModal: React.FC<DraftLogicModalProps> = ({ onClose, isDar
                 return {
                     team,
                     originalPosition: s.position,
-                    position: override ? override.custom_position : s.position,
+                    position: override?.custom_position ?? s.position,
+                    probability: override?.lottery_probability != null ? override.lottery_probability : null,
                     record: `${s.wins}V - ${s.losses}D`
                 };
             }).filter(t => t.team); // ensure team exists
@@ -90,12 +92,23 @@ export const DraftLogicModal: React.FC<DraftLogicModalProps> = ({ onClose, isDar
             const sorted = activeTeams.sort((a, b) => (b.position || 0) - (a.position || 0));
             setSortedTeams(sorted);
 
-            // Initialize local positions for edit mode
-            const locals: Record<string, number> = {};
-            sorted.forEach(t => {
-                locals[t.team.id] = t.position || 0;
+            // Initialize local state for edit mode
+            const localsPos: Record<string, number> = {};
+            const localsOdds: Record<string, number> = {};
+            sorted.forEach((t, i) => {
+                localsPos[t.team.id] = t.position || 0;
+
+                // If probability exists in DB, use it. Otherwise, look up default LOTTERY_ODDS if within top 14.
+                // Or default to 0 for lower seeded teams.
+                if (t.probability != null) {
+                    localsOdds[t.team.id] = t.probability;
+                } else {
+                    const defaultOddStr = LOTTERY_ODDS[i]?.[0];
+                    localsOdds[t.team.id] = defaultOddStr ? parseFloat(defaultOddStr.replace('%', '')) : 0;
+                }
             });
-            setLocalPositions(locals);
+            setLocalPositions(localsPos);
+            setLocalOdds(localsOdds);
         } else {
             setSortedTeams([]);
         }
@@ -104,13 +117,14 @@ export const DraftLogicModal: React.FC<DraftLogicModalProps> = ({ onClose, isDar
     const handleSaveOverrides = async () => {
         setIsSaving(true);
         try {
-            for (const [teamId, customPos] of Object.entries(localPositions)) {
+            for (const teamId of Object.keys(localPositions)) {
                 await supabase
                     .from('draft_overrides')
                     .upsert({
                         season_id: selectedSeasonId,
                         team_id: teamId,
-                        custom_position: customPos
+                        custom_position: localPositions[teamId],
+                        lottery_probability: localOdds[teamId]
                     }, { onConflict: 'season_id,team_id' });
             }
             await fetchOverrides(selectedSeasonId);
@@ -245,69 +259,97 @@ export const DraftLogicModal: React.FC<DraftLogicModalProps> = ({ onClose, isDar
                         Esta tabela ilustra as chances que cada time ativo na temporada escolhida possui de garantir cada uma das escolhas no sorteio do Draft. Times com piores campanhas possuem maiores chances matemáticas de conseguir a 1ª escolha global.
                     </p>
 
-                    <div className="min-w-[1000px]">
+                    <div className="min-w-full">
                         <table className="w-full text-center border-collapse">
                             <thead>
                                 <tr>
                                     <th className={`p-2 font-black text-[10px] uppercase tracking-wider text-left ${isDarkMode ? 'text-gray-500' : 'text-gray-400'}`}>Seed</th>
                                     <th className={`p-2 font-black text-[10px] uppercase tracking-wider text-left pl-4 ${isDarkMode ? 'text-gray-500' : 'text-gray-400'}`}>Time (Pior Recorde 1º)</th>
-                                    {Array.from({ length: 14 }).map((_, i) => (
-                                        <th key={i} className={`p-2 font-black text-[10px] uppercase tracking-wider ${isDarkMode ? 'text-gray-300' : 'text-[#0B1D33]'}`}>Pick {i + 1}</th>
-                                    ))}
+                                    <th className={`p-2 font-black text-[10px] uppercase tracking-wider ${isDarkMode ? 'text-gray-300' : 'text-[#0B1D33]'}`}>Pick 1 (%)</th>
+                                    <th className={`p-2 font-black text-[10px] uppercase tracking-wider hidden sm:table-cell ${isDarkMode ? 'text-gray-500' : 'text-gray-400'}`}>Pick 2 (%)</th>
+                                    <th className={`p-2 font-black text-[10px] uppercase tracking-wider hidden sm:table-cell ${isDarkMode ? 'text-gray-500' : 'text-gray-400'}`}>Pick 3 (%)</th>
+                                    <th className={`p-2 font-black text-[10px] uppercase tracking-wider hidden sm:table-cell ${isDarkMode ? 'text-gray-500' : 'text-gray-400'}`}>Pick 4 (%)</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                {LOTTERY_ODDS.map((row, rowIndex) => {
-                                    const teamObj = sortedTeams[rowIndex];
+                                {sortedTeams.map((teamObj, rowIndex) => {
+                                    // Get display probability
+                                    let displayProb = 0;
+                                    if (teamObj.probability != null) {
+                                        displayProb = teamObj.probability;
+                                    } else {
+                                        const defaultOddStr = LOTTERY_ODDS[rowIndex]?.[0];
+                                        displayProb = defaultOddStr ? parseFloat(defaultOddStr.replace('%', '')) : 0;
+                                    }
+
                                     return (
                                         <tr key={rowIndex} className={`border-b border-t transition-colors ${isDarkMode ? 'border-white/5 hover:bg-white/5' : 'border-gray-100 hover:bg-gray-50'}`}>
                                             <td className={`p-2 text-xs font-bold ${isDarkMode ? 'text-yellow-500' : 'text-blue-600'} text-left`}>
                                                 #{rowIndex + 1}
                                             </td>
                                             <td className="p-2 text-left pl-4">
-                                                {teamObj ? (
-                                                    <div className="flex items-center gap-3">
-                                                        <div className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 overflow-hidden ${isDarkMode ? 'bg-[#222]' : 'bg-gray-100'}`}>
-                                                            {teamObj.team.logo_url ? (
-                                                                <img src={teamObj.team.logo_url} alt="logo" className="w-[80%] h-[80%] object-contain" />
-                                                            ) : (
-                                                                <span className="text-[10px] font-bold">AT</span>
-                                                            )}
+                                                <div className="flex items-center gap-3">
+                                                    <div className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 overflow-hidden ${isDarkMode ? 'bg-[#222]' : 'bg-gray-100'}`}>
+                                                        {teamObj.team.logo_url ? (
+                                                            <img src={teamObj.team.logo_url} alt="logo" className="w-[80%] h-[80%] object-contain" />
+                                                        ) : (
+                                                            <span className="text-[10px] font-bold">AT</span>
+                                                        )}
+                                                    </div>
+                                                    <div>
+                                                        <div className={`text-xs font-black uppercase ${isDarkMode ? 'text-white' : 'text-[#0B1D33]'}`}>
+                                                            {teamObj.team.name}
                                                         </div>
-                                                        <div>
-                                                            <div className={`text-xs font-black uppercase ${isDarkMode ? 'text-white' : 'text-[#0B1D33]'}`}>
-                                                                {teamObj.team.name}
-                                                            </div>
-                                                            <div className={`text-[9px] font-bold flex items-center gap-1 ${isDarkMode ? 'text-gray-500' : 'text-gray-400'}`}>
-                                                                {editMode ? (
-                                                                    <>
-                                                                        Pos:
-                                                                        <input
-                                                                            type="number"
-                                                                            value={localPositions[teamObj.team.id] || 0}
-                                                                            onChange={(e) => setLocalPositions({
-                                                                                ...localPositions,
-                                                                                [teamObj.team.id]: parseInt(e.target.value) || 0
-                                                                            })}
-                                                                            className={`w-12 px-1 py-0.5 rounded text-center border ${isDarkMode ? 'bg-black border-[#333] text-white' : 'bg-white border-gray-300 text-black'}`}
-                                                                        />
-                                                                    </>
-                                                                ) : (
-                                                                    <>Pos: {teamObj.position} {teamObj.originalPosition !== teamObj.position && '(Editada)'}</>
-                                                                )}
-                                                                <span className="ml-1 opacity-50">({teamObj.record})</span>
-                                                            </div>
+                                                        <div className={`text-[9px] font-bold flex items-center gap-1 ${isDarkMode ? 'text-gray-500' : 'text-gray-400'}`}>
+                                                            {editMode ? (
+                                                                <>
+                                                                    Pos:
+                                                                    <input
+                                                                        type="number"
+                                                                        value={localPositions[teamObj.team.id] || 0}
+                                                                        onChange={(e) => setLocalPositions({
+                                                                            ...localPositions,
+                                                                            [teamObj.team.id]: parseInt(e.target.value) || 0
+                                                                        })}
+                                                                        className={`w-12 px-1 py-0.5 rounded text-center border ${isDarkMode ? 'bg-black border-[#333] text-white' : 'bg-white border-gray-300 text-black'}`}
+                                                                    />
+                                                                </>
+                                                            ) : (
+                                                                <>Pos: {teamObj.position} {teamObj.originalPosition !== teamObj.position && '(Editada)'}</>
+                                                            )}
+                                                            <span className="ml-1 opacity-50">({teamObj.record})</span>
                                                         </div>
                                                     </div>
+                                                </div>
+                                            </td>
+                                            <td className={`p-2 text-xs font-bold ${displayProb > 0 ? getCellColor(displayProb.toString() + '%') : ''} ${isDarkMode ? 'text-gray-300 border-x border-[#1a1a1a]' : 'text-gray-700 border-x border-white'}`}>
+                                                {editMode ? (
+                                                    <div className="flex items-center justify-center gap-1">
+                                                        <input
+                                                            type="number"
+                                                            step="0.1"
+                                                            value={localOdds[teamObj.team.id] ?? 0}
+                                                            onChange={(e) => setLocalOdds({
+                                                                ...localOdds,
+                                                                [teamObj.team.id]: parseFloat(e.target.value) || 0
+                                                            })}
+                                                            className={`w-16 px-1 py-0.5 rounded text-center border ${isDarkMode ? 'bg-black border-[#333] text-white' : 'bg-white border-gray-300 text-black'}`}
+                                                        />
+                                                        <span className="text-[10px]">%</span>
+                                                    </div>
                                                 ) : (
-                                                    <span className={`text-[10px] italic ${isDarkMode ? 'text-gray-600' : 'text-gray-400'}`}>- Não aplicável -</span>
+                                                    <>{displayProb > 0 ? `${displayProb.toFixed(1)}%` : '-'}</>
                                                 )}
                                             </td>
-                                            {row.map((val, colIndex) => (
-                                                <td key={colIndex} className={`p-2 text-[11px] font-medium ${val !== '0.0%' ? getCellColor(val) : ''} ${isDarkMode ? 'text-gray-300 border-x border-[#1a1a1a]' : 'text-gray-700 border-x border-white'}`}>
-                                                    {val !== '0.0%' ? val : '-'}
-                                                </td>
-                                            ))}
+                                            <td className={`p-2 text-[10px] font-bold hidden sm:table-cell ${isDarkMode ? 'text-gray-400 border-x border-[#1a1a1a]' : 'text-gray-600 border-x border-white'} ${displayProb > 0 ? 'bg-opacity-50' : ''}`}>
+                                                {displayProb > 0 ? `${(displayProb * 0.957).toFixed(1)}%` : '-'}
+                                            </td>
+                                            <td className={`p-2 text-[10px] font-bold hidden sm:table-cell ${isDarkMode ? 'text-gray-400 border-x border-[#1a1a1a]' : 'text-gray-600 border-x border-white'} ${displayProb > 0 ? 'bg-opacity-50' : ''}`}>
+                                                {displayProb > 0 ? `${(displayProb * 0.907).toFixed(1)}%` : '-'}
+                                            </td>
+                                            <td className={`p-2 text-[10px] font-bold hidden sm:table-cell ${isDarkMode ? 'text-gray-400 border-x border-[#1a1a1a]' : 'text-gray-600 border-x border-white'} ${displayProb > 0 ? 'bg-opacity-50' : ''}`}>
+                                                {displayProb > 0 ? `${(displayProb * 0.857).toFixed(1)}%` : '-'}
+                                            </td>
                                         </tr>
                                     );
                                 })}

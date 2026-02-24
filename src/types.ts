@@ -94,6 +94,7 @@ export interface FeaturedReaderRow {
 
 export interface Article {
   id: string;
+  slug: string;
   authorId: string;
   category: Category;
   title: string;

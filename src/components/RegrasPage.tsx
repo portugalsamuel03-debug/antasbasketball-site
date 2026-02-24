@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { Article } from '../types';
 import { Repeat, CalendarDays, Hash, Trophy, ChevronRight, Search, Plus } from 'lucide-react';
 import { RulePopupModal } from './RulePopupModal';
+import { QuickCreateRuleModal } from './admin/QuickCreateRuleModal';
 import { DraftLogicModal } from './DraftLogicModal';
 import { EmptyState } from './EmptyState';
 import SectionTitle from './SectionTitle';
@@ -20,6 +21,7 @@ export const RegrasPage: React.FC<RegrasPageProps> = ({ articles, isDarkMode, is
     const [selectedRule, setSelectedRule] = useState<Article | null>(null);
     const [showDraftLogic, setShowDraftLogic] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
+    const [isCreatingRule, setIsCreatingRule] = useState(false);
     const [currentPage, setCurrentPage] = useState(1);
     const ITEMS_PER_PAGE = 5;
 
@@ -33,23 +35,33 @@ export const RegrasPage: React.FC<RegrasPageProps> = ({ articles, isDarkMode, is
 
     // Derived content based on activeTema
     const currentRules = useMemo(() => {
-        if (!activeTema) return [];
+        const currentTheme = activeTema.toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+
         return rulesArticles.filter(a => {
+            const aTitle = (a.title || '').toLowerCase();
             const tagsLower = (a.tags || []).map(t => t.toLowerCase());
-            const searchTag = activeTema.toLowerCase();
-            const aSub = (a.subcategory || '').toLowerCase();
 
-            // Map the menu to potential tags or subcategories
-            if (activeTema === 'TRADES' && (aSub === 'trades' || tagsLower.includes('trades') || tagsLower.includes('trocas') || tagsLower.includes('trade'))) return true;
-            if (activeTema === 'DRAFT' && (aSub === 'draft' || tagsLower.includes('draft') || tagsLower.includes('recrutamento'))) return true;
-            if (activeTema === 'PONTUAÇÃO' && (aSub === 'pontuação' || aSub === 'pontuacao' || tagsLower.includes('pontuação') || tagsLower.includes('pontuacao') || tagsLower.includes('scout'))) return true;
-            if (activeTema === 'LIGA' && (aSub === 'liga' || tagsLower.includes('liga') || tagsLower.includes('geral') || tagsLower.includes('regulamento'))) return true;
+            // Normalize subcategory from DB to uppercase without accents
+            const rawSub = a.subcategory || '';
+            const aSub = rawSub.toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 
-            // Fallback: If no tags match but it's a general rule, we can try to show it in 'LIGA'
-            if (activeTema === 'LIGA' && tagsLower.includes('regras')) return true;
+            // If it has a specific subcategory, it should ONLY appear in that tab
+            if (rawSub.trim()) {
+                // Check for exact match or special mappings
+                if (aSub === currentTheme) return true;
+                if (currentTheme === 'PONTUACAO' && aSub === 'PONTUAÇÃO') return true;
+                if (currentTheme === 'LIGA' && aSub === 'REGULAMENTO') return true;
+                return false;
+            }
 
-            // Also check title just in case
-            if (a.title.toLowerCase().includes(searchTag)) return true;
+            // Fallback to tags if no subcategory is set
+            if (currentTheme === 'TRADES' && (tagsLower.includes('trades') || tagsLower.includes('trocas') || tagsLower.includes('trade'))) return true;
+            if (currentTheme === 'DRAFT' && (tagsLower.includes('draft') || tagsLower.includes('recrutamento'))) return true;
+            if (currentTheme === 'PONTUACAO' && (tagsLower.includes('pontuação') || tagsLower.includes('pontuacao') || tagsLower.includes('scout'))) return true;
+            if (currentTheme === 'LIGA' && (tagsLower.includes('liga') || tagsLower.includes('geral') || tagsLower.includes('regras') || tagsLower.includes('regulamento'))) return true;
+
+            // Final fallback: check title
+            if (aTitle.includes(currentTheme.toLowerCase())) return true;
 
             return false;
         }).filter(a => {
@@ -137,9 +149,9 @@ export const RegrasPage: React.FC<RegrasPageProps> = ({ articles, isDarkMode, is
                             style={{ color: isDarkMode ? 'white' : 'black' }}
                         />
                     </div>
-                    {isEditing && onEdit && (
+                    {isEditing && (
                         <button
-                            onClick={() => onEdit('', 'REGRAS')}
+                            onClick={() => setIsCreatingRule(true)}
                             className={`p-3 rounded-2xl flex items-center justify-center shrink-0 transition-transform active:scale-95 ${isDarkMode ? 'bg-yellow-500 text-black hover:bg-yellow-400' : 'bg-[#0B1D33] text-white hover:bg-yellow-400 hover:text-black'}`}
                             title="Adicionar Nova Regra"
                         >
@@ -266,6 +278,18 @@ export const RegrasPage: React.FC<RegrasPageProps> = ({ articles, isDarkMode, is
                 <DraftLogicModal
                     isDarkMode={isDarkMode}
                     onClose={() => setShowDraftLogic(false)}
+                />
+            )}
+
+            {isCreatingRule && (
+                <QuickCreateRuleModal
+                    isOpen={isCreatingRule}
+                    onClose={() => setIsCreatingRule(false)}
+                    isDarkMode={isDarkMode}
+                    initialSubcategory={activeTema}
+                    onSaveSuccess={() => {
+                        window.location.reload();
+                    }}
                 />
             )}
         </div>

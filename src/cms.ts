@@ -1,6 +1,16 @@
 import { supabase } from "./lib/supabase";
 import { CategoryRow, SubcategoryRow } from "./types";
 
+function slugify(input: string) {
+  return input
+    .toLowerCase()
+    .trim()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/(^-|-$)/g, "");
+}
+
 export type AuthorRow = {
   id: string;
   slug: string;
@@ -72,34 +82,95 @@ export async function upsertArticle(payload: Partial<ArticleRow>) {
       else payload.category = payload.category.toUpperCase();
     }
 
-    console.log("CMS: Construction of payload complete. Category mapped to:", payload.category);
-    console.log("CMS: Calling upsert...");
-    const { data, error } = await supabase.from("articles").upsert(payload).select("*").single();
-
-    if (error) {
-      console.error("CMS: Upsert error", error);
-      return { data: null, error };
-    }
-
-    console.log("CMS: Upsert success", data.id);
-
-    if (isNew && data?.published) {
-      console.log("CMS: Creating notification for new article...");
-      try {
-        await createNotification({
-          title: data.category.toUpperCase(),
-          description: data.title,
-          type: 'noticia',
-          link: data.id,
-          is_global: true
-        });
-        console.log("CMS: Notification created.");
-      } catch (e) {
-        console.warn("CMS: Failed to create notification", e);
+    // Ensure slug handling
+    if (isNew) {
+      if (!payload.slug && payload.title) {
+        payload.slug = slugify(payload.title);
+      }
+      // Add timestamp to ensure uniqueness for new posts
+      if (payload.slug) {
+        payload.slug = `${payload.slug}-${Math.floor(Date.now() / 1000).toString().slice(-4)}`;
+      }
+      if (!payload.published_at) {
+        payload.published_at = new Date().toISOString();
+      }
+    } else {
+      // For updates, EXPLICITLY delete slug from payload if not intended to change
+      // or at least don't overwrite it with a new slugify(title) if we don't have to.
+      // If the user wants to keep the slug, we shouldn't re-slugify unless it's null/empty.
+      if (!payload.slug) {
+        // Keep existing slug by not sending it, or we could fetch it first.
+        // PostgREST will not update columns not present in the payload.
+        delete payload.slug;
       }
     }
 
-    return { data, error: null };
+    // Mandatory fields for new articles if missing
+    if (isNew) {
+      if (payload.published === undefined) payload.published = true;
+      if (payload.reading_minutes === undefined) payload.reading_minutes = 5;
+    }
+
+    // Verify Author ID exists. If not, fallback to a valid one to avoid FK violation
+    if (payload.author_id) {
+      try {
+        const { data: authorExists } = await supabase.from('authors').select('id').eq('id', payload.author_id).maybeSingle();
+
+        if (!authorExists) {
+          console.log("CMS: Author ID not found in table. Searching for mapping...");
+          const { data: authors } = await supabase.from('authors').select('id, name');
+
+          const samuel = authors?.find(a => a.name.toUpperCase() === 'SAMUEL');
+          const antas = authors?.find(a => a.name.toUpperCase().includes('ANTAS'));
+
+          if (samuel) payload.author_id = samuel.id;
+          else if (antas) payload.author_id = antas.id;
+          else if (authors && authors.length > 0) payload.author_id = authors[0].id;
+        }
+      } catch (e) {
+        console.warn("CMS: Author check failed", e);
+      }
+    } else if (isNew) {
+      // New article must have an author_id (nullable but better to have one)
+      const { data: authors } = await supabase.from('authors').select('id, name').limit(1);
+      if (authors && authors.length > 0) payload.author_id = authors[0].id;
+    }
+
+    console.log("CMS: Construction of payload complete. Author ID fixed to:", payload.author_id);
+
+    if (isNew) {
+      const { data, error } = await supabase.from("articles").insert(payload).select("*").single();
+      if (error) {
+        console.error("CMS: Insert error", error);
+        return { data: null, error };
+      }
+      console.log("CMS: Insert success", data.id);
+
+      if (data?.published) {
+        console.log("CMS: Creating notification for new article...");
+        try {
+          await createNotification({
+            title: data.category.toUpperCase(),
+            description: data.title,
+            type: 'noticia',
+            link: data.id,
+            is_global: true
+          });
+          console.log("CMS: Notification created.");
+        } catch (e) {
+          console.warn("CMS: Failed to create notification", e);
+        }
+      }
+      return { data, error: null };
+    } else {
+      const { data, error } = await supabase.from("articles").update(payload).eq("id", payload.id).select("*").single();
+      if (error) {
+        console.error("CMS: Update error", error);
+        return { data: null, error };
+      }
+      console.log("CMS: Update success", data.id);
+      return { data, error: null };
+    }
   } catch (err) {
     console.error("CMS: Critical error in upsertArticle", err);
     return { data: null, error: err };

@@ -156,7 +156,8 @@ export const EditArticleModal: React.FC<EditArticleModalProps> = ({ article, onC
         try {
             const payload: Partial<ArticleRow> = {
                 ...editing,
-                category: editing.category || "NOTICIAS",
+                // Ensure we keep the category if it was already set (especially for REGRAS)
+                category: editing.category || article.category || "NOTICIAS",
                 published: editing.published ?? true,
                 reading_minutes: editing.reading_minutes ?? 5,
                 published_at: editing.published_at ?? new Date().toISOString(),
