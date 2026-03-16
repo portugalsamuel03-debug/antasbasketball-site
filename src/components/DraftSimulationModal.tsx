@@ -38,13 +38,16 @@ export const DraftSimulationModal: React.FC<DraftSimulationModalProps> = ({
                 const weights = availableTeams.map(t => {
                     const originalIndex = teams.findIndex(ot => ot.team.id === t.team.id);
 
-                    // Use probability if it exists, otherwise use LOTTERY_ODDS, otherwise 0
+                    // Use specific probability for the current pick (1-4)
                     let weight = 0;
-                    if (t.probability != null) {
-                        weight = pick === 1 ? t.probability : t.probability / pick; // roughly decrease odds for subsequent picks
-                    } else {
-                        const weightStr = oddsMap[originalIndex]?.[pick - 1] || '0%';
-                        weight = parseFloat(weightStr.replace('%', ''));
+                    if (pick === 1) {
+                        weight = t.probability != null ? t.probability : parseFloat(oddsMap[originalIndex]?.[0]?.replace('%', '') || '0');
+                    } else if (pick === 2) {
+                        weight = t.probabilityP2 != null ? t.probabilityP2 : parseFloat(oddsMap[originalIndex]?.[1]?.replace('%', '') || '0');
+                    } else if (pick === 3) {
+                        weight = t.probabilityP3 != null ? t.probabilityP3 : parseFloat(oddsMap[originalIndex]?.[2]?.replace('%', '') || '0');
+                    } else if (pick === 4) {
+                        weight = t.probabilityP4 != null ? t.probabilityP4 : parseFloat(oddsMap[originalIndex]?.[3]?.replace('%', '') || '0');
                     }
 
                     totalWeight += weight;

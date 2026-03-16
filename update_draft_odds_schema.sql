@@ -1,0 +1,4 @@
+ALTER TABLE draft_overrides 
+ADD COLUMN IF NOT EXISTS lottery_probability_p2 DECIMAL DEFAULT 0,
+ADD COLUMN IF NOT EXISTS lottery_probability_p3 DECIMAL DEFAULT 0,
+ADD COLUMN IF NOT EXISTS lottery_probability_p4 DECIMAL DEFAULT 0;
