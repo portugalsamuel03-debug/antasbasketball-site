@@ -162,7 +162,7 @@ export const DraftSimulationModal: React.FC<DraftSimulationModalProps> = ({
     return (
         <div className="fixed inset-0 z-[300] flex items-center justify-center p-4">
             <div className="absolute inset-0 bg-black/95 backdrop-blur-xl" onClick={onClose}></div>
-            <div className={`relative w-full max-w-2xl max-h-[90vh] flex flex-col rounded-[32px] overflow-hidden shadow-2xl animate-in zoom-in-95 duration-300 ${isDarkMode ? 'bg-[#121212] border border-white/10' : 'bg-white border border-gray-200'}`}>
+            <div className={`relative w-full max-w-2xl h-[85vh] flex flex-col rounded-[32px] overflow-hidden shadow-2xl animate-in zoom-in-95 duration-300 ${isDarkMode ? 'bg-[#121212] border border-white/10' : 'bg-white border border-gray-200'}`}>
 
                 <div className={`px-6 py-4 flex items-center justify-between border-b ${isDarkMode ? 'border-white/10' : 'border-black/5'}`}>
                     <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
@@ -289,12 +289,10 @@ export const DraftSimulationModal: React.FC<DraftSimulationModalProps> = ({
                                             <div className={`text-base md:text-lg font-black uppercase tracking-tight flex items-center gap-2 ${isDarkMode ? 'text-white' : 'text-[#0B1D33]'}`}>
                                                 {r.team.team.name}
                                                 {(() => {
-                                                    // Position is 1-indexed, `r.pick` is 1-indexed.
-                                                    // `t.position` represents the seed (1 is worst, 20 is best).
-                                                    // The pre-lottery natural pick order assumes worst seed gets pick 1.
-                                                    // So natural pick = t.position.
-                                                    const naturalPick = r.team.position;
-                                                    const diff = naturalPick - r.pick;
+                                                    // The 'seed' is the index in the original sorted 'teams' array + 1
+                                                    // (where 0 is the worst record/seed #1)
+                                                    const seed = teams.findIndex(ot => ot.team.id === r.team.team.id) + 1;
+                                                    const diff = seed - r.pick;
 
                                                     if (diff > 0) {
                                                         return <span className="flex items-center text-green-500 text-[10px] font-black tracking-widest bg-green-500/10 px-1.5 py-0.5 rounded-md" title={`Subiu ${diff} posições`}><ArrowUpRight size={14} className="mr-0.5" />{diff}</span>;
@@ -355,6 +353,35 @@ export const DraftSimulationModal: React.FC<DraftSimulationModalProps> = ({
                         </div>
                         <div className="mt-8 text-3xl font-black uppercase text-white animate-in fade-in slide-in-from-bottom-5 duration-1000 delay-500 fill-mode-both text-center">
                             {suspensePick.team.team.name}
+                        </div>
+                        
+                        {/* Movement info in suspense overlay */}
+                        <div className="mt-4 animate-in fade-in slide-in-from-bottom-5 duration-1000 delay-700 fill-mode-both">
+                            {(() => {
+                                const seed = teams.findIndex(ot => ot.team.id === suspensePick.team.team.id) + 1;
+                                const diff = seed - suspensePick.pick;
+                                if (diff > 0) {
+                                    return (
+                                        <div className="flex items-center gap-2 px-4 py-2 rounded-2xl bg-green-500/20 border border-green-500/50 shadow-[0_0_20px_rgba(34,197,94,0.3)]">
+                                            <ArrowUpRight size={24} className="text-green-500" />
+                                            <span className="text-xl font-black text-green-500 uppercase">Subiu {diff} posições!</span>
+                                        </div>
+                                    );
+                                } else if (diff < 0) {
+                                    return (
+                                        <div className="flex items-center gap-2 px-4 py-2 rounded-2xl bg-red-500/20 border border-red-500/50">
+                                            <ArrowDownRight size={24} className="text-red-500" />
+                                            <span className="text-xl font-black text-red-500 uppercase">Caiu {Math.abs(diff)} posições</span>
+                                        </div>
+                                    );
+                                }
+                                return (
+                                    <div className="flex items-center gap-2 px-4 py-2 rounded-2xl bg-white/10 border border-white/20">
+                                        <Minus size={24} className="text-gray-400" />
+                                        <span className="text-xl font-black text-gray-400 uppercase">Manteve a posição</span>
+                                    </div>
+                                );
+                            })()}
                         </div>
                     </div>
                 </div>

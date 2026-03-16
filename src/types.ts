@@ -220,11 +220,19 @@ export interface PlayoffMatchup {
     label?: string;
 }
 
+export interface PlayoffSettings {
+    show_play_in: boolean;
+    first_round_count: number; // 4, 2, or 0
+    show_semis: boolean;
+    show_finals: boolean;
+}
+
 export interface PlayoffData {
     play_in?: PlayoffMatchup[];
     first_round?: PlayoffMatchup[];
     semifinals?: PlayoffMatchup[];
     finals?: PlayoffMatchup;
+    settings?: PlayoffSettings;
 }
 
 export interface Season {

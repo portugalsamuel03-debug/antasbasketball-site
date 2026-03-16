@@ -117,21 +117,24 @@ export const DraftLogicModal: React.FC<DraftLogicModalProps> = ({ onClose, isDar
     const handleSaveOverrides = async () => {
         setIsSaving(true);
         try {
-            for (const teamId of Object.keys(localPositions)) {
-                await supabase
-                    .from('draft_overrides')
-                    .upsert({
-                        season_id: selectedSeasonId,
-                        team_id: teamId,
-                        custom_position: localPositions[teamId],
-                        lottery_probability: localOdds[teamId]
-                    }, { onConflict: 'season_id,team_id' });
-            }
+            const upsertData = Object.keys(localPositions).map(teamId => ({
+                season_id: selectedSeasonId,
+                team_id: teamId,
+                custom_position: localPositions[teamId],
+                lottery_probability: localOdds[teamId]
+            }));
+
+            const { error } = await supabase
+                .from('draft_overrides')
+                .upsert(upsertData, { onConflict: 'season_id,team_id' });
+
+            if (error) throw error;
+
             await fetchOverrides(selectedSeasonId);
             setEditMode(false);
         } catch (err) {
             console.error(err);
-            alert("Erro ao salvar overrrides.");
+            alert("Erro ao salvar overrides.");
         } finally {
             setIsSaving(false);
         }
