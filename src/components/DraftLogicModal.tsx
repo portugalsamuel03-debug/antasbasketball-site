@@ -115,26 +115,48 @@ export const DraftLogicModal: React.FC<DraftLogicModalProps> = ({ onClose, isDar
     }, [selectedSeasonId, standings, teams, overrides]);
 
     const handleSaveOverrides = async () => {
+        if (!selectedSeasonId) {
+            alert("Selecione uma temporada.");
+            return;
+        }
+
         setIsSaving(true);
         try {
-            const upsertData = Object.keys(localPositions).map(teamId => ({
-                season_id: selectedSeasonId,
-                team_id: teamId,
-                custom_position: localPositions[teamId],
-                lottery_probability: localOdds[teamId]
-            }));
+            const upsertData = Object.keys(localPositions)
+                .filter(teamId => teamId && teamId !== 'undefined') // Safety filter
+                .map(teamId => {
+                    const existing = overrides.find(o => o.team_id === teamId);
+                    return {
+                        ...(existing?.id ? { id: existing.id } : {}),
+                        season_id: selectedSeasonId,
+                        team_id: teamId,
+                        custom_position: Math.floor(Number(localPositions[teamId])) || 0,
+                        lottery_probability: parseFloat(Number(localOdds[teamId]).toString()) || 0
+                    };
+                });
+
+            if (upsertData.length === 0) {
+                setEditMode(false);
+                setIsSaving(false);
+                return;
+            }
 
             const { error } = await supabase
                 .from('draft_overrides')
-                .upsert(upsertData, { onConflict: 'season_id,team_id' });
+                .upsert(upsertData, { 
+                    onConflict: 'season_id,team_id'
+                });
 
-            if (error) throw error;
+            if (error) {
+                console.error("Supabase upsert error:", error);
+                throw error;
+            }
 
             await fetchOverrides(selectedSeasonId);
             setEditMode(false);
-        } catch (err) {
-            console.error(err);
-            alert("Erro ao salvar overrides.");
+        } catch (err: any) {
+            console.error("Catch block error:", err);
+            alert(`Erro ao salvar: ${err.message || 'Erro desconhecido'}`);
         } finally {
             setIsSaving(false);
         }

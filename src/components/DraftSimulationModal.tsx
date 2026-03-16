@@ -101,7 +101,8 @@ export const DraftSimulationModal: React.FC<DraftSimulationModalProps> = ({
 
             if (isTop3) {
                 // Trigger suspense pop-up for Top 3
-                setSuspensePick(lotteryOrder[picksRevealed]);
+                // Index 0 in lotteryOrder is Pick 1, index 1 is Pick 2, etc.
+                setSuspensePick(lotteryOrder[nextPickNum - 1]);
 
                 // Auto-advance after 3.5 seconds
                 setTimeout(() => {
