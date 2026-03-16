@@ -6,6 +6,7 @@ import { listChampions, listAwards, listTeams, listRecords, listAwardCategories 
 import { SEASON_OPTIONS } from '../../utils/seasons';
 import { useGlobalData } from '../../hooks/useGlobalData';
 import { calculateAutomaticRecords } from '../../utils/records';
+import { PlayoffsBracket } from '../PlayoffsBracket';
 
 interface SeasonDetailsModalProps {
     season: Season | null;
@@ -44,10 +45,10 @@ export const SeasonDetailsModal: React.FC<SeasonDetailsModalProps> = ({ season, 
     // Global Data for Records
     const { standings: gStandings, history: gHistory, teams: gTeams, managers: gManagers, seasons: gSeasons, champions: gChampions, awards: gAwards, trades: gTrades, loading: gLoading } = useGlobalData();
 
-    const [formData, setFormData] = useState<Partial<Season>>({ year: '', summary: '' });
+    const [formData, setFormData] = useState<Partial<Season>>({ year: '', summary: '', playoff_data: {} });
     const [standings, setStandings] = useState<SeasonStanding[]>([]);
     const [teams, setTeams] = useState<TeamRow[]>([]);
-    const [activeTab, setActiveTab] = useState<'DETAILS' | 'STANDINGS'>('DETAILS');
+    const [activeTab, setActiveTab] = useState<'DETAILS' | 'STANDINGS' | 'PLAYOFFS'>('DETAILS');
 
     // Auto-fetched data
     const [yearChampion, setYearChampion] = useState<Champion | null>(null);
@@ -122,6 +123,13 @@ export const SeasonDetailsModal: React.FC<SeasonDetailsModalProps> = ({ season, 
             setAutoRecordsState(mappedAutoRecords);
         }
     }, [gLoading, season?.year]);
+
+    // Sync Teams from Global Data
+    useEffect(() => {
+        if (gTeams.length > 0) {
+            setTeams(gTeams);
+        }
+    }, [gTeams]);
 
     // Sync Standings from Global Data
     useEffect(() => {
@@ -319,6 +327,7 @@ export const SeasonDetailsModal: React.FC<SeasonDetailsModalProps> = ({ season, 
                         {!isCreating && <div className="flex gap-2 mt-2">
                             <button onClick={() => setActiveTab('DETAILS')} className={`text-[10px] font-black uppercase px-3 py-1 rounded-full ${activeTab === 'DETAILS' ? 'bg-yellow-400 text-black' : isDarkMode ? 'bg-white/5 text-gray-500' : 'bg-black/5 text-gray-500'}`}>Resumo</button>
                             <button onClick={() => setActiveTab('STANDINGS')} className={`text-[10px] font-black uppercase px-3 py-1 rounded-full ${activeTab === 'STANDINGS' ? 'bg-yellow-400 text-black' : isDarkMode ? 'bg-white/5 text-gray-500' : 'bg-black/5 text-gray-500'}`}>Tabelas</button>
+                            <button onClick={() => setActiveTab('PLAYOFFS')} className={`text-[10px] font-black uppercase px-3 py-1 rounded-full ${activeTab === 'PLAYOFFS' ? 'bg-yellow-400 text-black' : isDarkMode ? 'bg-white/5 text-gray-500' : 'bg-black/5 text-gray-500'}`}>Playoffs</button>
                         </div>}
                     </div>
                     <button onClick={onClose} className="p-2 rounded-full hover:bg-white/10 transition-colors">
@@ -625,7 +634,7 @@ export const SeasonDetailsModal: React.FC<SeasonDetailsModalProps> = ({ season, 
                                                         <div className="flex items-center gap-3">
                                                             <img src={st.team?.logo_url || ''} className="w-8 h-8 object-contain" />
                                                             <div>
-                                                                <div className={`font-bold leading-none ${isDarkMode ? 'text-white' : 'text-[#0B1D33]'}`}>{st.team?.name}</div>
+                                                                 <div className={`font-bold leading-none ${isDarkMode ? 'text-white' : 'text-[#0B1D33]'}`}>{st.team?.name}</div>
                                                                 <div className="text-[10px] text-gray-500 font-bold uppercase mt-1">
                                                                     {st.wins}V - {st.losses}D - {st.ties}E {st.trades_count > 0 ? `• ${st.trades_count} Trades` : ''}
                                                                 </div>
@@ -662,6 +671,39 @@ export const SeasonDetailsModal: React.FC<SeasonDetailsModalProps> = ({ season, 
                                     })}
                                 </div>
                             </div>
+                        </div>
+                    )}
+
+                    {/* PLAYOFFS TAB */}
+                    {!isCreating && activeTab === 'PLAYOFFS' && (
+                        <div className="space-y-6">
+                            <div className="flex justify-between items-center mb-4">
+                                <h3 className="text-[10px] font-black uppercase tracking-widest text-gray-500">Chaveamento dos Playoffs</h3>
+                                {canEdit && (
+                                    <button
+                                        onClick={handleSaveSeason}
+                                        className="px-4 py-2 bg-yellow-400 text-black rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-yellow-300 transition-all flex items-center gap-2"
+                                    >
+                                        <Save size={14} />
+                                        Salvar Chaveamento
+                                    </button>
+                                )}
+                            </div>
+                            
+                            <PlayoffsBracket
+                                data={formData.playoff_data || {}}
+                                teams={teams}
+                                isDarkMode={isDarkMode}
+                                isEditing={canEdit}
+                                onUpdate={(updatedData) => setFormData({ ...formData, playoff_data: updatedData })}
+                            />
+
+                            {!canEdit && (!formData.playoff_data || Object.keys(formData.playoff_data).length === 0) && (
+                                <div className="text-center py-12 opacity-50">
+                                    <Trophy size={48} className="mx-auto mb-4 text-gray-500" />
+                                    <p className="text-sm font-bold uppercase tracking-widest">Nenhum dado de playoffs disponível</p>
+                                </div>
+                            )}
                         </div>
                     )}
                 </div>

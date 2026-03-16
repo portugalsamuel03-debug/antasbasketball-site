@@ -207,10 +207,31 @@ export interface RecordItem {
   manager_ids?: string[];
 }
 
+export interface PlayoffMatchup {
+    id: string;
+    team1_id?: string;
+    team2_id?: string;
+    team1_score?: number;
+    team2_score?: number;
+    team1_seed?: string;
+    team2_seed?: string;
+    team1_placeholder?: string; // e.g. "Vencedor Game A"
+    team2_placeholder?: string;
+    label?: string;
+}
+
+export interface PlayoffData {
+    play_in?: PlayoffMatchup[];
+    first_round?: PlayoffMatchup[];
+    semifinals?: PlayoffMatchup[];
+    finals?: PlayoffMatchup;
+}
+
 export interface Season {
-  id: string;
-  year: string;
-  summary: string;
+    id: string;
+    year: string;
+    summary: string;
+    playoff_data?: PlayoffData;
 }
 
 export interface SeasonStanding {
