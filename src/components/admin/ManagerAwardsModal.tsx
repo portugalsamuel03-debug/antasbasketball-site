@@ -14,6 +14,8 @@ export const ManagerAwardsModal: React.FC<ManagerAwardsModalProps> = ({ managerI
     const [groupedAwards, setGroupedAwards] = useState<{ category: string, years: string[], count: number }[]>([]);
     const [loading, setLoading] = useState(true);
     const [total, setTotal] = useState(0);
+    const [currentPage, setCurrentPage] = useState(1);
+    const ITEMS_PER_PAGE = 5;
 
     useEffect(() => {
         fetchData();
@@ -40,9 +42,16 @@ export const ManagerAwardsModal: React.FC<ManagerAwardsModalProps> = ({ managerI
             })).sort((a, b) => b.count - a.count);
 
             setGroupedAwards(processed);
+            setCurrentPage(1);
         }
         setLoading(false);
     }
+
+    const totalPages = Math.ceil(groupedAwards.length / ITEMS_PER_PAGE);
+    const paginatedAwards = groupedAwards.slice(
+        (currentPage - 1) * ITEMS_PER_PAGE,
+        currentPage * ITEMS_PER_PAGE
+    );
 
     return (
         <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
@@ -76,7 +85,7 @@ export const ManagerAwardsModal: React.FC<ManagerAwardsModalProps> = ({ managerI
                                 </div>
                             </div>
 
-                            {groupedAwards.map((g, i) => (
+                            {paginatedAwards.map((g, i) => (
                                 <div key={i} className={`p-4 rounded-2xl border ${isDarkMode ? 'bg-white/5 border-white/5' : 'bg-gray-50 border-gray-100'}`}>
                                     <div className="flex items-center justify-between mb-2">
                                         <div className={`text-sm font-black uppercase ${isDarkMode ? 'text-white' : 'text-[#0B1D33]'}`}>
@@ -92,6 +101,36 @@ export const ManagerAwardsModal: React.FC<ManagerAwardsModalProps> = ({ managerI
                                     </div>
                                 </div>
                             ))}
+
+                            {totalPages > 1 && (
+                                <div className="flex items-center justify-between pt-4 pb-2">
+                                    <button
+                                        onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                                        disabled={currentPage === 1}
+                                        className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase transition-all ${
+                                            currentPage === 1 
+                                            ? 'opacity-30 cursor-not-allowed' 
+                                            : isDarkMode ? 'bg-white/5 text-white hover:bg-white/10' : 'bg-gray-100 text-[#0B1D33] hover:bg-gray-200'
+                                        }`}
+                                    >
+                                        Anterior
+                                    </button>
+                                    <div className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">
+                                        Pág {currentPage} de {totalPages}
+                                    </div>
+                                    <button
+                                        onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                                        disabled={currentPage === totalPages}
+                                        className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase transition-all ${
+                                            currentPage === totalPages 
+                                            ? 'opacity-30 cursor-not-allowed' 
+                                            : isDarkMode ? 'bg-white/5 text-white hover:bg-white/10' : 'bg-gray-100 text-[#0B1D33] hover:bg-gray-200'
+                                        }`}
+                                    >
+                                        Próximo
+                                    </button>
+                                </div>
+                            )}
                         </>
                     ) : (
                         <div className="flex flex-col items-center justify-center py-12 px-6 text-center opacity-50">

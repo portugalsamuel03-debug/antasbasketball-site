@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Trophy, RefreshCw, ChevronDown, SkipForward, Play, ArrowUpRight, ArrowDownRight, Minus, Download, Search } from 'lucide-react';
+import { X, Trophy, RefreshCw, ChevronDown, SkipForward, Play, ArrowUpRight, ArrowDownRight, Minus, Download, Search, Share2, MessageCircle, Send } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import html2canvas from 'html2canvas';
 
@@ -12,7 +12,7 @@ interface DraftSimulationModalProps {
     onSeasonChange?: (id: string) => void;
 }
 
-const DRAFT_WEIGHTS = [125, 100, 75, 45, 35, 25, 20, 15, 8, 8, 8, 8, 8, 8, 2, 2, 2, 2, 2, 2];
+const DRAFT_WEIGHTS = [127, 100, 75, 45, 35, 25, 20, 15, 8, 8, 8, 8, 8, 8, 2, 2, 2, 2, 1, 1];
 
 export const DraftSimulationModal: React.FC<DraftSimulationModalProps> = ({
     teams, isDarkMode, onClose, seasons = [], selectedSeasonId, onSeasonChange
@@ -21,6 +21,7 @@ export const DraftSimulationModal: React.FC<DraftSimulationModalProps> = ({
     const [picksRevealed, setPicksRevealed] = useState(0); // 0 means none revealed
     const [suspensePick, setSuspensePick] = useState<{ pick: number, team: any } | null>(null);
     const [isDownloading, setIsDownloading] = useState(false);
+    const [isSharing, setIsSharing] = useState(false);
     const listRef = React.useRef<HTMLDivElement>(null);
 
     const totalPicks = teams.length;
@@ -126,7 +127,7 @@ export const DraftSimulationModal: React.FC<DraftSimulationModalProps> = ({
         try {
             const canvas = await html2canvas(listRef.current, {
                 backgroundColor: isDarkMode ? '#121212' : '#ffffff',
-                scale: 2, // High resolution
+                scale: 2,
                 logging: false,
                 useCORS: true
             });
@@ -141,6 +142,52 @@ export const DraftSimulationModal: React.FC<DraftSimulationModalProps> = ({
             alert("Erro ao tentar gerar imagem do Draft.");
         } finally {
             setIsDownloading(false);
+        }
+    };
+
+    const handleShare = async (platform: 'whatsapp' | 'telegram') => {
+        if (!listRef.current) return;
+        setIsSharing(true);
+        
+        try {
+            const seasonName = seasons.find(s => s.id === selectedSeasonId)?.year || "2024/2025";
+            const shareText = `Simulei o draft do Antas Basketball na temporada ${seasonName} e esse foi o meu board! 🏀🔥`;
+            
+            // Try to use Web Share API first if supported (mobile/some desktops)
+            if (navigator.share && navigator.canShare) {
+                const canvas = await html2canvas(listRef.current, {
+                    backgroundColor: isDarkMode ? '#121212' : '#ffffff',
+                    scale: 2,
+                    useCORS: true
+                });
+                
+                const blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, 'image/png'));
+                if (blob) {
+                    const file = new File([blob], 'antas-draft.png', { type: 'image/png' });
+                    
+                    if (navigator.canShare({ files: [file] })) {
+                        await navigator.share({
+                            files: [file],
+                            title: 'Antas Basketball Draft',
+                            text: shareText,
+                        });
+                        setIsSharing(false);
+                        return;
+                    }
+                }
+            }
+
+            // Fallback to URL based sharing (text only)
+            const encodedText = encodeURIComponent(shareText);
+            const url = platform === 'whatsapp' 
+                ? `https://wa.me/?text=${encodedText}`
+                : `https://t.me/share/url?url=${window.location.origin}&text=${encodedText}`;
+            
+            window.open(url, '_blank');
+        } catch (err) {
+            console.error("Share error", err);
+        } finally {
+            setIsSharing(false);
         }
     };
 
@@ -217,21 +264,41 @@ export const DraftSimulationModal: React.FC<DraftSimulationModalProps> = ({
                             </span>
                             <div className="flex items-center gap-2">
                                 <button
+                                    onClick={() => handleShare('whatsapp')}
+                                    disabled={isSharing}
+                                    className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-widest transition-all
+                                        ${isDarkMode ? 'bg-[#25D366]/10 text-[#25D366] hover:bg-[#25D366]/20' : 'bg-[#25D366] text-white hover:bg-[#128C7E]'}`}
+                                    title="Compartilhar no WhatsApp"
+                                >
+                                    <MessageCircle size={12} />
+                                    WhatsApp
+                                </button>
+                                <button
+                                    onClick={() => handleShare('telegram')}
+                                    disabled={isSharing}
+                                    className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-widest transition-all
+                                        ${isDarkMode ? 'bg-[#0088cc]/10 text-[#0088cc] hover:bg-[#0088cc]/20' : 'bg-[#0088cc] text-white hover:bg-[#0077b3]'}`}
+                                    title="Compartilhar no Telegram"
+                                >
+                                    <Send size={12} />
+                                    Telegram
+                                </button>
+                                <button
                                     onClick={handleDownloadFormat}
                                     disabled={isDownloading}
-                                    className={`flex items-center gap-2 px-4 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-widest transition-all
-                                        ${isDarkMode ? 'bg-green-500/10 text-green-500 hover:bg-green-500/20' : 'bg-green-500 text-white hover:bg-green-600'}`}
+                                    className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-widest transition-all
+                                        ${isDarkMode ? 'bg-white/10 text-white hover:bg-white/20' : 'bg-gray-200 text-black hover:bg-gray-300'}`}
                                 >
                                     <Download size={12} />
-                                    {isDownloading ? 'Gerando...' : 'Salvar PNG'}
+                                    {isDownloading ? '...' : 'PNG'}
                                 </button>
                                 <button
                                     onClick={calculateLottery}
-                                    className={`flex items-center gap-2 px-4 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-widest transition-all
-                                        ${isDarkMode ? 'bg-white/10 text-white hover:bg-white/20' : 'bg-gray-200 text-black hover:bg-gray-300'}`}
+                                    className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-widest transition-all
+                                        ${isDarkMode ? 'bg-yellow-500/10 text-yellow-500 hover:bg-yellow-500/20' : 'bg-yellow-400 text-black hover:bg-yellow-500'}`}
                                 >
                                     <RefreshCw size={12} />
-                                    Reiniciar Sorteio
+                                    Reiniciar
                                 </button>
                             </div>
                         </div>

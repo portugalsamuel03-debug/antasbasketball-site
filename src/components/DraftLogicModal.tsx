@@ -11,7 +11,7 @@ interface DraftLogicModalProps {
 }
 
 // 500-Ball Weights per Seed
-const DRAFT_WEIGHTS = [125, 100, 75, 45, 35, 25, 20, 15, 8, 8, 8, 8, 8, 8, 2, 2, 2, 2, 2, 2];
+const DRAFT_WEIGHTS = [127, 100, 75, 45, 35, 25, 20, 15, 8, 8, 8, 8, 8, 8, 2, 2, 2, 2, 1, 1];
 
 const getPick1Probability = (index: number) => {
     const balls = DRAFT_WEIGHTS[index] || 0;
