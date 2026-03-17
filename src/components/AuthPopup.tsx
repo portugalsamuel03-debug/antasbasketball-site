@@ -7,10 +7,12 @@ export const ADMIN_EMAIL = "portugalsamuel03@gmail.com";
 interface AuthPopupProps {
   isOpen: boolean;
   onClose: () => void;
+  initialView?: "LOGIN" | "SIGNUP" | "FORGOT_PASSWORD" | "UPDATE_PASSWORD";
+  initialError?: string | null;
 }
 
-const AuthPopup: React.FC<AuthPopupProps> = ({ isOpen, onClose }) => {
-  const [view, setView] = useState<"LOGIN" | "SIGNUP">("LOGIN");
+const AuthPopup: React.FC<AuthPopupProps> = ({ isOpen, onClose, initialView = "LOGIN", initialError = null }) => {
+  const [view, setView] = useState<"LOGIN" | "SIGNUP" | "FORGOT_PASSWORD" | "UPDATE_PASSWORD">(initialView);
   const [selectedTeam, setSelectedTeam] = useState("");
   const [teams, setTeams] = useState<string[]>([]);
 
@@ -24,6 +26,12 @@ const AuthPopup: React.FC<AuthPopupProps> = ({ isOpen, onClose }) => {
     });
   }, []);
 
+  useEffect(() => {
+    if (isOpen && initialView !== view) {
+      setView(initialView);
+    }
+  }, [isOpen, initialView]);
+
   const [loginEmail, setLoginEmail] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
 
@@ -32,7 +40,15 @@ const AuthPopup: React.FC<AuthPopupProps> = ({ isOpen, onClose }) => {
   const [signupPassword, setSignupPassword] = useState("");
 
   const [loading, setLoading] = useState(false);
-  const [err, setErr] = useState<string | null>(null);
+  const [err, setErr] = useState<string | null>(initialError);
+  const [successMsg, setSuccessMsg] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (isOpen) {
+      setErr(initialError);
+      setSuccessMsg(null);
+    }
+  }, [isOpen, initialError]);
 
   if (!isOpen) return null;
 
@@ -41,6 +57,7 @@ const AuthPopup: React.FC<AuthPopupProps> = ({ isOpen, onClose }) => {
 
   async function handleLogin() {
     setErr(null);
+    setSuccessMsg(null);
     setLoading(true);
 
     try {
@@ -61,6 +78,7 @@ const AuthPopup: React.FC<AuthPopupProps> = ({ isOpen, onClose }) => {
 
   async function handleSignup() {
     setErr(null);
+    setSuccessMsg(null);
     setLoading(true);
 
     try {
@@ -93,6 +111,53 @@ const AuthPopup: React.FC<AuthPopupProps> = ({ isOpen, onClose }) => {
     }
   }
 
+  async function handleForgotPassword() {
+    setErr(null);
+    setSuccessMsg(null);
+    if (!loginEmail) {
+      setErr("Por favor, insira seu e-mail.");
+      return;
+    }
+    setLoading(true);
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(loginEmail.trim(), {
+        redirectTo: window.location.origin,
+      });
+      if (error) throw error;
+      setSuccessMsg("Link de recuperação enviado para o seu e-mail!");
+    } catch (e: any) {
+      if (e?.status === 429 || e?.message?.includes("429") || e?.message?.toLowerCase().includes("too many requests")) {
+        setErr("Muitas solicitações! Por favor, aguarde alguns minutos antes de tentar novamente.");
+      } else {
+        setErr(e?.message ?? "Erro ao solicitar recuperação");
+      }
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleUpdatePassword() {
+    setErr(null);
+    setSuccessMsg(null);
+    if (!signupPassword) {
+      setErr("Por favor, insira a nova senha.");
+      return;
+    }
+    setLoading(true);
+    try {
+      const { error } = await supabase.auth.updateUser({
+        password: signupPassword,
+      });
+      if (error) throw error;
+      setSuccessMsg("Senha atualizada com sucesso! Você já pode entrar.");
+      setTimeout(() => setView("LOGIN"), 2000);
+    } catch (e: any) {
+      setErr(e?.message ?? "Erro ao atualizar senha");
+    } finally {
+      setLoading(false);
+    }
+  }
+
   return (
     <div className="fixed inset-0 z-[150] flex items-center justify-center px-6">
       <div
@@ -120,8 +185,18 @@ const AuthPopup: React.FC<AuthPopupProps> = ({ isOpen, onClose }) => {
         <p className="text-[11px] font-bold text-gray-400 uppercase tracking-widest mb-6 text-center px-4 leading-tight">
           {view === "LOGIN"
             ? "Junte-se à maior comunidade de basquete."
-            : "Se identifique, meliante"}
+            : view === "SIGNUP"
+            ? "Se identifique, meliante"
+            : view === "FORGOT_PASSWORD"
+            ? "Não esquenta, acontece com os melhores."
+            : "Escolha uma senha difícil de adivinhar."}
         </p>
+
+        {!!successMsg && (
+          <div className="w-full mb-4 text-[12px] font-bold text-green-600 bg-green-50 border border-green-200 rounded-2xl px-4 py-3">
+            {successMsg}
+          </div>
+        )}
 
         {!!err && (
           <div className="w-full mb-4 text-[12px] font-bold text-red-600 bg-red-50 border border-red-200 rounded-2xl px-4 py-3">
@@ -162,8 +237,15 @@ const AuthPopup: React.FC<AuthPopupProps> = ({ isOpen, onClose }) => {
               >
                 CRIAR NOVA CONTA
               </button>
+
+              <button
+                onClick={() => setView("FORGOT_PASSWORD")}
+                className="w-full text-gray-400 py-2 font-black text-[10px] uppercase tracking-widest hover:text-[#0B1D33] transition-colors"
+              >
+                Esqueci minha senha
+              </button>
             </>
-          ) : (
+          ) : view === "SIGNUP" ? (
             <>
               <input
                 type="text"
@@ -225,6 +307,49 @@ const AuthPopup: React.FC<AuthPopupProps> = ({ isOpen, onClose }) => {
                 className="w-full text-gray-400 py-2 font-black text-[10px] uppercase tracking-widest hover:text-[#0B1D33] transition-colors"
               >
                 Já tenho conta, quero entrar
+              </button>
+            </>
+          ) : view === "FORGOT_PASSWORD" ? (
+            <>
+              <input
+                type="email"
+                placeholder="SEU E-MAIL CADASTRADO"
+                className={inputClasses}
+                value={loginEmail}
+                onChange={(e) => setLoginEmail(e.target.value)}
+              />
+
+              <button
+                onClick={handleForgotPassword}
+                disabled={loading}
+                className="w-full bg-[#0B1D33] text-white py-5 rounded-3xl font-black text-xs uppercase tracking-[0.2em] shadow-lg shadow-[#0B1D33]/20 active:scale-95 transition-all mt-2 disabled:opacity-60"
+              >
+                {loading ? "ENVIANDO..." : "RECUPERAR SENHA"}
+              </button>
+
+              <button
+                onClick={() => setView("LOGIN")}
+                className="w-full text-gray-400 py-2 font-black text-[10px] uppercase tracking-widest hover:text-[#0B1D33] transition-colors"
+              >
+                Voltar para o login
+              </button>
+            </>
+          ) : (
+            <>
+              <input
+                type="password"
+                placeholder="NOVA SENHA"
+                className={inputClasses}
+                value={signupPassword}
+                onChange={(e) => setSignupPassword(e.target.value)}
+              />
+
+              <button
+                onClick={handleUpdatePassword}
+                disabled={loading}
+                className="w-full bg-[#0B1D33] text-white py-5 rounded-3xl font-black text-xs uppercase tracking-[0.2em] shadow-lg shadow-[#0B1D33]/20 active:scale-95 transition-all mt-2 disabled:opacity-60"
+              >
+                {loading ? "ATUALIZANDO..." : "ATUALIZAR SENHA"}
               </button>
             </>
           )}

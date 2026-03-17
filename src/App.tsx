@@ -42,6 +42,8 @@ export default function App() {
   const [activeTab, setActiveTab] = useState<Category>(Category.INICIO);
 
   const [authOpen, setAuthOpen] = useState(false);
+  const [authView, setAuthView] = useState<"LOGIN" | "SIGNUP" | "FORGOT_PASSWORD" | "UPDATE_PASSWORD">("LOGIN");
+  const [authError, setAuthError] = useState<string | null>(null);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [sortOption, setSortOption] = useState<SortOption>("RECENTES");
   const [searchQuery, setSearchQuery] = useState("");
@@ -72,6 +74,37 @@ export default function App() {
     localStorage.setItem("antas_theme", isDarkMode ? "dark" : "light");
     document.body.style.background = isDarkMode ? "#000" : "#FDFBF4";
   }, [isDarkMode]);
+
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+      console.log("Auth Event in App:", event);
+      if (event === "PASSWORD_RECOVERY") {
+        setAuthView("UPDATE_PASSWORD");
+        setAuthOpen(true);
+      }
+    });
+
+    // Backup check: if we have a recovery hash but the event didn't trigger correctly
+    if (window.location.hash.includes("type=recovery") || window.location.href.includes("type=recovery")) {
+      setAuthView("UPDATE_PASSWORD");
+      setAuthOpen(true);
+    }
+
+    // Check for errors in URL (e.g. expired link)
+    const params = new URLSearchParams(window.location.hash.substring(1));
+    const errorCode = params.get("error_code");
+    const errorDesc = params.get("error_description");
+
+    if (errorCode === "otp_expired" || errorCode === "access_denied") {
+      setAuthError("O link de recuperação expirou ou já foi usado. Por favor, solicite um novo.");
+      setAuthView("FORGOT_PASSWORD");
+      setAuthOpen(true);
+      // Clean up the hash to avoid showing the error again on refresh
+      window.history.replaceState(null, "", window.location.pathname);
+    }
+
+    return () => subscription.unsubscribe();
+  }, []);
 
   // Loading Logic
   const loadArticles = async () => {
@@ -221,7 +254,7 @@ export default function App() {
           isDarkMode={isDarkMode}
         />
         <ShareModal isOpen={shareOpen} onClose={() => setShareOpen(false)} article={shareArticle} isDarkMode={isDarkMode} />
-        <AuthPopup isOpen={authOpen} onClose={() => setAuthOpen(false)} />
+        <AuthPopup isOpen={authOpen} onClose={() => { setAuthOpen(false); setAuthError(null); }} initialView={authView} initialError={authError} />
         <NotificationPopup isOpen={notificationsOpen} onClose={() => setNotificationsOpen(false)} isDarkMode={isDarkMode} />
         {sessionUserId && <ProfilePopup isOpen={profileOpen} onClose={() => setProfileOpen(false)} userId={sessionUserId} onOpenArticle={(id) => {
           const found = articles.find(a => a.id === id);
@@ -379,7 +412,7 @@ export default function App() {
         </main>
 
         <BottomNav activeTab={activeTab} onTabChange={setActiveTab} isDarkMode={isDarkMode} />
-        <AuthPopup isOpen={authOpen} onClose={() => setAuthOpen(false)} />
+        <AuthPopup isOpen={authOpen} onClose={() => { setAuthOpen(false); setAuthError(null); }} initialView={authView} initialError={authError} />
         {sessionUserId && <ProfilePopup isOpen={profileOpen} onClose={() => setProfileOpen(false)} userId={sessionUserId} onOpenArticle={(id) => {
           const found = articles.find(a => a.id === id);
           if (found) { setProfileOpen(false); setSelectedArticle(found); }

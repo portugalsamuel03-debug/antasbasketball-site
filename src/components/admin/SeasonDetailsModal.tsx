@@ -1,5 +1,23 @@
 import React, { useState, useEffect } from 'react';
-import { X, Save, Plus, Trash2, Edit2, Trophy, Award as AwardIcon, Star, User, Users, ChevronDown, ChevronUp } from 'lucide-react';
+import { X, Save, Plus, Trash2, Edit2, Trophy, Award as AwardIcon, Star, User, Users, ChevronDown, ChevronUp, GripVertical } from 'lucide-react';
+import {
+    DndContext,
+    closestCenter,
+    KeyboardSensor,
+    PointerSensor,
+    useSensor,
+    useSensors,
+    DragEndEvent
+} from '@dnd-kit/core';
+import {
+    arrayMove,
+    SortableContext,
+    sortableKeyboardCoordinates,
+    verticalListSortingStrategy,
+    useSortable
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
+import { restrictToVerticalAxis, restrictToWindowEdges } from '@dnd-kit/modifiers';
 import { supabase } from '../../lib/supabase';
 import { Season, Team, SeasonStanding, Champion, Award, TeamRow, RecordItem } from '../../types';
 import { listChampions, listAwards, listTeams, listRecords, listAwardCategories } from '../../cms';
@@ -36,6 +54,79 @@ const CollapsibleSection = ({ title, icon, children, isDarkMode, defaultOpen = f
             {isOpen && (
                 <div className="px-5 pb-5">
                     {children}
+                </div>
+            )}
+        </div>
+    );
+};
+
+// Sortable Item Wrapper
+const SortableStandingRow = ({ st, isDarkMode, canEdit, onEdit, onDelete, dynamicAchievements }: any) => {
+    const {
+        attributes,
+        listeners,
+        setNodeRef,
+        transform,
+        transition,
+        isDragging
+    } = useSortable({ id: st.id });
+
+    const style = {
+        transform: CSS.Transform.toString(transform),
+        transition,
+        zIndex: isDragging ? 200 : undefined,
+        opacity: isDragging ? 0.5 : 1,
+    };
+
+    const displayAchievements = dynamicAchievements || st.team_achievements;
+
+    return (
+        <div
+            ref={setNodeRef}
+            style={style}
+            className={`p-4 rounded-2xl ${isDarkMode ? 'bg-white/5' : 'bg-gray-50'} ${isDragging ? 'shadow-xl' : ''}`}
+        >
+            <div className="flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                    {canEdit && (
+                        <div {...attributes} {...listeners} className="cursor-grab active:cursor-grabbing p-1 text-gray-500 hover:text-white transition-colors">
+                            <GripVertical size={16} />
+                        </div>
+                    )}
+                    <span className={`font-black w-6 text-center text-lg ${st.position <= 4 ? 'text-yellow-400' : 'text-gray-500'}`}>{st.position}º</span>
+                    <div className="flex items-center gap-3">
+                        <img src={st.team?.logo_url || ''} className="w-8 h-8 object-contain" />
+                        <div>
+                            <div className={`font-bold leading-none ${isDarkMode ? 'text-white' : 'text-[#0B1D33]'}`}>{st.team?.name}</div>
+                            <div className="text-[10px] text-gray-500 font-bold uppercase mt-1">
+                                {st.wins}V - {st.losses}D - {st.ties}E {st.trades_count > 0 ? `• ${st.trades_count} Trades` : ''}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {canEdit && (
+                    <div className="flex items-center gap-2">
+                        <button onClick={() => onEdit(st)} className="p-2 text-blue-400 hover:bg-blue-400/10 rounded-full"><Edit2 size={14} /></button>
+                        <button onClick={() => onDelete(st)} className="p-2 text-red-400 hover:bg-red-400/10 rounded-full"><Trash2 size={14} /></button>
+                    </div>
+                )}
+            </div>
+
+            {/* RICH DATA DISPLAY */}
+            {(st.highlight_players || displayAchievements) && (
+                <div className="mt-3 pt-3 border-t border-dashed border-gray-500/20 text-xs ml-10 space-y-1">
+                    {st.highlight_players && (
+                        <div className="flex gap-2">
+                             <span className="text-gray-500 font-bold uppercase text-[9px]">Destaques:</span>
+                             <span className={isDarkMode ? 'text-gray-300' : 'text-gray-700'}>{st.highlight_players}</span>
+                        </div>
+                    )}
+                    {displayAchievements && (
+                        <div className="flex gap-2">
+                            <span className="text-yellow-500 font-bold uppercase text-[9px]">Feitos:</span>
+                            <span className={isDarkMode ? 'text-gray-300' : 'text-gray-700'}>{displayAchievements}</span>
+                        </div>
+                    )}
                 </div>
             )}
         </div>
@@ -372,6 +463,33 @@ export const SeasonDetailsModal: React.FC<SeasonDetailsModalProps> = ({ season, 
         }
     };
 
+    const sensors = useSensors(
+        useSensor(PointerSensor),
+        useSensor(KeyboardSensor, {
+            coordinateGetter: sortableKeyboardCoordinates,
+        })
+    );
+
+    const handleDragEnd = (event: DragEndEvent) => {
+        const { active, over } = event;
+
+        if (over && active.id !== over.id) {
+            setPendingStandings((items) => {
+                const oldIndex = items.findIndex((item) => item.id === active.id);
+                const newIndex = items.findIndex((item) => item.id === over.id);
+
+                const reordered = arrayMove(items, oldIndex, newIndex);
+                
+                // Recalculate positions based on new order
+                return reordered.map((item, idx) => ({
+                    ...item,
+                    position: idx + 1
+                }));
+            });
+            setHasUnsavedChanges(true);
+        }
+    };
+
     const inputClass = `w-full bg-transparent border-b p-3 text-sm font-bold focus:outline-none transition-colors ${isDarkMode
         ? 'border-white/10 text-white focus:border-yellow-400 placeholder:text-gray-700'
         : 'border-[#0B1D33]/10 text-[#0B1D33] focus:border-[#0B1D33] placeholder:text-gray-300'
@@ -697,54 +815,29 @@ export const SeasonDetailsModal: React.FC<SeasonDetailsModalProps> = ({ season, 
                                     )}
                                 </div>
                                 <div className="space-y-2">
-                                    {standingsByRank.map((st) => {
-                                        // Calculate team achievements dynamically
-                                        const dynamicAchievements = getDynamicAchievements(st.team_id);
-                                        const displayAchievements = dynamicAchievements || st.team_achievements;
-
-                                        return (
-                                            <div key={st.id} className={`p-4 rounded-2xl ${isDarkMode ? 'bg-white/5' : 'bg-gray-50'}`}>
-                                                <div className="flex items-center justify-between">
-                                                    <div className="flex items-center gap-4">
-                                                        <span className={`font-black w-6 text-center text-lg ${st.position <= 4 ? 'text-yellow-400' : 'text-gray-500'}`}>{st.position}º</span>
-                                                        <div className="flex items-center gap-3">
-                                                            <img src={st.team?.logo_url || ''} className="w-8 h-8 object-contain" />
-                                                            <div>
-                                                                 <div className={`font-bold leading-none ${isDarkMode ? 'text-white' : 'text-[#0B1D33]'}`}>{st.team?.name}</div>
-                                                                <div className="text-[10px] text-gray-500 font-bold uppercase mt-1">
-                                                                    {st.wins}V - {st.losses}D - {st.ties}E {st.trades_count > 0 ? `• ${st.trades_count} Trades` : ''}
-                                                                </div>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                    {canEdit && (
-                                                        <div className="flex items-center gap-2">
-                                                            <button onClick={() => setEditingStanding(st)} className="p-2 text-blue-400 hover:bg-blue-400/10 rounded-full"><Edit2 size={14} /></button>
-                                                            <button onClick={() => handleDeleteLocalStanding(st)} className="p-2 text-red-400 hover:bg-red-400/10 rounded-full"><Trash2 size={14} /></button>
-                                                        </div>
-                                                    )}
-                                                </div>
-
-                                                {/* RICH DATA DISPLAY */}
-                                                {(st.highlight_players || displayAchievements) && (
-                                                    <div className="mt-3 pt-3 border-t border-dashed border-gray-500/20 text-xs space-y-1">
-                                                        {st.highlight_players && (
-                                                            <div className="flex gap-2">
-                                                                <span className="text-gray-500 font-bold uppercase text-[9px]">Destaques:</span>
-                                                                <span className={isDarkMode ? 'text-gray-300' : 'text-gray-700'}>{st.highlight_players}</span>
-                                                            </div>
-                                                        )}
-                                                        {displayAchievements && (
-                                                            <div className="flex gap-2">
-                                                                <span className="text-yellow-500 font-bold uppercase text-[9px]">Feitos:</span>
-                                                                <span className={isDarkMode ? 'text-gray-300' : 'text-gray-700'}>{displayAchievements}</span>
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                )}
-                                            </div>
-                                        )
-                                    })}
+                                    <DndContext
+                                        sensors={sensors}
+                                        collisionDetection={closestCenter}
+                                        onDragEnd={handleDragEnd}
+                                        modifiers={[restrictToVerticalAxis, restrictToWindowEdges]}
+                                    >
+                                        <SortableContext
+                                            items={standingsByRank.map(s => s.id)}
+                                            strategy={verticalListSortingStrategy}
+                                        >
+                                            {standingsByRank.map((st) => (
+                                                <SortableStandingRow
+                                                    key={st.id}
+                                                    st={st}
+                                                    isDarkMode={isDarkMode}
+                                                    canEdit={canEdit}
+                                                    onEdit={setEditingStanding}
+                                                    onDelete={handleDeleteLocalStanding}
+                                                    dynamicAchievements={getDynamicAchievements(st.team_id)}
+                                                />
+                                            ))}
+                                        </SortableContext>
+                                    </DndContext>
                                 </div>
                             </div>
                         </div>
