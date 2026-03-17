@@ -333,15 +333,18 @@ export const SeasonDetailsModal: React.FC<SeasonDetailsModalProps> = ({ season, 
             }
 
             // 2. Perform batch upsert
-            // Map to payload and remove temp IDs
-            const upsertData = pendingStandings.map(s => {
-                const { team, created_at, ...rest } = s as any;
-                const payload = { ...rest };
-                if (!payload.id || (typeof payload.id === 'string' && payload.id.startsWith('temp-'))) {
-                    delete payload.id;
-                }
-                return payload;
-            });
+            // Map to explicit payload - IMPORTANT: Remove 'id' to rely solely on onConflict unique constraint
+            const upsertData = pendingStandings.map(s => ({
+                season_id: s.season_id,
+                team_id: s.team_id,
+                wins: Number(s.wins || 0),
+                losses: Number(s.losses || 0),
+                ties: Number(s.ties || 0),
+                trades_count: Number(s.trades_count || 0),
+                position: Number(s.position || 0),
+                highlight_players: s.highlight_players || '',
+                team_achievements: s.team_achievements || ''
+            }));
 
             console.log('Upserting Standings Data:', upsertData);
 
