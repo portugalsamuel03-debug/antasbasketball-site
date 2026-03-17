@@ -7,6 +7,7 @@ import { SEASON_OPTIONS } from '../../utils/seasons';
 import { useGlobalData } from '../../hooks/useGlobalData';
 import { calculateAutomaticRecords } from '../../utils/records';
 import { PlayoffsBracket } from '../PlayoffsBracket';
+import { SearchableSelect } from '../SearchableSelect';
 
 interface SeasonDetailsModalProps {
     season: Season | null;
@@ -334,19 +335,26 @@ export const SeasonDetailsModal: React.FC<SeasonDetailsModalProps> = ({ season, 
             // 2. Perform batch upsert
             // Map to payload and remove temp IDs
             const upsertData = pendingStandings.map(s => {
-                const { team, ...rest } = s as any;
+                const { team, created_at, ...rest } = s as any;
                 const payload = { ...rest };
-                if (payload.id && payload.id.startsWith('temp-')) {
+                if (!payload.id || (typeof payload.id === 'string' && payload.id.startsWith('temp-'))) {
                     delete payload.id;
                 }
                 return payload;
             });
 
+            console.log('Upserting Standings Data:', upsertData);
+
             if (upsertData.length > 0) {
-                const { error: upsertError } = await supabase
+                const { data, error: upsertError } = await supabase
                     .from('season_standings')
                     .upsert(upsertData, { onConflict: 'season_id,team_id' });
-                if (upsertError) throw upsertError;
+                
+                if (upsertError) {
+                    console.error('Supabase Upsert Error Detail:', upsertError);
+                    throw upsertError;
+                }
+                console.log('Upsert Success:', data);
             }
 
             setHasUnsavedChanges(false);
@@ -608,14 +616,13 @@ export const SeasonDetailsModal: React.FC<SeasonDetailsModalProps> = ({ season, 
                                         {editingStanding?.id ? 'Editar Registro' : 'Adicionar Registro'}
                                     </h3>
                                     <div className="space-y-4">
-                                        <select
-                                            className={inputClass}
+                                        <SearchableSelect
+                                            options={teams}
                                             value={editingStanding?.team_id || ''}
-                                            onChange={e => setEditingStanding(prev => ({ ...prev, team_id: e.target.value }))}
-                                        >
-                                            <option value="">Selecione um time...</option>
-                                            {teams.map(t => <option key={t.id} value={t.id} className="text-black">{t.name}</option>)}
-                                        </select>
+                                            onChange={val => setEditingStanding(prev => ({ ...prev, team_id: val }))}
+                                            placeholder="Selecione um time..."
+                                            isDarkMode={isDarkMode}
+                                        />
 
                                         <div className="grid grid-cols-5 gap-3">
                                             <div>
