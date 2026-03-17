@@ -178,10 +178,32 @@ export const DraftSimulationModal: React.FC<DraftSimulationModalProps> = ({
             }
 
             // Fallback to URL based sharing (text only)
+            // But first, try to copy image to clipboard so user can just PASTE it in Telegram/WA
+            try {
+                const canvas = await html2canvas(listRef.current, {
+                    backgroundColor: isDarkMode ? '#121212' : '#ffffff',
+                    scale: 2,
+                    useCORS: true
+                });
+                const blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, 'image/png'));
+                if (blob && navigator.clipboard && navigator.clipboard.write) {
+                    await navigator.clipboard.write([
+                        new ClipboardItem({ 'image/png': blob })
+                    ]);
+                    // If we successfully copied the image, we might want to tell the user?
+                    // For now, let's just proceed to open the link.
+                }
+            } catch (err) {
+                console.warn("Could not copy image to clipboard", err);
+            }
+
             const encodedText = encodeURIComponent(shareText);
+            const shareUrl = window.location.origin;
+            const encodedUrl = encodeURIComponent(shareUrl);
+
             const url = platform === 'whatsapp' 
-                ? `https://wa.me/?text=${encodedText}`
-                : `https://t.me/share/url?url=${window.location.origin}&text=${encodedText}`;
+                ? `https://wa.me/?text=${encodedText}%0A%0A${encodedUrl}`
+                : `https://t.me/share/url?url=${encodedUrl}&text=${encodedText}`;
             
             window.open(url, '_blank');
         } catch (err) {
