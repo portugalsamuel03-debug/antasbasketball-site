@@ -56,9 +56,13 @@ export const SeasonDetailsModal: React.FC<SeasonDetailsModalProps> = ({ season, 
     const [groupedAwards, setGroupedAwards] = useState<{ individual: any[], team: any[] }>({ individual: [], team: [] });
     const [yearRecords, setYearRecords] = useState<RecordItem[]>([]);
     const [awardCategories, setAwardCategories] = useState<Record<string, 'INDIVIDUAL' | 'TEAM'>>({});
+    const [isSaving, setIsSaving] = useState(false);
 
     // For adding/editing standing row
     const [editingStanding, setEditingStanding] = useState<Partial<SeasonStanding> | null>(null);
+    const [pendingStandings, setPendingStandings] = useState<SeasonStanding[]>([]);
+    const [deletedStandingIds, setDeletedStandingIds] = useState<string[]>([]);
+    const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
     // Records State
     const [manualRecords, setManualRecords] = useState<RecordItem[]>([]);
@@ -131,7 +135,7 @@ export const SeasonDetailsModal: React.FC<SeasonDetailsModalProps> = ({ season, 
         }
     }, [gTeams]);
 
-    // Sync Standings from Global Data
+    // Sync Standings and Initialize Pending Standings
     useEffect(() => {
         if (season?.id && gStandings.length > 0) {
             const s = gStandings
@@ -141,6 +145,9 @@ export const SeasonDetailsModal: React.FC<SeasonDetailsModalProps> = ({ season, 
                     team: gTeams.find((t: any) => t.id === st.team_id)
                 }));
             setStandings(s);
+            if (!hasUnsavedChanges) {
+                setPendingStandings(s);
+            }
         }
     }, [gStandings, gTeams, season?.id]);
 
@@ -267,14 +274,15 @@ export const SeasonDetailsModal: React.FC<SeasonDetailsModalProps> = ({ season, 
         }
     };
 
-    const handleUpsertStanding = async () => {
+    const handleUpsertLocalStanding = () => {
         if (!season?.id) return alert('Salve a temporada primeiro.');
         if (!editingStanding?.team_id) return alert('Selecione um time.');
 
-        // Generate string for DB (fallback/indexing)
+        const team = gTeams.find(t => t.id === editingStanding.team_id);
         const autoAchievements = getDynamicAchievements(editingStanding.team_id);
 
-        const payload = {
+        const newStanding: SeasonStanding = {
+            id: editingStanding.id || `temp-${Date.now()}`,
             season_id: season.id,
             team_id: editingStanding.team_id,
             wins: Number(editingStanding.wins || 0),
@@ -282,36 +290,83 @@ export const SeasonDetailsModal: React.FC<SeasonDetailsModalProps> = ({ season, 
             ties: Number(editingStanding.ties || 0),
             trades_count: Number(editingStanding.trades_count || 0),
             position: Number(editingStanding.position || 0),
-            highlight_players: editingStanding.highlight_players,
-            team_achievements: autoAchievements // Still saving to DB, but UI will prefer dynamic
-        };
+            highlight_players: editingStanding.highlight_players || '',
+            team_achievements: autoAchievements,
+            team: team
+        } as any;
 
-        const { error } = await supabase
-            .from('season_standings')
-            .upsert(payload, { onConflict: 'season_id,team_id' });
+        setPendingStandings(prev => {
+            const index = prev.findIndex(s => s.team_id === editingStanding.team_id);
+            if (index >= 0) {
+                const updated = [...prev];
+                updated[index] = newStanding;
+                return updated;
+            }
+            return [...prev, newStanding];
+        });
 
-        if (error) {
-            console.error(error);
-            alert('Erro ao salvar classificação.');
-        } else {
-            setEditingStanding(null);
-            setEditingStanding(null);
-            window.location.reload();
-        }
+        setEditingStanding(null);
+        setHasUnsavedChanges(true);
     };
 
-    const handleDeleteStanding = async (id: string) => {
+    const handleDeleteLocalStanding = (standing: SeasonStanding) => {
         if (!confirm('Remover time da tabela?')) return;
-        await supabase.from('season_standings').delete().eq('id', id);
-        if (season) window.location.reload();
-    }
+        
+        setPendingStandings(prev => prev.filter(s => s.id !== standing.id));
+        if (standing.id && !standing.id.startsWith('temp-')) {
+            setDeletedStandingIds(prev => [...prev, standing.id]);
+        }
+        setHasUnsavedChanges(true);
+    };
+
+    const handleSaveAllStandings = async () => {
+        setIsSaving(true);
+        try {
+            // 1. Perform batch delete
+            if (deletedStandingIds.length > 0) {
+                const { error: delError } = await supabase
+                    .from('season_standings')
+                    .delete()
+                    .in('id', deletedStandingIds);
+                if (delError) throw delError;
+            }
+
+            // 2. Perform batch upsert
+            // Map to payload and remove temp IDs
+            const upsertData = pendingStandings.map(s => {
+                const { team, ...rest } = s as any;
+                const payload = { ...rest };
+                if (payload.id && payload.id.startsWith('temp-')) {
+                    delete payload.id;
+                }
+                return payload;
+            });
+
+            if (upsertData.length > 0) {
+                const { error: upsertError } = await supabase
+                    .from('season_standings')
+                    .upsert(upsertData, { onConflict: 'season_id,team_id' });
+                if (upsertError) throw upsertError;
+            }
+
+            setHasUnsavedChanges(false);
+            setDeletedStandingIds([]);
+            alert('Tabelas salvas com sucesso!');
+            onSave(); // Refresh global data
+        } catch (error) {
+            console.error(error);
+            alert('Erro ao salvar tabelas.');
+        } finally {
+            setIsSaving(false);
+        }
+    };
 
     const inputClass = `w-full bg-transparent border-b p-3 text-sm font-bold focus:outline-none transition-colors ${isDarkMode
         ? 'border-white/10 text-white focus:border-yellow-400 placeholder:text-gray-700'
         : 'border-[#0B1D33]/10 text-[#0B1D33] focus:border-[#0B1D33] placeholder:text-gray-300'
         }`;
 
-    const standingsByRank = [...standings].sort((a, b) => (a.position - b.position));
+    const standingsByRank = [...pendingStandings].sort((a, b) => (a.position - b.position));
 
     return (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
@@ -595,7 +650,6 @@ export const SeasonDetailsModal: React.FC<SeasonDetailsModalProps> = ({ season, 
                                                 onChange={e => setEditingStanding(prev => ({ ...prev, highlight_players: e.target.value }))}
                                             />
                                         </div>
-
                                         {/* REMOVED MANUAL INPUT FOR TEAM ACHIEVEMENTS - NOW AUTO GENERATED */}
                                         <div className="p-3 rounded-xl bg-yellow-500/10 border border-yellow-500/20">
                                             <p className="text-[10px] text-yellow-500 font-bold">
@@ -604,8 +658,8 @@ export const SeasonDetailsModal: React.FC<SeasonDetailsModalProps> = ({ season, 
                                         </div>
 
                                         <div className="flex gap-2 pt-2">
-                                            <button onClick={handleUpsertStanding} className="flex-1 py-3 bg-yellow-400 text-black rounded-xl text-xs font-black uppercase tracking-widest hover:bg-yellow-300">
-                                                {editingStanding?.id ? 'Atualizar' : 'Adicionar'}
+                                            <button onClick={handleUpsertLocalStanding} className="flex-1 py-3 bg-yellow-400 text-black rounded-xl text-xs font-black uppercase tracking-widest hover:bg-yellow-300">
+                                                {editingStanding?.id && !editingStanding.id.toString().startsWith('temp-') ? 'Atualizar' : 'Adicionar'}
                                             </button>
                                             {editingStanding?.id && (
                                                 <button onClick={() => setEditingStanding(null)} className="px-4 py-3 bg-white/10 text-gray-400 rounded-xl font-bold hover:bg-white/20">
@@ -619,7 +673,19 @@ export const SeasonDetailsModal: React.FC<SeasonDetailsModalProps> = ({ season, 
 
                             {/* Tables View */}
                             <div>
-                                <h3 className="text-[10px] font-black uppercase tracking-widest text-gray-500 mb-3">Classificação</h3>
+                                <div className="flex justify-between items-center mb-3">
+                                    <h3 className="text-[10px] font-black uppercase tracking-widest text-gray-500">Classificação</h3>
+                                    {hasUnsavedChanges && (
+                                        <button
+                                            onClick={handleSaveAllStandings}
+                                            disabled={isSaving}
+                                            className="px-4 py-2 bg-green-500 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-green-400 transition-all flex items-center gap-2 disabled:opacity-50"
+                                        >
+                                            <Save size={14} />
+                                            {isSaving ? 'Salvando...' : 'Salvar Alterações'}
+                                        </button>
+                                    )}
+                                </div>
                                 <div className="space-y-2">
                                     {standingsByRank.map((st) => {
                                         // Calculate team achievements dynamically
@@ -644,7 +710,7 @@ export const SeasonDetailsModal: React.FC<SeasonDetailsModalProps> = ({ season, 
                                                     {canEdit && (
                                                         <div className="flex items-center gap-2">
                                                             <button onClick={() => setEditingStanding(st)} className="p-2 text-blue-400 hover:bg-blue-400/10 rounded-full"><Edit2 size={14} /></button>
-                                                            <button onClick={() => handleDeleteStanding(st.id)} className="p-2 text-red-400 hover:bg-red-400/10 rounded-full"><Trash2 size={14} /></button>
+                                                            <button onClick={() => handleDeleteLocalStanding(st)} className="p-2 text-red-400 hover:bg-red-400/10 rounded-full"><Trash2 size={14} /></button>
                                                         </div>
                                                     )}
                                                 </div>

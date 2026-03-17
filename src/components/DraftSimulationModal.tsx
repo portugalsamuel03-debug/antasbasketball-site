@@ -5,7 +5,6 @@ import html2canvas from 'html2canvas';
 
 interface DraftSimulationModalProps {
     teams: any[];
-    oddsMap: string[][];
     isDarkMode: boolean;
     onClose: () => void;
     seasons?: any[];
@@ -13,8 +12,10 @@ interface DraftSimulationModalProps {
     onSeasonChange?: (id: string) => void;
 }
 
+const DRAFT_WEIGHTS = [125, 100, 75, 45, 35, 25, 20, 15, 8, 8, 8, 8, 8, 8, 2, 2, 2, 2, 2, 2];
+
 export const DraftSimulationModal: React.FC<DraftSimulationModalProps> = ({
-    teams, oddsMap, isDarkMode, onClose, seasons = [], selectedSeasonId, onSeasonChange
+    teams, isDarkMode, onClose, seasons = [], selectedSeasonId, onSeasonChange
 }) => {
     const [lotteryOrder, setLotteryOrder] = useState<{ pick: number, team: any }[]>([]);
     const [picksRevealed, setPicksRevealed] = useState(0); // 0 means none revealed
@@ -27,65 +28,49 @@ export const DraftSimulationModal: React.FC<DraftSimulationModalProps> = ({
     const calculateLottery = () => {
         if (teams.length === 0) return;
 
-        // Clone the sorted teams list (already sorted worst -> best)
-        const availableTeams = [...teams];
+        // teams is sorted by Seed #1 to #20
+        const pool = teams.map((t, index) => ({
+            team: t,
+            initialSeed: index + 1,
+            balls: DRAFT_WEIGHTS[index] || 0
+        }));
+
         const calculated = [];
+        const drawnCount = teams.length;
 
-        // 1. Determine the Top 4 picks using weighted random selection
-        for (let pick = 1; pick <= 4; pick++) {
-            if (availableTeams.length > 0) {
-                let totalWeight = 0;
-                const weights = availableTeams.map(t => {
-                    const originalIndex = teams.findIndex(ot => ot.team.id === t.team.id);
+        for (let pick = 1; pick <= drawnCount; pick++) {
+            let totalBalls = pool.reduce((sum, item) => sum + item.balls, 0);
+            
+            if (totalBalls === 0) {
+                // Should not happen with 500 balls, but safety first
+                const remaining = pool[0];
+                calculated.push({ pick, team: remaining.team });
+                pool.splice(0, 1);
+                continue;
+            }
 
-                    // Use specific probability for the current pick (1-4)
-                    let weight = 0;
-                    if (pick === 1) {
-                        weight = t.probability != null ? t.probability : parseFloat(oddsMap[originalIndex]?.[0]?.replace('%', '') || '0');
-                    } else if (pick === 2) {
-                        weight = t.probabilityP2 != null ? t.probabilityP2 : parseFloat(oddsMap[originalIndex]?.[1]?.replace('%', '') || '0');
-                    } else if (pick === 3) {
-                        weight = t.probabilityP3 != null ? t.probabilityP3 : parseFloat(oddsMap[originalIndex]?.[2]?.replace('%', '') || '0');
-                    } else if (pick === 4) {
-                        weight = t.probabilityP4 != null ? t.probabilityP4 : parseFloat(oddsMap[originalIndex]?.[3]?.replace('%', '') || '0');
-                    }
+            let random = Math.random() * totalBalls;
+            let winnerIndex = -1;
 
-                    totalWeight += weight;
-                    return { team: t, weight, originalIndex };
-                });
-
-                let random = Math.random() * totalWeight;
-                let selected = null;
-
-                for (const w of weights) {
-                    random -= w.weight;
-                    if (random <= 0) {
-                        selected = w.team;
-                        break;
-                    }
-                }
-
-                // If random fails or all remaining weights are 0, just grab the worst available
-                if (!selected && availableTeams.length > 0) {
-                    selected = availableTeams[0];
-                }
-
-                if (selected) {
-                    calculated.push({ pick, team: selected });
-                    availableTeams.splice(availableTeams.findIndex(t => t.team.id === selected.team.id), 1);
+            for (let i = 0; i < pool.length; i++) {
+                random -= pool[i].balls;
+                if (random <= 0) {
+                    winnerIndex = i;
+                    break;
                 }
             }
-        }
 
-        // 2. The rest of the picks (5 through 20) go in strict reverse order of standings
-        // `availableTeams` is still sorted from worst to best, so we just pop off the front.
-        let nextPick = 5;
-        while (availableTeams.length > 0) {
-            const selected = availableTeams.shift();
-            if (selected) {
-                calculated.push({ pick: nextPick, team: selected });
-                nextPick++;
-            }
+            if (winnerIndex === -1) winnerIndex = 0;
+
+            const winner = pool[winnerIndex];
+            calculated.push({ 
+                pick, 
+                team: { 
+                    ...winner.team, 
+                    initialSeed: winner.initialSeed 
+                } 
+            });
+            pool.splice(winnerIndex, 1);
         }
 
         setLotteryOrder(calculated);
@@ -390,6 +375,6 @@ export const DraftSimulationModal: React.FC<DraftSimulationModalProps> = ({
                     </div>
                 </div>
             )}
-        </div >
+        </div>
     );
 };

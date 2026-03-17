@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, ChevronDown, Play, Save, RefreshCw, Settings2 } from 'lucide-react';
+import { X, ChevronDown, Play, Save, RefreshCw, Settings2, GripVertical as ReorderIcon } from 'lucide-react';
 import { useGlobalData } from '../hooks/useGlobalData';
 import { useAdmin } from '../context/AdminContext';
 import { DraftSimulationModal } from './DraftSimulationModal';
@@ -10,29 +10,13 @@ interface DraftLogicModalProps {
     isDarkMode: boolean;
 }
 
-// 20x4 Matrix of NBA Lottery Odds (Loteria Protegida)
-const LOTTERY_ODDS = [
-    ["14.0%", "13.4%", "12.7%", "12.0%"], // #1
-    ["14.0%", "13.4%", "12.7%", "12.0%"], // #2
-    ["14.0%", "13.4%", "12.7%", "12.0%"], // #3
-    ["10.0%", "9.9%", "9.7%", "9.5%"],   // #4
-    ["8.0%", "8.1%", "8.2%", "8.2%"],    // #5
-    ["7.0%", "7.2%", "7.4%", "7.5%"],    // #6
-    ["6.0%", "6.3%", "6.6%", "6.9%"],    // #7
-    ["5.0%", "5.3%", "5.7%", "6.1%"],    // #8
-    ["4.0%", "4.3%", "4.7%", "5.1%"],    // #9
-    ["1.5%", "1.7%", "1.9%", "2.1%"],    // #10
-    ["1.5%", "1.7%", "1.9%", "2.1%"],    // #11
-    ["1.5%", "1.7%", "1.9%", "2.1%"],    // #12
-    ["1.5%", "1.7%", "1.9%", "2.1%"],    // #13
-    ["1.5%", "1.7%", "1.9%", "2.1%"],    // #14
-    ["1.5%", "1.7%", "1.9%", "2.1%"],    // #15
-    ["0.2%", "0.3%", "0.4%", "0.5%"],    // #16
-    ["0.1%", "0.3%", "0.4%", "0.5%"],    // #17
-    ["0.0%", "0.3%", "0.4%", "0.5%"],    // #18
-    ["0.0%", "0.3%", "0.4%", "0.5%"],    // #19
-    ["0.0%", "0.3%", "0.4%", "0.5%"]     // #20
-];
+// 500-Ball Weights per Seed
+const DRAFT_WEIGHTS = [125, 100, 75, 45, 35, 25, 20, 15, 8, 8, 8, 8, 8, 8, 2, 2, 2, 2, 2, 2];
+
+const getPick1Probability = (index: number) => {
+    const balls = DRAFT_WEIGHTS[index] || 0;
+    return ((balls / 500) * 100).toFixed(1) + '%';
+};
 
 export const DraftLogicModal: React.FC<DraftLogicModalProps> = ({ onClose, isDarkMode }) => {
     const { seasons, standings, teams } = useGlobalData();
@@ -44,11 +28,7 @@ export const DraftLogicModal: React.FC<DraftLogicModalProps> = ({ onClose, isDar
     // UI State
     const [showSimulation, setShowSimulation] = useState(false);
     const [editMode, setEditMode] = useState(false);
-    const [localPositions, setLocalPositions] = useState<Record<string, number>>({});
-    const [localOdds, setLocalOdds] = useState<Record<string, number>>({});
-    const [localOddsP2, setLocalOddsP2] = useState<Record<string, number>>({});
-    const [localOddsP3, setLocalOddsP3] = useState<Record<string, number>>({});
-    const [localOddsP4, setLocalOddsP4] = useState<Record<string, number>>({});
+    const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
     const [isSaving, setIsSaving] = useState(false);
 
     useEffect(() => {
@@ -102,57 +82,32 @@ export const DraftLogicModal: React.FC<DraftLogicModalProps> = ({ onClose, isDar
             // Usually, largest position number is the worst (e.g., 14th place).
             const sorted = activeTeams.sort((a, b) => (b.position || 0) - (a.position || 0));
             setSortedTeams(sorted);
-
-            // Initialize local state for edit mode
-            const localsPos: Record<string, number> = {};
-            const localsOdds: Record<string, number> = {};
-            const localsOddsP2: Record<string, number> = {};
-            const localsOddsP3: Record<string, number> = {};
-            const localsOddsP4: Record<string, number> = {};
-            sorted.forEach((t, i) => {
-                localsPos[t.team.id] = t.position || 0;
-
-                // Probability P1
-                if (t.probability != null) {
-                    localsOdds[t.team.id] = t.probability;
-                } else {
-                    const defaultOddStr = LOTTERY_ODDS[i]?.[0];
-                    localsOdds[t.team.id] = defaultOddStr ? parseFloat(defaultOddStr.replace('%', '')) : 0;
-                }
-
-                // Probability P2
-                if (t.probabilityP2 != null) {
-                    localsOddsP2[t.team.id] = t.probabilityP2;
-                } else {
-                    const defaultOddStr = LOTTERY_ODDS[i]?.[1];
-                    localsOddsP2[t.team.id] = defaultOddStr ? parseFloat(defaultOddStr.replace('%', '')) : 0;
-                }
-
-                // Probability P3
-                if (t.probabilityP3 != null) {
-                    localsOddsP3[t.team.id] = t.probabilityP3;
-                } else {
-                    const defaultOddStr = LOTTERY_ODDS[i]?.[2];
-                    localsOddsP3[t.team.id] = defaultOddStr ? parseFloat(defaultOddStr.replace('%', '')) : 0;
-                }
-
-                // Probability P4
-                if (t.probabilityP4 != null) {
-                    localsOddsP4[t.team.id] = t.probabilityP4;
-                } else {
-                    const defaultOddStr = LOTTERY_ODDS[i]?.[3];
-                    localsOddsP4[t.team.id] = defaultOddStr ? parseFloat(defaultOddStr.replace('%', '')) : 0;
-                }
-            });
-            setLocalPositions(localsPos);
-            setLocalOdds(localsOdds);
-            setLocalOddsP2(localsOddsP2);
-            setLocalOddsP3(localsOddsP3);
-            setLocalOddsP4(localsOddsP4);
         } else {
             setSortedTeams([]);
         }
     }, [selectedSeasonId, standings, teams, overrides]);
+
+    // Drag and Drop Handlers
+    const handleDragStart = (index: number) => {
+        if (!editMode) return;
+        setDraggedIndex(index);
+    };
+
+    const handleDragOver = (e: React.DragEvent, index: number) => {
+        if (!editMode || draggedIndex === null) return;
+        e.preventDefault();
+        if (index === draggedIndex) return;
+
+        const newTeams = [...sortedTeams];
+        const item = newTeams.splice(draggedIndex, 1)[0];
+        newTeams.splice(index, 0, item);
+        setSortedTeams(newTeams);
+        setDraggedIndex(index);
+    };
+
+    const handleDragEnd = () => {
+        setDraggedIndex(null);
+    };
 
     const handleSaveOverrides = async () => {
         if (!selectedSeasonId) {
@@ -162,19 +117,24 @@ export const DraftLogicModal: React.FC<DraftLogicModalProps> = ({ onClose, isDar
 
         setIsSaving(true);
         try {
-            const upsertData = Object.keys(localPositions)
-                .filter(teamId => teamId && teamId !== 'undefined')
-                .map(teamId => {
-                    return {
-                        season_id: selectedSeasonId,
-                        team_id: teamId,
-                        custom_position: Math.floor(Number(localPositions[teamId])) || 0,
-                        lottery_probability: parseFloat(Number(localOdds[teamId]).toString()) || 0,
-                        lottery_probability_p2: parseFloat(Number(localOddsP2[teamId]).toString()) || 0,
-                        lottery_probability_p3: parseFloat(Number(localOddsP3[teamId]).toString()) || 0,
-                        lottery_probability_p4: parseFloat(Number(localOddsP4[teamId]).toString()) || 0
-                    };
-                });
+            // Recalculate positions based on the current list order (Draggable)
+            // Worst record (Position 20 if 20 teams) should be at INDEX 0 (Seed #1)
+            const totalTeams = sortedTeams.length;
+            const upsertData = sortedTeams.map((t, index) => {
+                const teamId = t.team.id;
+                const existing = overrides.find(o => o.team_id === teamId);
+                
+                // If the user wants Seed #1 at index 0, and we have 20 teams,
+                // the custom_position should be 20 for index 0, 19 for index 1...
+                const calculatedPos = totalTeams - index;
+
+                return {
+                    ...(existing?.id ? { id: existing.id } : {}),
+                    season_id: selectedSeasonId,
+                    team_id: teamId,
+                    custom_position: calculatedPos
+                };
+            });
 
             if (upsertData.length === 0) {
                 setEditMode(false);
@@ -185,19 +145,16 @@ export const DraftLogicModal: React.FC<DraftLogicModalProps> = ({ onClose, isDar
             const { error } = await supabase
                 .from('draft_overrides')
                 .upsert(upsertData, { 
-                    onConflict: 'season_id,team_id',
-                    ignoreDuplicates: false
+                    onConflict: 'season_id,team_id'
                 });
 
-            if (error) {
-                console.error("Supabase upsert error:", error);
-                throw error;
-            }
+            if (error) throw error;
 
             await fetchOverrides(selectedSeasonId);
             setEditMode(false);
+            alert('Ordem do Draft salva com sucesso!');
         } catch (err: any) {
-            console.error("Catch block error:", err);
+            console.error("Save error:", err);
             alert(`Erro ao salvar: ${err.message || 'Erro desconhecido'}`);
         } finally {
             setIsSaving(false);
@@ -226,9 +183,9 @@ export const DraftLogicModal: React.FC<DraftLogicModalProps> = ({ onClose, isDar
     const getCellColor = (valStr: string) => {
         const val = parseFloat(valStr.replace('%', ''));
         if (val === 0) return 'transparent';
-        if (val >= 50) return isDarkMode ? 'bg-blue-600/60' : 'bg-blue-600/30';
-        if (val >= 20) return isDarkMode ? 'bg-blue-500/40' : 'bg-blue-500/20';
-        if (val >= 10) return isDarkMode ? 'bg-blue-400/20' : 'bg-blue-400/10';
+        if (val >= 20) return isDarkMode ? 'bg-blue-600/60' : 'bg-blue-600/30';
+        if (val >= 10) return isDarkMode ? 'bg-blue-500/40' : 'bg-blue-500/20';
+        if (val >= 5) return isDarkMode ? 'bg-blue-400/20' : 'bg-blue-400/10';
         return isDarkMode ? 'bg-white/5' : 'bg-black/5';
     };
 
@@ -332,44 +289,26 @@ export const DraftLogicModal: React.FC<DraftLogicModalProps> = ({ onClose, isDar
                                 <tr>
                                     <th className={`p-2 font-black text-[10px] uppercase tracking-wider text-left ${isDarkMode ? 'text-gray-500' : 'text-gray-400'}`}>Seed</th>
                                     <th className={`p-2 font-black text-[10px] uppercase tracking-wider text-left pl-4 ${isDarkMode ? 'text-gray-500' : 'text-gray-400'}`}>Time (Pior Recorde 1º)</th>
+                                    <th className={`p-2 font-black text-[10px] uppercase tracking-wider ${isDarkMode ? 'text-gray-300' : 'text-[#0B1D33]'}`}>Bolinhas</th>
                                     <th className={`p-2 font-black text-[10px] uppercase tracking-wider ${isDarkMode ? 'text-gray-300' : 'text-[#0B1D33]'}`}>Pick 1 (%)</th>
-                                    <th className={`p-2 font-black text-[10px] uppercase tracking-wider ${isDarkMode ? 'text-gray-300' : 'text-[#0B1D33]'}`}>Pick 2 (%)</th>
-                                    <th className={`p-2 font-black text-[10px] uppercase tracking-wider ${isDarkMode ? 'text-gray-300' : 'text-[#0B1D33]'}`}>Pick 3 (%)</th>
-                                    <th className={`p-2 font-black text-[10px] uppercase tracking-wider ${isDarkMode ? 'text-gray-300' : 'text-[#0B1D33]'}`}>Pick 4 (%)</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {sortedTeams.map((teamObj, rowIndex) => {
-                                    // Get display probabilities
-                                    const getProb = (type: 'p1'|'p2'|'p3'|'p4') => {
-                                        if (type === 'p1') {
-                                            if (teamObj.probability != null) return teamObj.probability;
-                                            const defaultOddStr = LOTTERY_ODDS[rowIndex]?.[0];
-                                            return defaultOddStr ? parseFloat(defaultOddStr.replace('%', '')) : 0;
-                                        }
-                                        if (type === 'p2') {
-                                            if (teamObj.probabilityP2 != null) return teamObj.probabilityP2;
-                                            const defaultOddStr = LOTTERY_ODDS[rowIndex]?.[1];
-                                            return defaultOddStr ? parseFloat(defaultOddStr.replace('%', '')) : 0;
-                                        }
-                                        if (type === 'p3') {
-                                            if (teamObj.probabilityP3 != null) return teamObj.probabilityP3;
-                                            const defaultOddStr = LOTTERY_ODDS[rowIndex]?.[2];
-                                            return defaultOddStr ? parseFloat(defaultOddStr.replace('%', '')) : 0;
-                                        }
-                                        if (teamObj.probabilityP4 != null) return teamObj.probabilityP4;
-                                        const defaultOddStr = LOTTERY_ODDS[rowIndex]?.[3];
-                                        return defaultOddStr ? parseFloat(defaultOddStr.replace('%', '')) : 0;
-                                    };
-
-                                    const p1 = getProb('p1');
-                                    const p2 = getProb('p2');
-                                    const p3 = getProb('p3');
-                                    const p4 = getProb('p4');
+                                    const balls = DRAFT_WEIGHTS[rowIndex] || 0;
+                                    const pick1Prob = getPick1Probability(rowIndex);
 
                                     return (
-                                        <tr key={rowIndex} className={`border-b border-t transition-colors ${isDarkMode ? 'border-white/5 hover:bg-white/5' : 'border-gray-100 hover:bg-gray-50'}`}>
-                                            <td className={`p-2 text-xs font-bold ${isDarkMode ? 'text-yellow-500' : 'text-blue-600'} text-left`}>
+                                        <tr 
+                                            key={teamObj.team.id} 
+                                            draggable={editMode}
+                                            onDragStart={() => handleDragStart(rowIndex)}
+                                            onDragOver={(e) => handleDragOver(e, rowIndex)}
+                                            onDragEnd={handleDragEnd}
+                                            className={`border-b border-t transition-all ${editMode ? 'cursor-move' : ''} ${draggedIndex === rowIndex ? 'opacity-50 scale-[0.98] bg-blue-500/10' : ''} ${isDarkMode ? 'border-white/5 hover:bg-white/5' : 'border-gray-100 hover:bg-gray-50'}`}
+                                        >
+                                            <td className={`p-2 text-xs font-bold ${isDarkMode ? 'text-yellow-500' : 'text-blue-600'} text-left flex items-center gap-2`}>
+                                                {editMode && <ReorderIcon size={12} className="opacity-50" />}
                                                 #{rowIndex + 1}
                                             </td>
                                             <td className="p-2 text-left pl-4">
@@ -387,20 +326,9 @@ export const DraftLogicModal: React.FC<DraftLogicModalProps> = ({ onClose, isDar
                                                         </div>
                                                         <div className={`text-[9px] font-bold flex items-center gap-1 ${isDarkMode ? 'text-gray-500' : 'text-gray-400'}`}>
                                                             {editMode ? (
-                                                                <>
-                                                                    Pos:
-                                                                    <input
-                                                                        type="number"
-                                                                        value={localPositions[teamObj.team.id] || 0}
-                                                                        onChange={(e) => setLocalPositions({
-                                                                            ...localPositions,
-                                                                            [teamObj.team.id]: parseInt(e.target.value) || 0
-                                                                        })}
-                                                                        className={`w-12 px-1 py-0.5 rounded text-center border ${isDarkMode ? 'bg-black border-[#333] text-white' : 'bg-white border-gray-300 text-black'}`}
-                                                                    />
-                                                                </>
+                                                                <span className="text-blue-500 font-black">Arraste para reordenar</span>
                                                             ) : (
-                                                                <>Pos: {teamObj.position} {teamObj.originalPosition !== teamObj.position && '(Editada)'}</>
+                                                                <>Pos: {teamObj.position} {teamObj.originalPosition !== teamObj.position && '(Ajustada)'}</>
                                                             )}
                                                             <span className="ml-1 opacity-50">({teamObj.record})</span>
                                                         </div>
@@ -408,56 +336,14 @@ export const DraftLogicModal: React.FC<DraftLogicModalProps> = ({ onClose, isDar
                                                 </div>
                                             </td>
                                             
-                                            {/* P1 */}
-                                            <td className={`p-2 text-xs font-bold ${p1 > 0 ? getCellColor(p1.toString() + '%') : ''} ${isDarkMode ? 'text-gray-300 border-x border-[#1a1a1a]' : 'text-gray-700 border-x border-white'}`}>
-                                                {editMode ? (
-                                                    <input
-                                                        type="number" step="0.1" value={localOdds[teamObj.team.id] ?? 0}
-                                                        onChange={(e) => setLocalOdds({...localOdds, [teamObj.team.id]: parseFloat(e.target.value) || 0})}
-                                                        className={`w-14 text-center border rounded ${isDarkMode ? 'bg-black border-[#333]' : 'bg-white border-gray-300'}`}
-                                                    />
-                                                ) : (
-                                                    <>{p1 > 0 ? `${p1.toFixed(1)}%` : '-'}</>
-                                                )}
+                                            {/* Bolinhas */}
+                                            <td className={`p-2 text-xs font-black ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                                                {balls} bolinhas
                                             </td>
 
-                                            {/* P2 */}
-                                            <td className={`p-2 text-xs font-bold ${p2 > 0 ? getCellColor(p2.toString() + '%') : ''} ${isDarkMode ? 'text-gray-300 border-x border-[#1a1a1a]' : 'text-gray-700 border-x border-white'}`}>
-                                                {editMode ? (
-                                                    <input
-                                                        type="number" step="0.1" value={localOddsP2[teamObj.team.id] ?? 0}
-                                                        onChange={(e) => setLocalOddsP2({...localOddsP2, [teamObj.team.id]: parseFloat(e.target.value) || 0})}
-                                                        className={`w-14 text-center border rounded ${isDarkMode ? 'bg-black border-[#333]' : 'bg-white border-gray-300'}`}
-                                                    />
-                                                ) : (
-                                                    <>{p2 > 0 ? `${p2.toFixed(1)}%` : '-'}</>
-                                                )}
-                                            </td>
-
-                                            {/* P3 */}
-                                            <td className={`p-2 text-xs font-bold ${p3 > 0 ? getCellColor(p3.toString() + '%') : ''} ${isDarkMode ? 'text-gray-300 border-x border-[#1a1a1a]' : 'text-gray-700 border-x border-white'}`}>
-                                                {editMode ? (
-                                                    <input
-                                                        type="number" step="0.1" value={localOddsP3[teamObj.team.id] ?? 0}
-                                                        onChange={(e) => setLocalOddsP3({...localOddsP3, [teamObj.team.id]: parseFloat(e.target.value) || 0})}
-                                                        className={`w-14 text-center border rounded ${isDarkMode ? 'bg-black border-[#333]' : 'bg-white border-gray-300'}`}
-                                                    />
-                                                ) : (
-                                                    <>{p3 > 0 ? `${p3.toFixed(1)}%` : '-'}</>
-                                                )}
-                                            </td>
-
-                                            {/* P4 */}
-                                            <td className={`p-2 text-xs font-bold ${p4 > 0 ? getCellColor(p4.toString() + '%') : ''} ${isDarkMode ? 'text-gray-300 border-x border-[#1a1a1a]' : 'text-gray-700 border-x border-white'}`}>
-                                                {editMode ? (
-                                                    <input
-                                                        type="number" step="0.1" value={localOddsP4[teamObj.team.id] ?? 0}
-                                                        onChange={(e) => setLocalOddsP4({...localOddsP4, [teamObj.team.id]: parseFloat(e.target.value) || 0})}
-                                                        className={`w-14 text-center border rounded ${isDarkMode ? 'bg-black border-[#333]' : 'bg-white border-gray-300'}`}
-                                                    />
-                                                ) : (
-                                                    <>{p4 > 0 ? `${p4.toFixed(1)}%` : '-'}</>
-                                                )}
+                                            {/* Pick 1 % */}
+                                            <td className={`p-2 text-xs font-bold ${getCellColor(pick1Prob)} ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                                                {pick1Prob}
                                             </td>
                                         </tr>
                                     );
@@ -471,7 +357,6 @@ export const DraftLogicModal: React.FC<DraftLogicModalProps> = ({ onClose, isDar
             {showSimulation && (
                 <DraftSimulationModal
                     teams={sortedTeams}
-                    oddsMap={LOTTERY_ODDS}
                     seasons={seasons}
                     selectedSeasonId={selectedSeasonId}
                     onSeasonChange={(id) => setSelectedSeasonId(id)}
